@@ -39,7 +39,7 @@ Settings are saved as soon as you change them, so **Finish** only needs to mark 
 
 > **Warning:** switching the monitored save folder to a different folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
 
-In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and how many characters and recorded grail finds will be deleted. **Back up first** is the highlighted action and receives focus when the dialog opens; once a backup has been made it becomes a secondary button; the destructive button says what it does (**Delete progress and switch folder**, or **Delete progress and use default folder**). Picking a different folder in the setup wizard shows the same confirmation.
+In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. While monitoring is on, the status badge reads **Active (N files)**, counting the save files listed under **Detected Characters**. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and how many characters and recorded grail finds will be deleted. **Back up first** is the highlighted action and receives focus when the dialog opens; once a backup has been made it becomes a secondary button; the destructive button says what it does (**Delete progress and switch folder**, or **Delete progress and use default folder**). Picking a different folder in the setup wizard shows the same confirmation.
 
 [Run Tracker](RUN_TRACKER.md) sessions and runs are kept when you switch folders, but they are no longer linked to a character. Items in those runs that were found through the deleted progress are removed with it. If the app can't delete the old data or save the new folder, it keeps the old folder and all data.
 
@@ -82,7 +82,6 @@ Things to know:
 
 - **D2R only writes save files when you leave a game**, so new finds show up after you exit to the menu, not when you pick them up.
 - **You don't need mule characters.** Once an item is recorded you can sell, drop or use it.
-- In **Settings → Save File Monitoring**, the **Active (N files)** badge counts the save files listed under **Detected Characters**.
 - Shared stash finds are attributed to the shared stash, not a character. Shared stashes in the newer v105+ `.d2i` format are listed as **Modern Shared Stash Softcore** or **Modern Shared Stash Hardcore**, the older format as **Shared Stash Softcore** or **Shared Stash Hardcore**.
 
 ### Manual entry

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2RInstallationSettings } from './D2RInstallationSettings';
 
@@ -16,6 +16,16 @@ interface ArrangeOptions {
   setD2RPath?: ReturnType<typeof vi.fn>;
   getSettings?: ReturnType<typeof vi.fn>;
   getSuggestedD2RPath?: ReturnType<typeof vi.fn>;
+}
+
+function createDeferred() {
+  let resolve: () => void = () => undefined;
+  let reject: (reason: Error) => void = () => undefined;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 function arrangeElectronAPI({
@@ -51,7 +61,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     window.electronAPI = originalElectronAPI;
   });
 
-  it('Then the icon-only browse button has a translated aria-label', async () => {
+  it('Then the icon-only browse button is exposed with its translated name', async () => {
     // Arrange
     arrangeElectronAPI({ savedPath: '/games/d2r' });
 
@@ -60,10 +70,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
     // Assert
     expect(await screen.findByDisplayValue('/games/d2r')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Browse for directory' })).toHaveAttribute(
-      'aria-label',
-      'Browse for directory',
-    );
+    expect(screen.getByRole('button', { name: 'Browse for directory' })).toBeInTheDocument();
   });
 
   it('If a path is saved, Then the field shows it, no notice is shown and nothing is auto-detected', async () => {
@@ -147,7 +154,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     expect(screen.getByLabelText('Installation Path')).toHaveValue(MAC_DEFAULT_PATH);
   });
 
-  it('If the user is typing, Then nothing is saved until the field loses focus', async () => {
+  it('If the user is typing, Then nothing is saved and the notice does not flash', async () => {
     // Arrange
     const api = arrangeElectronAPI({ savedPath: '/games/d2r' });
     render(<D2RInstallationSettings />);
@@ -160,6 +167,14 @@ describe('When D2RInstallationSettings is rendered', () => {
     // Assert
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
     expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('If the user typed a path, When the field loses focus, Then it is saved once', async () => {
+    // Arrange
+    const api = arrangeElectronAPI({ savedPath: '/games/d2r' });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByDisplayValue('/games/d2r');
+    fireEvent.change(input, { target: { value: '/games/other' } });
 
     // Act
     fireEvent.blur(input);
@@ -252,6 +267,115 @@ describe('When D2RInstallationSettings is rendered', () => {
     expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
   });
 
+  it('If saving a typed path fails and nothing is saved, Then the field is emptied and the notice remains', async () => {
+    // Arrange
+    arrangeElectronAPI({ setD2RPath: vi.fn().mockRejectedValue(new Error('disk full')) });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByLabelText('Installation Path');
+    await screen.findByText(NOT_SAVED_NOTICE);
+    fireEvent.change(input, { target: { value: '/games/other' } });
+
+    // Act
+    fireEvent.blur(input);
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
+    expect(input).toHaveValue('');
+    expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
+  });
+
+  it('If clearing the saved path fails, Then the saved path comes back and no notice appears', async () => {
+    // Arrange
+    arrangeElectronAPI({
+      savedPath: '/games/d2r',
+      setD2RPath: vi.fn().mockRejectedValue(new Error('disk full')),
+    });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByDisplayValue('/games/d2r');
+    fireEvent.change(input, { target: { value: '' } });
+
+    // Act
+    fireEvent.blur(input);
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
+    expect(input).toHaveValue('/games/d2r');
+    expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('If an earlier save fails after the user typed something else, Then the typed text is kept', async () => {
+    // Arrange
+    const firstSave = createDeferred();
+    arrangeElectronAPI({
+      savedPath: '/games/d2r',
+      setD2RPath: vi.fn().mockReturnValueOnce(firstSave.promise),
+    });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByDisplayValue('/games/d2r');
+    fireEvent.change(input, { target: { value: '/games/first' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: '/games/typing' } });
+
+    // Act
+    await act(async () => {
+      firstSave.reject(new Error('disk full'));
+    });
+
+    // Assert
+    expect(input).toHaveValue('/games/typing');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('If an earlier save finishes while a newer one is in flight, Then the newer path is not saved twice', async () => {
+    // Arrange
+    const firstSave = createDeferred();
+    const secondSave = createDeferred();
+    const api = arrangeElectronAPI({
+      savedPath: '/games/d2r',
+      setD2RPath: vi
+        .fn()
+        .mockReturnValueOnce(firstSave.promise)
+        .mockReturnValueOnce(secondSave.promise),
+    });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByDisplayValue('/games/d2r');
+    fireEvent.change(input, { target: { value: '/games/first' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: '/games/second' } });
+    fireEvent.blur(input);
+    await act(async () => {
+      firstSave.resolve();
+    });
+
+    // Act
+    fireEvent.blur(input);
+
+    // Assert
+    expect(api.icon.setD2RPath).toHaveBeenCalledTimes(2);
+  });
+
+  it('If a failed save left an error, When the saved path is entered again, Then the error goes away', async () => {
+    // Arrange
+    arrangeElectronAPI({
+      savedPath: '/games/d2r',
+      setD2RPath: vi.fn().mockRejectedValue(new Error('disk full')),
+    });
+    render(<D2RInstallationSettings />);
+    const input = await screen.findByDisplayValue('/games/d2r');
+    fireEvent.change(input, { target: { value: '/games/other' } });
+    fireEvent.blur(input);
+    await screen.findByRole('alert');
+    fireEvent.change(input, { target: { value: '/games/typing' } });
+    fireEvent.change(input, { target: { value: '/games/d2r' } });
+
+    // Act
+    fireEvent.blur(input);
+
+    // Assert
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(input).not.toHaveAttribute('aria-invalid');
+  });
+
   it('If loading the saved path fails, Then no "not saved" claim is made', async () => {
     // Arrange
     const api = arrangeElectronAPI({
@@ -263,8 +387,13 @@ describe('When D2RInstallationSettings is rendered', () => {
 
     // Assert
     await waitFor(() => expect(api.icon.getSuggestedD2RPath).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(console.error).toHaveBeenCalledWith('Failed to load D2R path:', expect.any(Error)),
+    );
+    const input = screen.getByLabelText('Installation Path');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', MAC_DEFAULT_PATH);
     expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument();
-    expect(console.error).toHaveBeenCalledWith('Failed to load D2R path:', expect.any(Error));
   });
 
   it('If looking up the suggestion fails, Then the notice falls back to the browse hint', async () => {
@@ -315,6 +444,24 @@ describe('When D2RInstallationSettings is rendered', () => {
       expect(api.icon.setD2RPath).not.toHaveBeenCalled();
     });
 
+    it('If saving the chosen folder fails, Then an error is shown and the saved path stays', async () => {
+      // Arrange
+      const api = arrangeElectronAPI({
+        savedPath: '/games/d2r',
+        setD2RPath: vi.fn().mockRejectedValue(new Error('disk full')),
+      });
+      api.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/games/new'] });
+      render(<D2RInstallationSettings />);
+      await screen.findByDisplayValue('/games/d2r');
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
+      expect(screen.getByLabelText('Installation Path')).toHaveValue('/games/d2r');
+    });
+
     it.each<[string, ArrangeOptions, string]>([
       ['a path is saved', { savedPath: '/games/d2r' }, '/games/d2r'],
       ['only a suggestion exists', { suggestedPath: MAC_DEFAULT_PATH }, MAC_DEFAULT_PATH],
@@ -323,14 +470,8 @@ describe('When D2RInstallationSettings is rendered', () => {
       // Arrange
       const api = arrangeElectronAPI(options);
       render(<D2RInstallationSettings />);
-      await screen.findByLabelText('Installation Path');
       await waitFor(() => expect(api.icon.getSuggestedD2RPath).toHaveBeenCalledTimes(1));
-      await waitFor(() =>
-        expect(screen.getByLabelText('Installation Path')).toHaveValue(options.savedPath ?? ''),
-      );
-      if (options.suggestedPath) {
-        await screen.findByRole('button', { name: 'Use this' });
-      }
+      await act(async () => undefined);
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
@@ -339,6 +480,24 @@ describe('When D2RInstallationSettings is rendered', () => {
       await waitFor(() =>
         expect(api.dialog.showOpenDialog).toHaveBeenCalledWith(
           expect.objectContaining({ defaultPath: expected }),
+        ),
+      );
+    });
+
+    it('If the field holds unsaved text, Then the dialog still starts in the saved path', async () => {
+      // Arrange
+      const api = arrangeElectronAPI({ savedPath: '/games/d2r' });
+      render(<D2RInstallationSettings />);
+      const input = await screen.findByDisplayValue('/games/d2r');
+      fireEvent.change(input, { target: { value: '/games/draft' } });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(api.dialog.showOpenDialog).toHaveBeenCalledWith(
+          expect.objectContaining({ defaultPath: '/games/d2r' }),
         ),
       );
     });

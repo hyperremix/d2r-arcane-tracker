@@ -372,6 +372,7 @@
       "disabledManualMode": "Disabled (Manual Mode)",
       "active_one": "Active ({{count}} file)",
       "active_other": "Active ({{count}} files)",
+      "activeLoading": "Active",
       "inactive": "Inactive",
       "manualModeNotice": "Save file monitoring is disabled because you have selected Manual Entry mode. Items must be entered manually when using this mode.",
       "manualModeActive": "Manual Mode Active:",

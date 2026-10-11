@@ -66,6 +66,8 @@ export function SaveFileMonitor() {
     directory: null,
   });
   const [saveFiles, setSaveFiles] = useState<D2SaveFile[]>([]);
+  // False until the save file list has loaded, so the badge never shows a count for an empty placeholder list
+  const [saveFilesLoaded, setSaveFilesLoaded] = useState(false);
   const [lastEvent, setLastEvent] = useState<SaveFileEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
@@ -91,6 +93,7 @@ export function SaveFileMonitor() {
       const files = await window.electronAPI?.saveFile.getSaveFiles();
       if (files) {
         setSaveFiles(files);
+        setSaveFilesLoaded(true);
       }
     } catch (error) {
       console.error('Failed to load save files:', error);
@@ -121,7 +124,9 @@ export function SaveFileMonitor() {
         <Badge variant="default" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
           {/* Counted from the listed save files so the badge matches "Detected Characters" */}
-          {t(translations.settings.saveFileMonitor.active, { count: saveFiles.length })}
+          {saveFilesLoaded
+            ? t(translations.settings.saveFileMonitor.active, { count: saveFiles.length })
+            : t(translations.settings.saveFileMonitor.activeLoading)}
         </Badge>
       );
     }
@@ -132,7 +137,14 @@ export function SaveFileMonitor() {
         {t(translations.settings.saveFileMonitor.inactive)}
       </Badge>
     );
-  }, [error, monitoringStatus.isMonitoring, saveFiles.length, settings.gameMode, t]);
+  }, [
+    error,
+    monitoringStatus.isMonitoring,
+    saveFiles.length,
+    saveFilesLoaded,
+    settings.gameMode,
+    t,
+  ]);
 
   const refreshAfterDirectoryChange = useCallback(async () => {
     // Reload data, monitoring status and save files to reflect the new directory
@@ -272,6 +284,8 @@ export function SaveFileMonitor() {
 
       if (status.status === 'started') {
         // Monitoring may have started on a different directory; refresh the listed save files
+        // and show no count until they have loaded
+        setSaveFilesLoaded(false);
         loadSaveFiles();
       }
     };

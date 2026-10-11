@@ -6,20 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { translations } from '@/i18n/translations';
-
-/**
- * Returns the default D2R installation directory for the current platform (the Battle.net
- * default on Windows). Only used as the input placeholder and the browse dialog's start folder,
- * never as the field value, so an unsaved path never looks saved.
- * Kept in sync with WINDOWS_DEFAULT_D2R_INSTALL_PATH / MAC_DEFAULT_D2R_INSTALL_PATH in
- * electron/services/iconService.ts.
- * @returns {string} Platform-specific default installation path
- */
-function getDefaultD2RPath(): string {
-  return window.electronAPI?.platform === 'win32'
-    ? 'C:\\Program Files (x86)\\Diablo II Resurrected'
-    : '/Applications/Diablo II Resurrected.app';
-}
+import { getDefaultD2RPath } from '@/lib/d2rInstallPath';
 
 /**
  * D2RInstallationSettings component that provides controls for configuring the D2R installation path.
@@ -47,6 +34,8 @@ export function D2RInstallationSettings() {
   const savedPathRef = useRef('');
   // Path currently being saved, so Enter followed by blur does not save it twice
   const savingPathRef = useRef<string | undefined>(undefined);
+  // Incremented on every commit and keystroke, so only the latest save updates the UI
+  const saveRequestRef = useRef(0);
   const defaultPath = getDefaultD2RPath();
 
   // Load the stored path on mount (the same setting Terror Zones reads); nothing is filled in
@@ -78,7 +67,17 @@ export function D2RInstallationSettings() {
   const savePath = useCallback(async (newPath: string) => {
     const trimmedPath = newPath.trim();
     setD2rPath(trimmedPath);
-    if (trimmedPath === savedPathRef.current || savingPathRef.current === trimmedPath) {
+
+    if (savingPathRef.current === trimmedPath) {
+      return;
+    }
+
+    // Any newer commit or typing makes the outcome of older saves irrelevant to the UI
+    saveRequestRef.current += 1;
+    const requestId = saveRequestRef.current;
+
+    if (trimmedPath === savedPathRef.current) {
+      setSaveFailed(false);
       return;
     }
 
@@ -87,22 +86,34 @@ export function D2RInstallationSettings() {
       await window.electronAPI?.icon.setD2RPath(trimmedPath);
       savedPathRef.current = trimmedPath;
       setHasSavedPath(trimmedPath !== '');
-      setSaveFailed(false);
+      if (requestId === saveRequestRef.current) {
+        setSaveFailed(false);
+      }
     } catch (error) {
       console.error('Failed to save D2R path:', error);
-      // Nothing was persisted, so the field and the notice go back to what is saved
-      setD2rPath(savedPathRef.current);
-      setSaveFailed(true);
+      if (requestId === saveRequestRef.current) {
+        // Nothing was persisted, so the field and the notice go back to what is saved
+        setD2rPath(savedPathRef.current);
+        setSaveFailed(true);
+      }
     } finally {
-      savingPathRef.current = undefined;
+      if (savingPathRef.current === trimmedPath) {
+        savingPathRef.current = undefined;
+      }
     }
+  }, []);
+
+  const handlePathChange = useCallback((newPath: string) => {
+    // Typing supersedes any save still in flight, so a late failure cannot overwrite the text
+    saveRequestRef.current += 1;
+    setD2rPath(newPath);
   }, []);
 
   const handleBrowseDirectory = useCallback(async () => {
     try {
       const result = await window.electronAPI?.dialog.showOpenDialog({
         title: t(translations.settings.d2rInstallation.title),
-        defaultPath: d2rPath || suggestedPath || defaultPath,
+        defaultPath: savedPathRef.current || suggestedPath || defaultPath,
         properties: ['openDirectory'],
       });
 
@@ -112,7 +123,7 @@ export function D2RInstallationSettings() {
     } catch (error) {
       console.error('Failed to browse directory:', error);
     }
-  }, [d2rPath, defaultPath, savePath, suggestedPath, t]);
+  }, [defaultPath, savePath, suggestedPath, t]);
 
   const isNotConfigured = hasLoaded && !hasSavedPath;
   const describedBy = [
@@ -142,7 +153,7 @@ export function D2RInstallationSettings() {
               id={d2rPathInputId}
               type="text"
               value={d2rPath}
-              onChange={(e) => setD2rPath(e.target.value)}
+              onChange={(e) => handlePathChange(e.target.value)}
               onBlur={(e) => void savePath(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {

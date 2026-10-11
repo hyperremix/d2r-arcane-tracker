@@ -247,6 +247,70 @@ describe('SaveFileMonitor', () => {
       expect(await screen.findByText('Active (1 file)')).toBeInTheDocument();
     });
 
+    it('If the save files are still loading, Then the badge shows no count instead of 0 files', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      let resolveSaveFiles: (files: ReturnType<typeof createSaveFiles>) => void = () => undefined;
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValue(
+        new Promise((resolve) => {
+          resolveSaveFiles = resolve;
+        }),
+      );
+
+      // Act
+      render(<SaveFileMonitor />);
+      await screen.findByText(CURRENT_DIRECTORY);
+
+      // Assert
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.queryByText(/Active \(/)).not.toBeInTheDocument();
+
+      // Act
+      await act(async () => {
+        resolveSaveFiles(createSaveFiles(2));
+      });
+
+      // Assert
+      expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
+    });
+
+    it('If monitoring restarts, Then the badge drops the old count until the list is reloaded', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
+      render(<SaveFileMonitor />);
+      expect(await screen.findByText('Active (3 files)')).toBeInTheDocument();
+      let resolveSaveFiles: (files: ReturnType<typeof createSaveFiles>) => void = () => undefined;
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValue(
+        new Promise((resolve) => {
+          resolveSaveFiles = resolve;
+        }),
+      );
+
+      // Act
+      act(() => {
+        mainEvents.emit('monitoring-status-changed', {
+          status: 'started',
+          directory: NEW_DIRECTORY,
+          saveFileCount: 1,
+        });
+      });
+
+      // Assert
+      expect(await screen.findByText('Active')).toBeInTheDocument();
+      expect(screen.queryByText('Active (3 files)')).not.toBeInTheDocument();
+
+      // Act
+      await act(async () => {
+        resolveSaveFiles(createSaveFiles(1));
+      });
+
+      // Assert
+      expect(await screen.findByText('Active (1 file)')).toBeInTheDocument();
+    });
+
     it('When monitoring starts, Then the save files are reloaded and the badge follows the list', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
