@@ -4273,7 +4273,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
   });
 
   describe('If a character is opened in its own window', () => {
-    it('Then the notice says that changes are written to the save files', async () => {
+    it('Then the short notice says to close the game because changes are written to the save files', async () => {
       // Arrange
       const snapshotTarget = {
         sourceFilePath: '/tmp/sorc.d2s',
@@ -4286,8 +4286,10 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       const notice = await screen.findByTestId('save-write-notice');
-      expect(notice).toHaveTextContent('Changes are written to your save files');
-      expect(notice).toHaveTextContent('Close Diablo II: Resurrected first');
+      expect(notice).toHaveTextContent(
+        'Close Diablo II: Resurrected first. Changes here are written to your save files.',
+      );
+      expect(within(notice).getByRole('button', { name: 'Details' })).toBeInTheDocument();
       expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
     });
   });

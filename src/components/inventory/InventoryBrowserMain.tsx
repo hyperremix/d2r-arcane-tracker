@@ -6,16 +6,18 @@ import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useTranslation } from 'react-i18next';
 import {
   hasInventoryOrVaultDragData,
+  INVENTORY_DRAG_MIME,
+  type InventoryDragStatePayload,
   parseInventoryDragStatePayload,
   parseInventoryTextPayload,
   parseVaultDragStatePayload,
   toActiveVaultDragItem,
 } from '@/components/inventory/dragPayloads';
 import { InventoryFilterBar, type LocationFilter } from '@/components/inventory/InventoryFilterBar';
-import { formatSourceFileTypeLabel } from '@/components/inventory/inventoryItemLabels';
 import { getTypeValue, type TypeFilter } from '@/components/inventory/inventoryItems';
 import { SaveWriteNotice } from '@/components/inventory/SaveWriteNotice';
 import { SelectedVaultItemPanel } from '@/components/inventory/SelectedVaultItemPanel';
+import { findSnapshotCharacter, SnapshotListRow } from '@/components/inventory/SnapshotListRow';
 import { useInventoryIconLookup } from '@/components/inventory/useInventoryIconLookup';
 import { useInventorySearch } from '@/components/inventory/useInventorySearch';
 import { useVaultActions } from '@/components/inventory/useVaultActions';
@@ -23,16 +25,42 @@ import { VaultDropzone } from '@/components/inventory/VaultDropzone';
 import { VaultedItemTile } from '@/components/inventory/VaultedItemTile';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
+import { useGrailStore } from '@/stores/grailStore';
 
 const SNAPSHOT_HOVER_OPEN_DELAY_MS = 650;
 const SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS = 900;
 
 function getSnapshotWindowTargetKey(snapshot: CharacterInventorySnapshot): string {
   return `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
+}
+
+/** Whether a drag state reported by another window is an inventory item that could be vaulted. */
+function isVaultableInventoryDrag(payload: InventoryDragStatePayload | undefined): boolean {
+  // A stack pickup is placed by clicking, not dropped, so the vault drop area can't take it
+  return payload?.active === true && payload.stackPickup !== true;
+}
+
+/** Whether a `dragleave` means the pointer left this window, not just moved between elements. */
+function isDragLeavingWindow(event: globalThis.DragEvent): boolean {
+  if (event.relatedTarget !== null) {
+    return false;
+  }
+
+  // Some browsers report no related element for moves inside the page, so the position decides.
+  // Pixels 0 to innerWidth/innerHeight - 1 are inside the window, so only a position past those
+  // edges is a leave. Chromium reports (0, 0) when a drag leaves the window, so that pair counts
+  // as a leave too; a single coordinate of 0 is just an element at the edge.
+  const isOutsideViewport =
+    event.clientX < 0 ||
+    event.clientY < 0 ||
+    event.clientX >= window.innerWidth ||
+    event.clientY >= window.innerHeight;
+  const isUnknownPosition = event.clientX === 0 && event.clientY === 0;
+
+  return isOutsideViewport || isUnknownPosition;
 }
 
 export function InventoryBrowserMain() {
@@ -42,6 +70,15 @@ export function InventoryBrowserMain() {
   const [characterId, setCharacterId] = useState('all');
   const [locationContext, setLocationContext] = useState<LocationFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  // The vault drop area is only shown while an inventory item can be dropped on it: another window
+  // reports its drags over IPC, and a drag that enters this window with inventory drag data counts
+  // too. `hasCrossWindowInventoryDragRef` (declared below) is wider than the remote state: it is
+  // set for every active drag another window reports, stack pickups included. A pickup keeps
+  // snapshot windows auto-opening on hover but can't be dropped on the vault. Refs hold the
+  // cross-window flags because the drag handlers read them without needing a render.
+  const [hasRemoteInventoryDrag, setHasRemoteInventoryDrag] = useState(false);
+  const [hasInventoryDragInWindow, setHasInventoryDragInWindow] = useState(false);
+  const characters = useGrailStore((state) => state.characters);
   const hasCrossWindowVaultDragRef = useRef(false);
   const hasCrossWindowInventoryDragRef = useRef(false);
   const snapshotHoverTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -97,38 +134,99 @@ export function InventoryBrowserMain() {
       }
 
       hasCrossWindowInventoryDragRef.current = parsedPayload.active;
+      setHasRemoteInventoryDrag(isVaultableInventoryDrag(parsedPayload));
       if (!parsedPayload.active) {
+        setHasInventoryDragInWindow(false);
         resetIfRemoteDragInactive();
       }
     };
 
-    return combineUnsubscribers([
+    // A drag that was already running when this page opened
+    let isDisposed = false;
+    const getActiveDragState = window.electronAPI?.inventory?.getActiveDragState;
+    if (typeof getActiveDragState === 'function') {
+      void getActiveDragState()
+        .then((payload) => {
+          if (isDisposed || !payload || typeof payload !== 'object') {
+            return;
+          }
+
+          const rawPayload: { inventory?: unknown } = payload;
+          const inventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
+          // Same as the live handler: any active drag counts for hover, only a vaultable one shows the area
+          if (inventoryPayload?.active === true) {
+            hasCrossWindowInventoryDragRef.current = true;
+          }
+          if (isVaultableInventoryDrag(inventoryPayload)) {
+            setHasRemoteInventoryDrag(true);
+          }
+        })
+        .catch((error) => {
+          if (!isDisposed) {
+            console.warn('Failed to get active inventory drag state', error);
+          }
+        });
+    }
+
+    const unsubscribe = combineUnsubscribers([
       onMainEvent(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState),
       onMainEvent(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState),
     ]);
+
+    return () => {
+      isDisposed = true;
+      unsubscribe();
+    };
   }, [resetSnapshotHoverSession]);
 
   useEffect(() => {
     const resetDragSession = () => {
       hasCrossWindowVaultDragRef.current = false;
       hasCrossWindowInventoryDragRef.current = false;
+      setHasRemoteInventoryDrag(false);
+      setHasInventoryDragInWindow(false);
       resetSnapshotHoverSession();
     };
 
+    // Fallback for a missed IPC drag state, for a drag that carries inventory data into this
+    // window. It ends with a drop, with the drag leaving this window, with `dragend` or with the
+    // IPC state. A drag another window reports over IPC ends only when that window reports it.
+    const trackInventoryDragEnter = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes(INVENTORY_DRAG_MIME)) {
+        setHasInventoryDragInWindow(true);
+      }
+    };
+
+    const trackInventoryDragLeave = (event: globalThis.DragEvent) => {
+      if (isDragLeavingWindow(event)) {
+        setHasInventoryDragInWindow(false);
+      }
+    };
+
+    window.addEventListener('dragenter', trackInventoryDragEnter);
+    window.addEventListener('dragleave', trackInventoryDragLeave);
     window.addEventListener('dragend', resetDragSession);
     window.addEventListener('drop', resetDragSession);
 
     return () => {
+      window.removeEventListener('dragenter', trackInventoryDragEnter);
+      window.removeEventListener('dragleave', trackInventoryDragLeave);
       window.removeEventListener('dragend', resetDragSession);
       window.removeEventListener('drop', resetDragSession);
       resetDragSession();
     };
   }, [resetSnapshotHoverSession]);
 
-  // Grail bookmarks are tracker bookmarks, not items: they must not show up as vault tiles.
+  // Grail bookmarks are tracker bookmarks, not items: they must not show up as vault tiles. The
+  // type filter is applied here; search, character and location are part of the vault query.
   const vaultItems = useMemo(
-    () => (inventoryResponse?.vault.items ?? []).filter((item) => !isGrailBookmark(item)),
-    [inventoryResponse?.vault.items],
+    () =>
+      (inventoryResponse?.vault.items ?? []).filter(
+        (item) =>
+          !isGrailBookmark(item) &&
+          (typeFilter === 'all' || getTypeValue(item.type) === typeFilter),
+      ),
+    [inventoryResponse?.vault.items, typeFilter],
   );
 
   const snapshots = useMemo(() => {
@@ -270,6 +368,17 @@ export function InventoryBrowserMain() {
   );
 
   const isInitialLoad = isLoading && !inventoryResponse;
+  const hasActiveFilters =
+    searchText.trim() !== '' ||
+    characterId !== 'all' ||
+    locationContext !== 'all' ||
+    typeFilter !== 'all';
+  const isVaultDropzoneVisible = hasRemoteInventoryDrag || hasInventoryDragInWindow;
+  // With filters on, an empty vault can mean "nothing matches", so say so instead of hiding it.
+  // Not tied to `isLoading`, so the card stays mounted while a reload is in flight; before the
+  // first response (or after a failed first load) there is no response and nothing is claimed.
+  const isVaultCardVisible =
+    vaultItems.length > 0 || (hasActiveFilters && inventoryResponse !== null);
 
   return (
     <PageShell>
@@ -280,26 +389,79 @@ export function InventoryBrowserMain() {
 
       <SaveWriteNotice />
 
-      <InventoryFilterBar
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
-        characterId={characterId}
-        onCharacterIdChange={setCharacterId}
-        characterOptions={characterOptions}
-        locationContext={locationContext}
-        onLocationContextChange={setLocationContext}
-        typeFilter={typeFilter}
-        onTypeFilterChange={setTypeFilter}
-      />
+      <Card>
+        <CardHeader>
+          <div className="space-y-1">
+            <CardTitle className="text-base">
+              {t(translations.inventoryBrowser.snapshotList.title)}
+            </CardTitle>
+            <div className="text-muted-foreground text-sm">
+              {t(translations.inventoryBrowser.snapshotList.description)}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <InventoryFilterBar
+            searchText={searchText}
+            onSearchTextChange={setSearchText}
+            characterId={characterId}
+            onCharacterIdChange={setCharacterId}
+            characterOptions={characterOptions}
+            locationContext={locationContext}
+            onLocationContextChange={setLocationContext}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+          />
+          {isInitialLoad ? (
+            <output className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {t(translations.common.loading)}
+            </output>
+          ) : !isLoading && snapshots.length === 0 ? (
+            <div className="text-center text-muted-foreground text-sm">
+              {t(translations.inventoryBrowser.snapshotList.empty)}
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {snapshots.map((snapshot) => (
+                <li key={snapshot.snapshotId}>
+                  <SnapshotListRow
+                    snapshot={snapshot}
+                    character={findSnapshotCharacter(snapshot, characters)}
+                    onOpen={(target) => {
+                      void handleOpenSnapshotWindow(target);
+                    }}
+                    onDragOver={handleSnapshotRowDragOver}
+                    onDragLeave={handleSnapshotRowDragLeave}
+                    onDrop={resetSnapshotHoverSession}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      {vaultItems.length > 0 && (
+      {isVaultCardVisible && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              {t(translations.inventoryBrowser.vaultedItems)}
-            </CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="text-base">
+                {t(translations.inventoryBrowser.vaultedItems)}
+              </CardTitle>
+              {hasActiveFilters && (
+                <div className="text-muted-foreground text-sm">
+                  {t(translations.inventoryBrowser.filters.vaultFiltered)}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {vaultItems.length === 0 && (
+              <div className="text-muted-foreground text-sm">
+                {t(translations.inventoryBrowser.empty)}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {vaultItems.map((item) => (
                 <VaultedItemTile
@@ -336,62 +498,12 @@ export function InventoryBrowserMain() {
         </Card>
       )}
 
-      <VaultDropzone onDropItem={handleVaultDrop} />
-
-      <Card>
-        <CardHeader>
-          <div className="space-y-1">
-            <CardTitle className="text-base">
-              {t(translations.inventoryBrowser.snapshotList.title)}
-            </CardTitle>
-            <div className="text-muted-foreground text-sm">
-              {t(translations.inventoryBrowser.snapshotList.description)}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {isInitialLoad ? (
-            <output className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              {t(translations.common.loading)}
-            </output>
-          ) : !isLoading && snapshots.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm">
-              {t(translations.inventoryBrowser.snapshotList.empty)}
-            </div>
-          ) : (
-            snapshots.map((snapshot) => (
-              <button
-                key={snapshot.snapshotId}
-                type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-md border border-border/60 bg-card/40 px-3 py-2 text-left hover:border-primary/60 hover:bg-primary/5"
-                onClick={() => {
-                  void handleOpenSnapshotWindow(snapshot);
-                }}
-                onDragOver={(event) => {
-                  handleSnapshotRowDragOver(event, snapshot);
-                }}
-                onDragLeave={() => {
-                  handleSnapshotRowDragLeave(snapshot);
-                }}
-                onDrop={() => {
-                  resetSnapshotHoverSession();
-                }}
-              >
-                <span className="font-medium text-sm">
-                  {t(translations.inventoryBrowser.groupHeader, {
-                    characterName: snapshot.characterName,
-                    sourceFileType: formatSourceFileTypeLabel(snapshot.sourceFileType, t),
-                  })}
-                </span>
-                <Badge variant="outline" className="shrink-0">
-                  {t(translations.inventoryBrowser.itemsCount, { count: snapshot.items.length })}
-                </Badge>
-              </button>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      {/* Appended last and sticky, so showing it mid-drag doesn't move the rows above */}
+      {isVaultDropzoneVisible && (
+        <div className="sticky bottom-0 rounded-lg bg-background shadow-lg">
+          <VaultDropzone onDropItem={handleVaultDrop} className="py-6" />
+        </div>
+      )}
     </PageShell>
   );
 }
