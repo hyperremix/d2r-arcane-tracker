@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TitleBarFrame } from './TitleBarFrame';
+import { isMacPlatform, TitleBarFrame } from './TitleBarFrame';
 
 describe('When TitleBarFrame is rendered', () => {
   const originalElectronAPI = window.electronAPI;
@@ -92,5 +92,42 @@ describe('When TitleBarFrame is rendered', () => {
     expect(children).toHaveLength(3);
     expect(children[0]).toHaveClass('w-8');
     expect(children[2]).toHaveClass('w-36');
+  });
+
+  it('If the platform is macOS, Then isMacPlatform is true', () => {
+    // Arrange
+    setPlatform('darwin');
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If the platform is Linux, Then isMacPlatform is false', () => {
+    // Arrange
+    setPlatform('linux');
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If electronAPI is unavailable, Then isMacPlatform defaults to true', () => {
+    // Arrange
+    Object.defineProperty(window, 'electronAPI', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(true);
   });
 });

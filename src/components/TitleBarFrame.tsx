@@ -8,6 +8,15 @@ const DRAG_REGION_STYLE = {
 } as CSSProperties;
 
 /**
+ * Whether the window runs on macOS, where the native traffic lights sit on the left of the title
+ * bar. The platform is exposed synchronously by the preload script; outside Electron the macOS
+ * layout is used.
+ */
+export function isMacPlatform(): boolean {
+  return (window.electronAPI?.platform ?? 'darwin') === 'darwin';
+}
+
+/**
  * Props for {@link TitleBarFrame}.
  */
 interface TitleBarFrameProps {
@@ -30,9 +39,7 @@ interface TitleBarFrameProps {
  * @returns {JSX.Element} The title bar frame around the given content
  */
 export function TitleBarFrame({ children, className, centered = false }: TitleBarFrameProps) {
-  // The platform is exposed synchronously by the preload script; outside Electron the macOS
-  // layout is used
-  const isMac = (window.electronAPI?.platform ?? 'darwin') === 'darwin';
+  const isMac = isMacPlatform();
 
   return (
     <header
