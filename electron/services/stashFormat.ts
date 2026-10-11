@@ -10,9 +10,14 @@ export interface D2iSectorDescriptor {
   payloadSignature: string;
 }
 
+/**
+ * Header data of a .d2i file. It has no game mode: the 32-bit field after the sector signature is
+ * not a hardcore flag (D2R writes 1 into both SharedStashSoftCoreV2.d2i and
+ * SharedStashHardCoreV2.d2i, 0 into older v97 files and 2 into modern ones), so the game mode of a
+ * stash comes from its file name (see `isHardcoreStashFileName`).
+ */
 export interface D2iMetadata {
   version: number;
-  hardcore: boolean;
   sectors: D2iSectorDescriptor[];
   /**
    * Bytes after the last readable sector. A well-formed file is the exact concatenation of its
@@ -99,13 +104,10 @@ export function readD2iMetadata(buffer: Buffer): D2iMetadata {
     throw new Error('Invalid d2i file: no stash sectors found');
   }
 
-  const firstSectorOffset = sectors[0].offset;
-  const hardcore = buffer.readUInt32LE(firstSectorOffset + 4) === 0;
-  const version = buffer.readUInt32LE(firstSectorOffset + 8);
+  const version = buffer.readUInt32LE(sectors[0].offset + 8);
 
   return {
     version,
-    hardcore,
     sectors,
     trailingBytes: buffer.length - offset,
   };

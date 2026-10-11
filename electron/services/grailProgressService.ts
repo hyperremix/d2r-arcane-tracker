@@ -46,14 +46,6 @@ interface RecordedFind {
   runItem?: { runId: string; grailProgress: GrailProgress; item: ItemDetectionEvent['item'] };
 }
 
-function isSharedStashCharacterName(characterName: string): boolean {
-  return characterName.toLowerCase().includes('shared stash');
-}
-
-function isSharedStashHardcore(characterName: string): boolean {
-  return /hardcore/i.test(characterName);
-}
-
 /**
  * Creates a grail progress entry for a character and item.
  * @param character - Character who found the item
@@ -106,8 +98,9 @@ export class GrailProgressService {
    * first, so the found items are attributed to that character, then the progress of every found
    * item (and its run item during an active run) is written. Only after the commit are the run items
    * and the progress change announced, so listeners that query the database see the new rows.
-   * A created character, or a changed class, level, hardcore or expansion, is announced as a
-   * progress change too, as the renderers reload the characters with it.
+   * A created character, or a changed name, class, level, hardcore or expansion, is announced as a
+   * progress change too, as the renderers reload the characters with it. If the character cannot be
+   * stored, nothing of the save file is written and the failure is surfaced.
    * @param saveFile - The parsed save file
    * @param foundItems - Grail items found in the save file for the first time
    */
@@ -117,10 +110,14 @@ export class GrailProgressService {
 
     try {
       this.deps.database.transaction(() => {
-        characterChanged = this.upsertCharacterFromSaveFile(saveFile);
+        const stored = this.upsertCharacterFromSaveFile(saveFile);
+        characterChanged = stored.changed;
 
+        // Every item of the save file belongs to its character. Looking the character up by name
+        // instead could pick another record with the same name, or create a record without a save
+        // file when the save file's character could not be stored.
         for (const event of foundItems) {
-          const recordedFind = this.recordFoundItem(event);
+          const recordedFind = this.recordFoundItem(event, stored.character);
           if (recordedFind) {
             recordedFinds.push(recordedFind);
           }
@@ -135,84 +132,53 @@ export class GrailProgressService {
   }
 
   /**
-   * Creates or updates the character of a save file with its latest data.
+   * Creates or updates the character of a save file with its latest data. The character is found
+   * by its save file, then by name (a save file that moved, e.g. after a save directory change).
+   * Its name follows the save file, so a stash whose name was derived wrongly before is corrected.
+   * Runs inside the save file transaction: a failure is thrown, so no item of the save file is
+   * attributed to a character that was not stored.
    * @param saveFile - Save file data containing character information
-   * @returns Whether the character was created, or its class, level, hardcore or expansion changed
+   * @returns The stored character, and whether it was created or its name, class, level, hardcore
+   * or expansion changed
    */
-  private upsertCharacterFromSaveFile(saveFile: D2SaveFile): boolean {
+  private upsertCharacterFromSaveFile(saveFile: D2SaveFile): {
+    character: Character;
+    changed: boolean;
+  } {
     const { database } = this.deps;
-    try {
-      const existing =
-        database.getCharacterBySaveFilePath(saveFile.path) ||
-        database.getCharacterByName(saveFile.name);
-      const now = new Date();
+    const existing =
+      database.getCharacterBySaveFilePath(saveFile.path) ||
+      database.getCharacterByName(saveFile.name);
+    const now = new Date();
 
-      database.upsertCharacter({
-        ...(existing ?? {
-          id: `char_${saveFile.name}_${now.getTime()}`,
-          name: saveFile.name,
-          created: now,
-        }),
-        characterClass: saveFile.characterClass as CharacterClass,
-        level: saveFile.level,
-        hardcore: saveFile.hardcore,
-        expansion: saveFile.expansion,
-        saveFilePath: saveFile.path,
-        lastUpdated: now,
-      });
+    const character: Character = {
+      ...(existing ?? {
+        id: `char_${saveFile.name}_${now.getTime()}`,
+        created: now,
+      }),
+      name: saveFile.name,
+      characterClass: saveFile.characterClass as CharacterClass,
+      level: saveFile.level,
+      hardcore: saveFile.hardcore,
+      expansion: saveFile.expansion,
+      saveFilePath: saveFile.path,
+      lastUpdated: now,
+    };
+    database.upsertCharacter(character);
 
-      if (!existing) {
-        console.log(`Created character: ${saveFile.name} (${saveFile.characterClass})`);
-        return true;
-      }
-      return (
+    if (!existing) {
+      console.log(`Created character: ${saveFile.name} (${saveFile.characterClass})`);
+      return { character, changed: true };
+    }
+    return {
+      character,
+      changed:
+        existing.name !== saveFile.name ||
         existing.characterClass !== saveFile.characterClass ||
         existing.level !== saveFile.level ||
         existing.hardcore !== saveFile.hardcore ||
-        existing.expansion !== saveFile.expansion
-      );
-    } catch (error) {
-      log.error('upsertCharacterFromSaveFile', error, { saveFile: saveFile.name });
-      return false;
-    }
-  }
-
-  /**
-   * Finds or creates the character an item was found by.
-   * @param characterName - Name of the character to find or create
-   * @param level - Level of the character (used when creating new character)
-   * @param characterClass - Optional character class to use when creating new character
-   * @returns The stored character
-   */
-  private findOrCreateCharacter(
-    characterName: string,
-    level: number,
-    characterClass?: CharacterClass,
-  ): Character {
-    const { database } = this.deps;
-    const existingCharacter = database.getCharacterByName(characterName);
-    if (existingCharacter) {
-      return existingCharacter;
-    }
-
-    // Determine if this is a shared stash based on the character name
-    const isSharedStash = isSharedStashCharacterName(characterName);
-    const character: Character = {
-      id: `char_${characterName}_${Date.now()}`,
-      name: characterName,
-      // Use shared_stash for shared stash files; regular characters are updated from their save file
-      characterClass: isSharedStash ? 'shared_stash' : characterClass || 'barbarian',
-      level: level || 1,
-      hardcore: isSharedStash ? isSharedStashHardcore(characterName) : false,
-      expansion: true,
-      saveFilePath: undefined,
-      lastUpdated: new Date(),
-      created: new Date(),
+        existing.expansion !== saveFile.expansion,
     };
-    database.upsertCharacter(character);
-    console.log(`Created character for found item: ${characterName}`);
-
-    return character;
   }
 
   /**
@@ -220,9 +186,13 @@ export class GrailProgressService {
    * Runs inside the save file transaction, in a savepoint of its own: a failing item is rolled back
    * completely, logged and skipped, without affecting the other items of the save file.
    * @param event - Item detection event of the found item
+   * @param character - The stored character of the save file the item was found in
    * @returns What to announce after the commit, or undefined if nothing was written
    */
-  private recordFoundItem(event: ItemDetectionEvent): RecordedFind | undefined {
+  private recordFoundItem(
+    event: ItemDetectionEvent,
+    character: Character,
+  ): RecordedFind | undefined {
     if (event.type !== 'item-found' || !event.item) {
       return undefined;
     }
@@ -230,12 +200,6 @@ export class GrailProgressService {
     const { database, runTracker } = this.deps;
     try {
       return database.transaction(() => {
-        const character = this.findOrCreateCharacter(
-          event.item.characterName,
-          event.item.level,
-          event.item.characterClass,
-        );
-
         // First-time global discovery: no character has found this item before
         const existingGlobalProgress = database.getProgressByItem(event.grailItem.id);
         const isFirstTimeDiscovery = existingGlobalProgress.length === 0;

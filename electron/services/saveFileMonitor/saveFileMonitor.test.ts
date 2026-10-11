@@ -70,6 +70,7 @@ interface MockGrailDatabase {
   getSaveFileState: ReturnType<typeof vi.fn>;
   upsertSaveFileState: ReturnType<typeof vi.fn>;
   getCharacterByName: ReturnType<typeof vi.fn>;
+  getCharacterBySaveFilePath: ReturnType<typeof vi.fn>;
   getAllSaveFileStates: ReturnType<typeof vi.fn>;
   deleteSaveFileState: ReturnType<typeof vi.fn>;
   reconcileVaultItemsForScan: ReturnType<typeof vi.fn>;
@@ -82,6 +83,7 @@ const createMockDatabase = (): MockGrailDatabase => ({
   getSaveFileState: vi.fn(),
   upsertSaveFileState: vi.fn(),
   getCharacterByName: vi.fn(),
+  getCharacterBySaveFilePath: vi.fn(),
   getAllSaveFileStates: vi.fn(),
   deleteSaveFileState: vi.fn(),
   reconcileVaultItemsForScan: vi.fn(),
@@ -2150,6 +2152,33 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
+  describe('When the game mode decides whether a .d2i stash is parsed', () => {
+    it.each([
+      ['ModernSharedStashHardCoreV2.d2i', GameMode.Hardcore, 'parsed'],
+      ['ModernSharedStashHardCoreV2.d2i', GameMode.Softcore, 'skipped'],
+      ['ModernSharedStashSoftCoreV2.d2i', GameMode.Softcore, 'parsed'],
+      ['ModernSharedStashSoftCoreV2.d2i', GameMode.Hardcore, 'skipped'],
+    ])('If %s is parsed in %s mode, Then its status is %s', async (fileName, gameMode, status) => {
+      // Arrange
+      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
+
+      // Act
+      const result = await parseSaveContent(
+        {
+          saveName: 'Modern Shared Stash',
+          filePath: join('/saves', fileName),
+          content: fixtureBuffer,
+          extension: '.d2i',
+        },
+        () => gameMode,
+      );
+
+      // Assert
+      expect(result.status).toBe(status);
+      expect(result.stashHardcore).toBe(fileName.includes('HardCore'));
+    });
+  });
+
   describe('When modern v105 shared stash files are parsed', () => {
     it('Then parseSave returns modern shared and resource tabs with strict stack counts', async () => {
       // Arrange
@@ -2234,6 +2263,29 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.inventorySnapshot?.items.map((item: any) => item.characterId)).toEqual([
         'char-1',
       ]);
+    });
+
+    it('If another record has the same name, Then the character linked to the save file is used', async () => {
+      // Arrange
+      const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
+      const savePath = join(saveDir, 'Hero.d2s');
+      writeFileSync(savePath, Buffer.from('mock file content'));
+      mockDatabase.getCharacterByName.mockReturnValue({ id: 'char-without-file', name: 'Hero' });
+      mockDatabase.getCharacterBySaveFilePath.mockImplementation((path: string) =>
+        path === savePath ? { id: 'char-with-file', name: 'Hero' } : undefined,
+      );
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        status: 'parsed',
+        items: [],
+      } as any);
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(savePath);
+      rmSync(saveDir, { recursive: true, force: true });
+
+      // Assert
+      expect(parseResult.inventorySnapshot?.characterId).toBe('char-with-file');
     });
   });
 

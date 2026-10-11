@@ -12,6 +12,7 @@ import { createServiceLogger } from '../../utils/serviceLogger';
 import { normalizeItemsWithSocketedItems } from '../itemNormalizer';
 import { parseModernStash } from '../modernStashParser';
 import { detectSaveFormat, getClassicStashCodec, type SaveFormat } from '../saveFormat/saveFormat';
+import { isHardcoreStashFileName } from './saveFileFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 
@@ -29,7 +30,10 @@ export type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
 export interface SaveParseResult {
   items: ParsedInventoryItemWithRaw[];
   status: SaveParseStatus;
-  /** Hardcore flag read from a stash header (.sss/.d2x/.d2i), when the parser got that far. */
+  /**
+   * Hardcore flag of a stash, when the parser got that far: read from the header of a legacy stash
+   * (.sss/.d2x), taken from the file name of a .d2i stash.
+   */
   stashHardcore?: boolean;
 }
 
@@ -116,8 +120,9 @@ export async function parseSaveContent(
     }
 
     const gameMode = readGameMode();
-    // Use hardcore flag from parsed stash header instead of filename
-    const isHardcore = response.hardcore;
+    // A .d2i header has no game mode (the field the parser reads as one is not), so D2R's file
+    // name decides; legacy .sss/.d2x stashes keep the flag from their header.
+    const isHardcore = extension === '.d2i' ? isHardcoreStashFileName(filePath) : response.hardcore;
     stashHardcore = isHardcore;
 
     if (isGameModeMismatch(gameMode, isHardcore)) {
@@ -137,7 +142,7 @@ export async function parseSaveContent(
 
     const modern = await parseModernStash(content);
     const gameMode = readGameMode();
-    const isHardcore = modern.hardcore;
+    const isHardcore = isHardcoreStashFileName(filePath);
     stashHardcore = isHardcore;
 
     if (isGameModeMismatch(gameMode, isHardcore)) {

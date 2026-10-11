@@ -9,7 +9,7 @@ const FIXTURE_PATH = resolve(
 );
 
 describe('When readD2iMetadata parses modern stash files', () => {
-  it('Then it returns version, hardcore, and sector descriptors', () => {
+  it('Then it returns the version and the sector descriptors', () => {
     // Arrange
     const buffer = readFileSync(FIXTURE_PATH);
 
@@ -18,7 +18,6 @@ describe('When readD2iMetadata parses modern stash files', () => {
 
     // Assert
     expect(metadata.version).toBe(105);
-    expect(metadata.hardcore).toBe(false);
     expect(metadata.sectors).toHaveLength(7);
     expect(metadata.sectors[0]?.payloadSignature).toBe('JM');
     expect(metadata.sectors[6]?.payloadSignature).not.toBe('JM');

@@ -277,6 +277,113 @@ describe('When a parsed save file is recorded in the database', () => {
     });
   });
 
+  describe('If the name of the found item differs from the save file name', () => {
+    it('Then the progress belongs to the character of the save file and no other character is created', () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withName('Modern Shared Stash Softcore')
+        .withCharacterClass('shared_stash')
+        .withPath('/saves/ModernSharedStashSoftCoreV2.d2i')
+        .build();
+
+      // Act
+      service.recordSaveFile(saveFile, [createFoundItem({ characterName: 'Someone Else' })]);
+
+      // Assert
+      const storedCharacters = characters.getAllCharacters(ctx);
+      expect(storedCharacters).toEqual([
+        expect.objectContaining({
+          name: 'Modern Shared Stash Softcore',
+          saveFilePath: '/saves/ModernSharedStashSoftCoreV2.d2i',
+        }),
+      ]);
+      expect(progress.getAllProgress(ctx)).toEqual([
+        expect.objectContaining({ characterId: storedCharacters[0].id }),
+      ]);
+    });
+  });
+
+  describe('If a record without a save file has the same name as the save file character', () => {
+    it('Then the progress belongs to the record linked to the save file', () => {
+      // Arrange
+      rawDb.exec(`
+        INSERT INTO characters (id, name, character_class) VALUES ('orphan', 'Sorc', 'sorceress');
+        INSERT INTO characters (id, name, character_class, save_file_path)
+          VALUES ('live', 'Sorc', 'sorceress', '/saves/Sorc.d2s');
+      `);
+      const saveFile = sorceressSaveFile('Sorc').withPath('/saves/Sorc.d2s').build();
+
+      // Act
+      service.recordSaveFile(saveFile, [createFoundItem({ characterName: 'Sorc' })]);
+
+      // Assert
+      expect(progress.getAllProgress(ctx)).toEqual([
+        expect.objectContaining({ characterId: 'live', itemId: 'shako' }),
+      ]);
+      expect(characters.getAllCharacters(ctx)).toHaveLength(2);
+    });
+  });
+
+  describe('If the stored name of a save file character is outdated', () => {
+    it('Then the name follows the save file and the change is broadcast', () => {
+      // Arrange
+      rawDb.exec(`
+        INSERT INTO characters (id, name, character_class, save_file_path)
+          VALUES ('hc-stash', 'Shared Stash Softcore', 'shared_stash', '/saves/SharedStashHardCoreV2.d2i');
+      `);
+      const saveFile = D2SaveFileBuilder.new()
+        .withName('Shared Stash Hardcore')
+        .withCharacterClass('shared_stash')
+        .withHardcore(true)
+        .withLevel(1)
+        .withExpansion(true)
+        .withPath('/saves/SharedStashHardCoreV2.d2i')
+        .build();
+
+      // Act
+      service.recordSaveFile(saveFile, []);
+
+      // Assert
+      expect(characters.getAllCharacters(ctx)).toEqual([
+        expect.objectContaining({ id: 'hc-stash', name: 'Shared Stash Hardcore', hardcore: true }),
+      ]);
+      expect(broadcastToRenderers).toHaveBeenCalledWith('grail-progress-updated');
+    });
+  });
+
+  describe('If the character of the save file cannot be stored', () => {
+    it('Then no progress and no character without a save file are written, and the failure is surfaced', () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withName('Broken')
+        .withCharacterClass('unknown')
+        .withPath('/saves/Broken.d2s')
+        .build();
+      const forwardError = vi.fn();
+      setErrorForwarder(forwardError);
+
+      try {
+        // Act
+        service.recordSaveFile(saveFile, [createFoundItem({ characterName: 'Broken' })]);
+
+        // Assert
+        expect(characters.getAllCharacters(ctx)).toEqual([]);
+        expect(progress.getAllProgress(ctx)).toEqual([]);
+        expect(forwardError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            service: 'GrailProgressService',
+            code: 'databaseWriteFailed',
+          }),
+        );
+        expect(broadcastToRenderers).not.toHaveBeenCalled();
+      } finally {
+        setErrorForwarder(() => {
+          /* intentionally empty */
+        });
+      }
+    });
+  });
+
   describe('If a grail item is found during an active run', () => {
     beforeEach(() => {
       rawDb.exec(`
@@ -540,28 +647,6 @@ describe('When the progress of found items is announced', () => {
       expect(newProgress.id).not.toBe('manual-progress');
       expect(database.addRunItem).toHaveBeenCalledWith(
         expect.objectContaining({ runId: 'run-1', grailProgressId: newProgress.id }),
-      );
-    });
-  });
-
-  describe('If an item is found in a modern shared stash without a character row', () => {
-    it.each([
-      ['Modern Shared Stash Softcore', false],
-      ['Modern Shared Stash Hardcore', true],
-    ])('Then %s is stored as a shared_stash character (hardcore: %s)', (stashName, hardcore) => {
-      // Arrange
-      const { service, database } = createDependencies();
-      const stashFile = D2SaveFileBuilder.new().withName('Other').build();
-      database.getCharacterBySaveFilePath.mockReturnValue(
-        CharacterBuilder.new().withName('Other').build(),
-      );
-
-      // Act
-      service.recordSaveFile(stashFile, [createFoundItem({ characterName: stashName })]);
-
-      // Assert
-      expect(database.upsertCharacter).toHaveBeenCalledWith(
-        expect.objectContaining({ name: stashName, characterClass: 'shared_stash', hardcore }),
       );
     });
   });

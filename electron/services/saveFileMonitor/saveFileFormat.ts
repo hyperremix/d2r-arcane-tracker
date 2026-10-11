@@ -6,7 +6,7 @@ import { readD2iMetadata } from '../stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 
-/** Hardcore flag and version of a .d2i file, falling back to the file name when unreadable. */
+/** Hardcore flag (from the file name) and version (from the header, when readable) of a .d2i file. */
 export interface D2iHeaderInfo {
   hardcore: boolean;
   version?: number;
@@ -33,6 +33,16 @@ const CHARACTER_CLASSES = [
   'druid',
   'assassin',
 ];
+
+/**
+ * True when the file name marks a hardcore stash. D2R tells its stashes apart by name only
+ * (SharedStashSoftCoreV2.d2i / SharedStashHardCoreV2.d2i, ModernSharedStashSoftCoreV2.d2i /
+ * ModernSharedStashHardCoreV2.d2i); the .d2i header has no game mode flag.
+ * @param filePath - Path or file name of the stash
+ */
+export function isHardcoreStashFileName(filePath: string): boolean {
+  return basename(filePath).toLowerCase().includes('hardcore');
+}
 
 /** True for backup copies of a .d2i stash (`_backup`, `.bak`, `_bak`, `-bak`), which are not scanned. */
 export function isBackupLikeStashFile(fileName: string): boolean {
@@ -100,8 +110,7 @@ export function getSaveNameFromPath(
   // Use friendly names for shared stash files
   if (extension === '.d2i') {
     // Use provided hardcore status if available, otherwise fall back to filename
-    const hardcore =
-      isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
+    const hardcore = isHardcore ?? isHardcoreStashFileName(filePath);
     saveName = resolveSharedStashName(hardcore, sourceFileVersion);
   }
 
@@ -117,21 +126,22 @@ export function getCharacterClass(classId: number): string {
   return CHARACTER_CLASSES[classId] || 'unknown';
 }
 
-/** Reads the hardcore flag and version of a .d2i file, falling back to the file name. */
+/**
+ * Reads the game mode and version of a .d2i file. The game mode comes from the file name, as the
+ * header does not hold one; the version is left out when the header cannot be read.
+ */
 export function readD2iHeaderInfo(filePath: string, buffer: Buffer): D2iHeaderInfo {
+  const hardcore = isHardcoreStashFileName(filePath);
   try {
     const metadata = readD2iMetadata(buffer);
     log.info(
       'readD2iHeaderInfo',
-      `Parsed .d2i metadata, hardcore: ${metadata.hardcore}, version: ${metadata.version}`,
+      `Parsed .d2i metadata, hardcore: ${hardcore}, version: ${metadata.version}`,
     );
-    return { hardcore: metadata.hardcore, version: metadata.version };
+    return { hardcore, version: metadata.version };
   } catch (error) {
-    log.warn(
-      'readD2iHeaderInfo',
-      `Failed to read .d2i metadata, falling back to filename: ${error}`,
-    );
-    return { hardcore: basename(filePath).toLowerCase().includes('hardcore') };
+    log.warn('readD2iHeaderInfo', `Failed to read .d2i metadata: ${error}`);
+    return { hardcore };
   }
 }
 
@@ -176,7 +186,7 @@ export function buildSaveFileHeader(
       lastModified,
       characterClass: 'shared_stash',
       level: 1,
-      hardcore: hints.stashHardcore ?? basename(filePath).toLowerCase().includes('hardcore'),
+      hardcore: hints.stashHardcore ?? isHardcoreStashFileName(filePath),
       expansion: true,
     };
   }

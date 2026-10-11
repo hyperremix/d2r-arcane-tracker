@@ -33,7 +33,6 @@ describe('When parseModernStash parses v105 fixtures', () => {
 
     // Assert
     expect(parsed.version).toBe(105);
-    expect(parsed.hardcore).toBe(false);
     expect(parsed.items.length).toBeGreaterThan(0);
     expect(parsed.items.length).toBe(130);
 
