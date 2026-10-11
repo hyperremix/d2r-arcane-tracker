@@ -1098,7 +1098,6 @@
       "showAll": "Show all runewords"
     },
     "card": {
-      "viewDetails": "View details",
       "sockets_one": "{{count}} socket",
       "sockets_other": "{{count}} sockets",
       "runesOwned": "{{available}}/{{total}} runes",

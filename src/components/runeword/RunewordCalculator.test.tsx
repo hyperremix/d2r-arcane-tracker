@@ -337,7 +337,9 @@ describe('RunewordCalculator', () => {
       // Assert
       const steelCard = getCard('Steel');
       const stealthCard = getCard('Stealth');
-      expect(within(steelCard).getByRole('link', { name: 'View details' })).toBeInTheDocument();
+      expect(
+        within(steelCard).getByRole('link', { name: 'View on d2runewizard' }),
+      ).toBeInTheDocument();
       expect(within(stealthCard).queryByRole('link')).not.toBeInTheDocument();
     });
 
@@ -348,7 +350,9 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Act
-      const notPrevented = fireEvent.click(screen.getByRole('link', { name: 'View details' }));
+      const notPrevented = fireEvent.click(
+        screen.getByRole('link', { name: 'View on d2runewizard' }),
+      );
 
       // Assert
       expect(notPrevented).toBe(false);

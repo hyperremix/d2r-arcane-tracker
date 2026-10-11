@@ -46,15 +46,15 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         className,
       )}
     >
-      {/* Header with name and completion badge */}
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="min-w-0 flex-1 break-words font-semibold text-lg leading-tight">
-          {runeword.name}
-        </h3>
+      {/* Header: the name gets the full card width and the completion badge sits on its own line
+          below it, so long names never collide with the badge. Most names fit on one line; a
+          long one wraps instead of being cut off. */}
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
+        <h3 className="w-full break-words font-semibold text-lg leading-tight">{runeword.name}</h3>
         <Badge
           variant={completionStatus.complete ? 'default' : 'outline'}
           className={cn(
-            'shrink-0 font-mono',
+            'font-mono',
             completionStatus.complete && 'bg-success text-success-foreground',
           )}
         >
@@ -85,7 +85,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         )}
       </div>
 
-      {/* Footer: one socket per rune, and a link to the full runeword details */}
+      {/* Footer: one socket per rune, and a link to the runeword's page on an external site */}
       <div className="flex items-end justify-between gap-2 border-border border-t pt-3 text-xs">
         {socketCount > 0 && (
           <span className="text-muted-foreground">
@@ -103,7 +103,10 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
               window.electronAPI?.shell.openExternal(runeword.link);
             }}
           >
-            {t(translations.runeword.card.viewDetails)}
+            {/* Name the external site the link opens, like the item details dialog does */}
+            {runeword.link.includes('diablo2.io')
+              ? t(translations.grail.itemDetails.viewOnDiablo2io)
+              : t(translations.grail.itemDetails.viewOnD2runewizard)}
             <ExternalLink aria-hidden="true" className="size-3" />
           </a>
         )}
