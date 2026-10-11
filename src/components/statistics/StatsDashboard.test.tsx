@@ -10,9 +10,9 @@ import type {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
+import { buildRune } from '@/test/buildRune';
 import { mockStoreState } from '@/test/storeMock';
 import { StatsDashboard } from './StatsDashboard';
-import { buildRune } from './testFixtures';
 
 vi.mock('@/stores/grailStore', () => ({
   useGrailStatistics: vi.fn(),

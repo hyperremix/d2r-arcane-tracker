@@ -1,8 +1,8 @@
 import type { Item } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { buildRune } from '@/test/buildRune';
 import { findLastTrackedFind, summarizeRunes, summarizeSets } from './dashboardHighlights';
-import { buildRune } from './testFixtures';
 
 const NORMAL_ONLY = { grailNormal: true, grailEthereal: false };
 const ETHEREAL_ONLY = { grailNormal: false, grailEthereal: true };
