@@ -53,6 +53,10 @@ function stubElectronApi({
   return api;
 }
 
+function getCard(name: string): HTMLElement {
+  return screen.getByRole('heading', { name }).closest('[data-slot="card"]') as HTMLElement;
+}
+
 function getCardTitles(): string[] {
   return screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent ?? '');
 }
@@ -282,17 +286,11 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
 
       // Assert
-      const infinityCard = screen
-        .getByRole('heading', { name: 'Infinity' })
-        .closest('[data-slot="card"]');
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]');
-      expect(within(infinityCard as HTMLElement).getByText('2/4 runes')).toBeInTheDocument();
-      expect(
-        within(infinityCard as HTMLElement).getByText('2 of 4 runes available'),
-      ).toBeInTheDocument();
-      expect(within(steelCard as HTMLElement).getByText('2/2 runes')).toBeInTheDocument();
+      const infinityCard = getCard('Infinity');
+      const steelCard = getCard('Steel');
+      expect(within(infinityCard).getByText('2/4 runes')).toBeInTheDocument();
+      expect(within(infinityCard).getByText('2 of 4 runes available')).toBeInTheDocument();
+      expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
     });
 
     it('If a runeword is craftable, Then the badge is the only completion signal on its card', async () => {
@@ -303,9 +301,7 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const steelCard = getCard('Steel');
       expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
       expect(within(steelCard).queryByText(/All runes available/)).not.toBeInTheDocument();
     });
@@ -319,12 +315,8 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
 
       // Assert
-      const infinityCard = screen
-        .getByRole('heading', { name: 'Infinity' })
-        .closest('[data-slot="card"]') as HTMLElement;
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const infinityCard = getCard('Infinity');
+      const steelCard = getCard('Steel');
       expect(within(infinityCard).getByText('4 sockets')).toBeInTheDocument();
       expect(within(steelCard).getByText('2 sockets')).toBeInTheDocument();
     });
@@ -343,12 +335,8 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]') as HTMLElement;
-      const stealthCard = screen
-        .getByRole('heading', { name: 'Stealth' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const steelCard = getCard('Steel');
+      const stealthCard = getCard('Stealth');
       expect(within(steelCard).getByRole('link', { name: 'View details' })).toBeInTheDocument();
       expect(within(stealthCard).queryByRole('link')).not.toBeInTheDocument();
     });
@@ -375,9 +363,7 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const steelCard = getCard('Steel');
       expect(steelCard).toHaveClass('row-span-3', 'grid-rows-subgrid');
     });
   });
@@ -392,9 +378,7 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
 
       // Assert
-      const enigmaCard = screen
-        .getByRole('heading', { name: 'Enigma' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const enigmaCard = getCard('Enigma');
       await waitFor(() =>
         expect(within(enigmaCard).getAllByTestId('missing-rune-marker')).toHaveLength(1),
       );

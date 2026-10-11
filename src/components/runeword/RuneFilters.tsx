@@ -85,8 +85,8 @@ export function RuneFilters({
         </p>
       </div>
 
-      {/* Two-column rune list. The sidebar card is about 610px tall with every rune shown (about
-          655px with the selection summary), so the list only scrolls in windows below ~830px tall */}
+      {/* Two-column rune list. The sidebar card is about 607px tall with every rune shown (about
+          656px with the selection summary), so the list only scrolls in windows below ~830px tall */}
       <fieldset
         aria-labelledby={headingId}
         className="grid min-h-32 min-w-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto pb-1"

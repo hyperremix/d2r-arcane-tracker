@@ -19,17 +19,24 @@ function createRuneword(runes: string[] | undefined, link = ''): Item {
 }
 
 // Other suites define a non-configurable `window.electronAPI` (vitest runs with isolate: false),
-// so it is replaced by assignment and restored after each test.
+// so it is replaced by assignment rather than vi.stubGlobal, and restored after each test.
 const windowGlobals = window as unknown as Record<string, unknown>;
 let originalElectronAPI: PropertyDescriptor | undefined;
 
-describe('RunewordCard sockets', () => {
+function stubElectronApi() {
+  windowGlobals.electronAPI = {
+    icon: { getByFilename: vi.fn().mockResolvedValue(undefined) },
+  };
+}
+
+function renderCard(runes: string[] | undefined) {
+  stubElectronApi();
+  render(<RunewordCard runeword={createRuneword(runes)} availableRunes={{}} />);
+}
+
+describe('RunewordCard', () => {
   beforeEach(() => {
     originalElectronAPI = Object.getOwnPropertyDescriptor(window, 'electronAPI');
-    windowGlobals.electronAPI = {
-      icon: { getByFilename: vi.fn().mockResolvedValue(undefined) },
-      shell: { openExternal: vi.fn() },
-    };
   });
 
   afterEach(() => {
@@ -42,7 +49,7 @@ describe('RunewordCard sockets', () => {
 
   it('When a runeword has several runes, Then the footer shows one socket per rune', () => {
     // Arrange & Act
-    render(<RunewordCard runeword={createRuneword(['tir', 'el'])} availableRunes={{}} />);
+    renderCard(['tir', 'el']);
 
     // Assert
     expect(screen.getByText('2 sockets')).toBeInTheDocument();
@@ -50,7 +57,7 @@ describe('RunewordCard sockets', () => {
 
   it('When a runeword has a single rune, Then the footer uses the singular form', () => {
     // Arrange & Act
-    render(<RunewordCard runeword={createRuneword(['tir'])} availableRunes={{}} />);
+    renderCard(['tir']);
 
     // Assert
     expect(screen.getByText('1 socket')).toBeInTheDocument();
@@ -61,9 +68,20 @@ describe('RunewordCard sockets', () => {
     ['no runes list', undefined],
   ])('If a runeword has %s, Then no socket count is shown', (_label, runes) => {
     // Arrange & Act
-    render(<RunewordCard runeword={createRuneword(runes)} availableRunes={{}} />);
+    renderCard(runes);
 
     // Assert
     expect(screen.queryByText(/socket/)).not.toBeInTheDocument();
+  });
+
+  it('When the card is rendered, Then it is a positioned container for the badge sr-only text', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el']);
+
+    // Assert
+    // The badge's sr-only span is position: absolute. Without a positioned card it would be
+    // contained by the page and stretch the document's scrollable height.
+    const card = screen.getByRole('heading', { name: 'Steel' }).closest('[data-slot="card"]');
+    expect(card).toHaveClass('relative');
   });
 });

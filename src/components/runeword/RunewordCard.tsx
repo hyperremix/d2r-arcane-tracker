@@ -28,6 +28,9 @@ interface RunewordCardProps {
  * a subgrid, so headers, rune rows and footers line up across every card in the same grid row
  * even when a long name wraps. The card sets `gap-[normal]`, which makes the subgrid inherit its
  * row gap from the parent grid, so the gap is defined in one place (the grid).
+ *
+ * The card is `relative` so the badge's absolutely positioned `sr-only` text is contained by the
+ * card instead of the page, where it would stretch the document's scrollable height.
  */
 export function RunewordCard({ runeword, availableRunes, className }: RunewordCardProps) {
   const { t } = useTranslation();
@@ -39,7 +42,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
   return (
     <Card
       className={cn(
-        'row-span-3 grid grid-rows-subgrid gap-[normal] px-6 transition-all hover:shadow-md',
+        'relative row-span-3 grid grid-rows-subgrid gap-[normal] px-6 transition-all hover:shadow-md',
         className,
       )}
     >
