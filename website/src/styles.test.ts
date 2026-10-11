@@ -26,12 +26,13 @@ function uiImportsOf(source: string): string[] {
   return [...source.matchAll(/['"]@\/components\/ui\/([\w-]+)['"]/g)].map((match) => match[1]);
 }
 
-/** Every relative import in a ui component that resolves to another file in the ui folder. */
+/** Every import in a ui component of another ui component: the `@/components/ui/` alias or relative. */
 function siblingUiImportsOf(source: string): string[] {
-  return [...source.matchAll(/['"](\.{1,2}\/[^'"]+)['"]/g)]
+  const relative = [...source.matchAll(/['"](\.{1,2}\/[^'"]+)['"]/g)]
     .map((match) => resolve(uiDir, match[1]))
     .filter((path) => dirname(path) === uiDir)
     .map((path) => path.slice(uiDir.length + 1));
+  return [...uiImportsOf(source), ...relative];
 }
 
 /** The ui components the site imports, plus the ui components those import in turn. */
