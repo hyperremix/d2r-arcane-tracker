@@ -4,13 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { translations } from '@/i18n/translations';
-import { shortcutFromEvent } from '@/lib/hotkeys';
+import { formatShortcutForDisplay, shortcutFromEvent } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
 interface ShortcutRecorderProps {
   id: string;
   label: string;
+  /** The stored shortcut (e.g. "Ctrl+R"); shown with platform-correct labels (e.g. "⌘R" on macOS). */
   value: string;
+  /** A stored-format shortcut shown as the placeholder, formatted like the value. */
   placeholder?: string;
   description?: string;
   onChange: (shortcut: string) => void;
@@ -73,8 +75,8 @@ export function ShortcutRecorder({
         <Input
           id={id}
           readOnly
-          value={value || ''}
-          placeholder={placeholder}
+          value={value ? formatShortcutForDisplay(value) : ''}
+          placeholder={placeholder ? formatShortcutForDisplay(placeholder) : undefined}
           className={cn('h-8 text-xs', isRecording && 'border-primary ring-2 ring-primary/30')}
         />
         <Button

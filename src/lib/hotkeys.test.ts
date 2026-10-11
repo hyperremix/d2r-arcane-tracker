@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { matchesShortcut, normalizeShortcut, parseShortcut, shortcutFromEvent } from './hotkeys';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  formatShortcutForDisplay,
+  matchesShortcut,
+  normalizeShortcut,
+  parseShortcut,
+  shortcutFromEvent,
+} from './hotkeys';
 
 describe('hotkeys helpers', () => {
   describe('normalizeShortcut', () => {
@@ -146,6 +152,71 @@ describe('hotkeys helpers', () => {
       // Assert
       expect(stored).toBe('Ctrl+Shift++');
       expect(result).toBe(true);
+    });
+  });
+
+  describe('formatShortcutForDisplay', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    afterEach(() => {
+      window.electronAPI = originalElectronAPI;
+    });
+
+    it.each([
+      ['Ctrl+R', '\u2318R'],
+      ['Ctrl+Space', '\u2318Space'],
+      ['Ctrl+E', '\u2318E'],
+      ['Ctrl+Shift+E', '\u21E7\u2318E'],
+      ['Ctrl+Alt+N', '\u2325\u2318N'],
+      ['Ctrl+Shift+Alt+F5', '\u2325\u21E7\u2318F5'],
+    ])('When %s is shown on macOS, Then it reads %s with the Command symbol', (stored, expected) => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay(stored, { isMac: true });
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    it.each([
+      ['Ctrl+R', 'Ctrl+R'],
+      ['ctrl + shift + e', 'Ctrl+Shift+E'],
+      ['Ctrl+Space', 'Ctrl+Space'],
+    ])('When %s is shown on Windows or Linux, Then it reads %s', (stored, expected) => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay(stored, { isMac: false });
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    it('If the shortcut has no usable key, Then it is shown unchanged', () => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay('Ctrl+Shift', { isMac: true });
+
+      // Assert
+      expect(result).toBe('Ctrl+Shift');
+    });
+
+    it('If the main process reports macOS, Then the label uses the Command symbol without an override', () => {
+      // Arrange
+      window.electronAPI = { platform: 'darwin' } as unknown as typeof window.electronAPI;
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('\u21E7\u2318E');
+    });
+
+    it('If the main process reports Windows, Then the label keeps Ctrl', () => {
+      // Arrange
+      window.electronAPI = { platform: 'win32' } as unknown as typeof window.electronAPI;
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('Ctrl+Shift+E');
     });
   });
 });

@@ -15,7 +15,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
-import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/date';
+import {
+  formatDuration,
+  formatSessionDateRelative,
+  formatShortDate,
+  formatTime,
+  isRecentFind,
+} from '@/lib/date';
 import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { PageNavigation } from './PageNavigation';
 import { SortableTableHead, type SortOrder } from './SortableTableHead';
@@ -27,6 +33,8 @@ interface SessionsListProps {
 type SortField = 'startTime' | 'duration' | 'runCount' | 'itemsFound';
 
 const ITEMS_PER_PAGE = 10;
+// Sessions younger than this many days show a relative day ("3 days ago") instead of a date
+const SESSION_DAY_RELATIVE_DAYS = 7;
 
 interface SessionTableRowProps {
   session: Session;
@@ -63,9 +71,9 @@ function SessionTableRow({
       aria-label={t(translations.runTracker.sessionsList.viewSessionDetails, { date: sessionDate })}
     >
       <TableCell className="font-medium">{sessionDate}</TableCell>
-      <TableCell className="font-mono text-sm">{formatTime(session.startTime)}</TableCell>
-      <TableCell className="font-mono text-sm">{formatTime(session.endTime)}</TableCell>
-      <TableCell className="font-mono text-sm">{formatDuration(duration)}</TableCell>
+      <TableCell className="text-sm tabular-nums">{formatTime(session.startTime)}</TableCell>
+      <TableCell className="text-sm tabular-nums">{formatTime(session.endTime)}</TableCell>
+      <TableCell className="text-sm tabular-nums">{formatDuration(duration)}</TableCell>
       <TableCell className="text-center">{session.runCount}</TableCell>
       <TableCell className="text-center">{sessionStats ? sessionStats.itemsFound : 0}</TableCell>
     </TableRow>
@@ -287,9 +295,13 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
     setCurrentPage(1);
   }, [showArchived]);
 
-  // Localized session day ("Today", "3 days ago", ...)
+  // Localized session day: "Today", "Yesterday" or "3 days ago" within the last week, and the
+  // compact localized date (e.g. "Feb 1, 2026") before that, so older rows stay short
   const formatSessionDay = useCallback(
-    (date: Date) => formatSessionDateRelative(date, t, i18n.language),
+    (date: Date) =>
+      isRecentFind(date, SESSION_DAY_RELATIVE_DAYS)
+        ? formatSessionDateRelative(date, t, i18n.language)
+        : formatShortDate(date, i18n.language),
     [t, i18n.language],
   );
 

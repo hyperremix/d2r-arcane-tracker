@@ -21,13 +21,13 @@ import { Switch } from '@/components/ui/switch';
 import { isGlobalHotkeysActive, useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
-import { matchesShortcut } from '@/lib/hotkeys';
+import { formatShortcutForDisplay, matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import type { RunTrackerAction } from '@/stores/runTrackerStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { getLiveSessionState } from '../liveSession';
 import { SessionStateBadge } from '../SessionStateBadge';
-import type { ControlButtonsPending } from './ControlButtons';
+import type { ControlButtonsPending, RunTrackerShortcuts } from './ControlButtons';
 import { ControlButtons, ShortcutsInfo } from './ControlButtons';
 import { LiveRunTimer } from './LiveRunTimer';
 import { ManualItemEntry } from './ManualItemEntry';
@@ -92,6 +92,16 @@ function PendingLabel({ pending, label, pendingLabel }: PendingLabelProps) {
   );
 }
 
+// Helper function to turn the stored shortcuts into platform-correct labels (e.g. "⌘R" on macOS)
+function _getDisplayShortcuts(shortcuts: RunTrackerShortcuts): RunTrackerShortcuts {
+  return {
+    startRun: formatShortcutForDisplay(shortcuts.startRun),
+    pauseRun: formatShortcutForDisplay(shortcuts.pauseRun),
+    endRun: formatShortcutForDisplay(shortcuts.endRun),
+    endSession: formatShortcutForDisplay(shortcuts.endSession),
+  };
+}
+
 // Helper function to map store action pending flags to the control buttons
 function _getControlsPending(
   pendingActions: Partial<Record<RunTrackerAction, boolean>>,
@@ -106,7 +116,8 @@ function _getControlsPending(
 }
 
 /**
- * SessionControls component that renders the live session area: a large current-run timer,
+ * SessionControls component that renders the live session area: a large current-run timer
+ * (or, without a session, a one-line invitation to start one),
  * a session state badge and the state-dependent run actions (with keyboard shortcuts),
  * plus auto mode and manual item entry.
  */
@@ -151,6 +162,7 @@ export function SessionControls() {
     endRun: 'Ctrl+E',
     endSession: 'Ctrl+Shift+E',
   };
+  const displayShortcuts = useMemo(() => _getDisplayShortcuts(shortcuts), [shortcuts]);
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
@@ -369,15 +381,23 @@ export function SessionControls() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-6">
-            {/* Live top row: current run timer and the state-dependent actions */}
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <LiveRunTimer
-                elapsedMs={runElapsed}
-                runNumber={activeRun?.runNumber}
-                paused={isPaused}
-              />
+            {/* Live top row: the current run timer (or, without a session, a short invitation to
+                start one) and the state-dependent actions. The row keeps the timer's height in
+                both states so the card does not jump when a session starts. */}
+            <div className="flex min-h-24 flex-wrap items-end justify-between gap-4">
+              {activeSession ? (
+                <LiveRunTimer
+                  elapsedMs={runElapsed}
+                  runNumber={activeRun?.runNumber}
+                  paused={isPaused}
+                />
+              ) : (
+                <p className="max-w-prose self-center text-muted-foreground text-sm">
+                  {t(translations.runTracker.sessionCard.startSessionPrompt)}
+                </p>
+              )}
               <ControlButtons
-                shortcuts={shortcuts}
+                shortcuts={displayShortcuts}
                 hasSession={Boolean(activeSession)}
                 hasActiveRun={Boolean(activeRun)}
                 autoModeEnabled={autoTrackingActive}
@@ -396,12 +416,6 @@ export function SessionControls() {
                 onEndSession={() => setShowEndSessionDialog(true)}
               />
             </div>
-
-            {!activeSession && (
-              <p className="text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.startSessionPrompt)}
-              </p>
-            )}
 
             {/* Auto Mode Toggle - Windows only */}
             {isWindows && activeSession && (
@@ -444,7 +458,7 @@ export function SessionControls() {
               />
             )}
 
-            <ShortcutsInfo shortcuts={shortcuts} globalHotkeysActive={globalHotkeysActive} />
+            <ShortcutsInfo shortcuts={displayShortcuts} globalHotkeysActive={globalHotkeysActive} />
           </div>
         </CardContent>
       </Card>

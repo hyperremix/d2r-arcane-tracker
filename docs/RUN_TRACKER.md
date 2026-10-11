@@ -12,11 +12,11 @@ Data is stored locally. Closing or crashing the app ends any open session, and y
 
 ## The Run Tracker page
 
-Open the Run Tracker from the title bar (the **Run Counter** button). The page is built to be read at a glance between runs:
+Open the Run Tracker from **Runs** in the title bar. The page is built to be read at a glance between runs:
 
-- **Live session**: a large timer for the current run and a status badge (**Running**, **Paused**, **Idle** or **No Session**). Next to it is one main button that changes with the state: **Start New Session** when no session is active, **Start Run** between runs, and **End Run** during a run. In manual mode, **End Session** sits beside **Start Run** between runs, and **Pause**/**Resume** and **End Session** sit beside **End Run** during a run. With [auto mode](#auto-mode-windows-only) on, the run buttons are replaced and only **End Session** remains. **End Run** on the page (the button or its in-app shortcut) ends the run right away and shows a short confirmation message; runs ended by a [global hotkey](#global-hotkeys) or by auto mode show no message. Only **End Session** asks you to confirm first. Below are **Auto Mode** (Windows only), **Add Item Manually** and a reminder of your keyboard shortcuts.
+- **Live session**: a large timer for the current run and a status badge (**Running**, **Paused**, **Idle** or **No Session**). Without a session, the timer is hidden and a short line invites you to start one. Next to it is one main button that changes with the state: **Start New Session** when no session is active, **Start Run** between runs, and **End Run** during a run. In manual mode, **End Session** sits beside **Start Run** between runs, and **Pause**/**Resume** and **End Session** sit beside **End Run** during a run. With [auto mode](#auto-mode-windows-only) on, the run buttons are replaced and only **End Session** remains. **End Run** on the page (the button or its in-app shortcut) ends the run right away and shows a short confirmation message; runs ended by a [global hotkey](#global-hotkeys) or by auto mode show no message. Only **End Session** asks you to confirm first. Below are **Auto Mode** (Windows only), **Add Item Manually** and a reminder of your keyboard shortcuts.
 - **Active session**: a compact row of session time, run count, average and fastest run, efficiency, items found and new grail items, then **Recent Runs** and the session actions. Recent Runs lists the last five finished runs, newest first, with each run's duration and the items found in it. **View all runs** opens the full run history of the active session. **Session Notes** are collapsed by default; select the toggle to open them. Notes are saved with the session when you leave the field, and you can also edit them from a session's detail view. Notes can be up to 10,000 characters long. Archive and export are at the bottom. **Archive Session** is unavailable while a run of the session is in progress (paused included), both here and in the session's detail view; end the run first. The app refuses to archive such a session even if the request doesn't come from the button.
-- **Sessions list**: past sessions. Select one to see its runs, the items in each run, and summary stats.
+- **Sessions list**: past sessions. Sessions from the last week show a relative day (**Today**, **Yesterday**, *3 days ago*), older ones a short date. Select one to see its runs, the items in each run, and summary stats.
 
 Efficiency is the share of the session spent in runs. It updates live and counts the run in progress, so it is correct before your first run ends.
 
@@ -46,12 +46,14 @@ Auto mode only reads memory and never writes to the game process. Each D2R patch
 
 Turn auto mode off to use the buttons, or use these shortcuts. You can change the shortcuts in **Settings → Run Tracker Settings**.
 
-| Action | Default |
-| --- | --- |
-| Start run | `Ctrl+R` |
-| Pause / resume run | `Ctrl+Space` |
-| End run | `Ctrl+E` |
-| End session | `Ctrl+Shift+E` |
+| Action | Default (Windows, Linux) | Default (macOS) |
+| --- | --- | --- |
+| Start run | `Ctrl+R` | `⌘R` |
+| Pause / resume run | `Ctrl+Space` | `⌘Space` |
+| End run | `Ctrl+E` | `⌘E` |
+| End session | `Ctrl+Shift+E` | `⇧⌘E` |
+
+On macOS the shortcuts use the Command key instead of Ctrl, both in the app and as [global hotkeys](#global-hotkeys), and the app shows them with the macOS key symbols.
 
 By default, shortcuts only work while the app window is focused on the Run Tracker page. They are ignored while you're typing in a text field.
 

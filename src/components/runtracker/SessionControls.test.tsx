@@ -200,6 +200,24 @@ describe('SessionControls', () => {
       expect(screen.getByText('0:00')).not.toHaveClass('text-muted-foreground/60');
     });
 
+    it('If no session is active, Then the timer is hidden and a one-line invitation sits next to the start button', () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.queryByText('0:00')).not.toBeInTheDocument();
+      expect(screen.queryByText('Current Run')).not.toBeInTheDocument();
+      expect(screen.queryByText('No run in progress')).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Start a session to track your runs and the items you find.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeInTheDocument();
+      expect(screen.getByText('Keyboard Shortcuts:')).toBeInTheDocument();
+    });
+
     it('When the run is paused, Then the timer stays frozen at the time it was paused', () => {
       // Arrange
       vi.useFakeTimers({ toFake: ['Date'] });
@@ -1029,6 +1047,63 @@ describe('SessionControls', () => {
 
       // Assert
       expect(mockStoreActions.startRun).toHaveBeenCalled();
+    });
+  });
+
+  describe('Shortcut labels', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    const setPlatform = (platform: string) => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform,
+          runTracker: {
+            getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+    };
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('When the app runs on macOS, Then the shortcut hint shows the Command key that actually fires', () => {
+      // Arrange
+      setPlatform('darwin');
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(
+        screen.getByText(
+          '\u2318R (Start), \u2318Space (Pause/Resume), \u2318E (End Run), \u21E7\u2318E (End Session)',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('When the app runs on Windows, Then the shortcut hint shows Ctrl', () => {
+      // Arrange
+      setPlatform('win32');
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(
+        screen.getByText(
+          'Ctrl+R (Start), Ctrl+Space (Pause/Resume), Ctrl+E (End Run), Ctrl+Shift+E (End Session)',
+        ),
+      ).toBeInTheDocument();
     });
   });
 

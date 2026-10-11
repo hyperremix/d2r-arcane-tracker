@@ -39,7 +39,21 @@ const DISPLAY_KEY_OVERRIDES: Record<string, string> = {
   arrowright: 'ArrowRight',
 };
 
+// macOS modifier symbols, in Apple's standard order (Option, Shift, Command)
+const MAC_ALT_SYMBOL = '\u2325';
+const MAC_SHIFT_SYMBOL = '\u21E7';
+const MAC_COMMAND_SYMBOL = '\u2318';
+
+/**
+ * Whether the app runs on macOS. Prefers the platform reported by the main process, which also
+ * decides how global hotkeys bind ("CommandOrControl" is Command on macOS), and falls back to
+ * the browser's platform string.
+ */
 const isPlatformMac = () => {
+  const electronPlatform = typeof window === 'undefined' ? undefined : window.electronAPI?.platform;
+  if (electronPlatform) {
+    return electronPlatform === 'darwin';
+  }
   if (typeof navigator === 'undefined') {
     return false;
   }
@@ -166,6 +180,30 @@ export const parseShortcut = (shortcut: string): ParsedShortcut => {
 export const normalizeShortcut = (shortcut: string) => {
   const parsed = parseShortcut(shortcut);
   return buildShortcutString(parsed);
+};
+
+/**
+ * Formats a stored shortcut (e.g. "Ctrl+Shift+E") for display on the current platform. The stored
+ * "Ctrl" modifier fires as Command on macOS, both in the app window and as a global hotkey, so
+ * macOS shows the native symbols (e.g. "⇧⌘E"); Windows and Linux keep the "Ctrl+Shift+E" form.
+ * @param shortcut - The stored shortcut
+ * @param options - Optional platform override
+ * @returns The display label, or the input unchanged if it has no usable key
+ */
+export const formatShortcutForDisplay = (shortcut: string, options?: { isMac?: boolean }) => {
+  const parsed = parseShortcut(shortcut);
+  if (!parsed.key) {
+    return shortcut;
+  }
+  if (!resolveIsMac(options)) {
+    return buildShortcutString(parsed);
+  }
+  return [
+    parsed.alt ? MAC_ALT_SYMBOL : '',
+    parsed.shift ? MAC_SHIFT_SYMBOL : '',
+    parsed.ctrl ? MAC_COMMAND_SYMBOL : '',
+    formatKeyForDisplay(parsed.key),
+  ].join('');
 };
 
 const parseEvent = (event: KeyboardEventLike, isMac: boolean): ParsedShortcut => {

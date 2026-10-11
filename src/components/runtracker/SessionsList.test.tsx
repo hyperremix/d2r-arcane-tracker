@@ -106,6 +106,47 @@ describe('When SessionsList is rendered with previous sessions', () => {
     // Assert
     expect(screen.getAllByRole('row', { name: /^View session from .+ details$/ })).toHaveLength(2);
   });
+
+  it('Then sessions older than a week show a compact date instead of the full weekday date', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getAllByRole('cell', { name: 'Jan 1, 2024' })).toHaveLength(2);
+    expect(screen.queryByText('Monday, January 1, 2024')).not.toBeInTheDocument();
+  });
+
+  it('Then time columns use tabular numerals instead of a monospace font', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    const [firstRow] = screen.getAllByRole('row', { name: /^View session from .+ details$/ });
+    const [, startCell, endCell, durationCell] = within(firstRow).getAllByRole('cell');
+    for (const cell of [startCell, endCell, durationCell]) {
+      expect(cell).toHaveClass('tabular-nums');
+      expect(cell).not.toHaveClass('font-mono');
+    }
+  });
+});
+
+describe('When SessionsList is rendered with a session from today', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const session = createSession('s-today', 0, 30);
+    const now = new Date();
+    session.startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    session.endTime = new Date(session.startTime.getTime() + 30 * 60_000);
+    setupRunTrackerStore([session]);
+  });
+
+  it('Then the date column shows the relative day', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getByRole('cell', { name: 'Today' })).toBeInTheDocument();
+  });
 });
 
 describe('When SessionsList is rendered without previous sessions', () => {

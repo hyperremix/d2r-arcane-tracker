@@ -1167,7 +1167,7 @@
     "errorLoading": "Error Loading Run Tracker",
     "sessionCard": {
       "noActiveSession": "No active session",
-      "startSessionPrompt": "Start a session to begin tracking your runs and items.",
+      "startSessionPrompt": "Start a session to track your runs and the items you find.",
       "startNewSession": "Start New Session",
       "activeSession": "Active Session",
       "sessionTime": "Session Time",
