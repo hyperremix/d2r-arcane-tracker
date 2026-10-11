@@ -1,4 +1,4 @@
-import type { Item } from 'electron/types/grail';
+import type { Character, Item } from 'electron/types/grail';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
@@ -73,6 +73,13 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
 }
 
 /**
+ * Props of the list row.
+ */
+export interface ListViewProps extends ItemCardViewProps {
+  discoveringCharacters: Character[];
+}
+
+/**
  * ListView component that renders an item in list view mode, using the same found / missing
  * language as the grid: lit in its quality color when found, dim and neutral while missing.
  * When interactive props are provided the row is a focusable button-like element
@@ -89,7 +96,7 @@ export function ListView({
   showItemIcons,
   className,
   interactiveProps,
-}: ItemCardViewProps) {
+}: ListViewProps) {
   const { t } = useTranslation();
   // Tooltip triggers are only taken out of the tab order when the row itself is the focusable button.
   // Trade-off: on clickable rows the tooltip content (category, characters, find dates) is

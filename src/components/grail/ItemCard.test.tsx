@@ -451,6 +451,30 @@ describe('When ItemCard is rendered', () => {
       // Assert
       expect(screen.getByText("Lacquered Plate • Set: Tal Rasha's Wrappings")).toBeInTheDocument();
     });
+
+    it('Then the list row tooltip does not repeat the set that the row already shows', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('set')
+        .withName("Tal Rasha's Guardianship")
+        .withSetName("Tal Rasha's Wrappings")
+        .withItemBase('Lacquered Plate')
+        .build();
+      render(<ItemCard item={item} viewMode="list" />);
+
+      // Act
+      fireEvent.focus(
+        screen
+          .getByRole('heading', { name: "Tal Rasha's Guardianship" })
+          .closest('[data-slot="tooltip-trigger"]') as Element,
+      );
+
+      // Assert
+      expect(
+        await screen.findByText("Tal Rasha's Guardianship • Lacquered Plate"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Set: Tal Rasha's Wrappings")).not.toBeInTheDocument();
+    });
   });
 
   describe('If the tile layout is checked', () => {
@@ -507,6 +531,21 @@ describe('When ItemCard is rendered', () => {
       const ethereal = container.querySelector('[data-version="ethereal"]');
       expect(ethereal).toHaveTextContent('Eth');
       expect(ethereal).toHaveTextContent('Ethereal missing');
+    });
+
+    it('Then the list row keeps the full version labels and the regular pill markup', () => {
+      // Arrange
+      setupStoreMock({ grailEthereal: true });
+      const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} viewMode="list" />);
+
+      // Assert
+      const ethereal = container.querySelector('[data-version="ethereal"]');
+      expect(ethereal).toHaveTextContent('Ethereal');
+      expect(ethereal).not.toHaveTextContent('Eth missing');
+      expect(ethereal?.querySelector('.truncate')).toBeNull();
     });
   });
 

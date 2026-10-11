@@ -51,16 +51,6 @@ export function TypeToggleChips({
             key={type}
             type="button"
             aria-pressed={pressed}
-            // The visible "142/385" counter is read out as "142 of 385 found"
-            aria-label={
-              progress
-                ? t(translations.grail.advancedSearch.typeChipLabel, {
-                    type: label,
-                    found: progress.found,
-                    total: progress.total,
-                  })
-                : undefined
-            }
             onClick={() => onToggleType(type)}
             className={cn(
               'inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 font-medium text-muted-foreground text-sm outline-none transition-colors',
@@ -74,14 +64,19 @@ export function TypeToggleChips({
             />
             {label}
             {progress && (
-              <span
-                className={cn(
-                  'text-muted-foreground text-xs tabular-nums',
-                  pressed && 'text-foreground',
-                )}
-              >
-                {progress.found}/{progress.total}
-              </span>
+              <>
+                {/* Plain space between label and counter keeps the accessible name readable */}{' '}
+                <span
+                  className={cn(
+                    'text-muted-foreground text-xs tabular-nums',
+                    pressed && 'text-foreground',
+                  )}
+                >
+                  {progress.found}/{progress.total}
+                  {/* Extra word for screen readers; the name still contains the visible counter */}
+                  <span className="sr-only"> {t(translations.common.found)}</span>
+                </span>
+              </>
             )}
           </button>
         );

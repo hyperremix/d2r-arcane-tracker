@@ -6,6 +6,7 @@ import {
   COLUMN_GUTTER,
   createGridRows,
   getColumnCount,
+  getItemRowHeightEstimate,
   MIN_COLUMN_WIDTH,
   VirtualItemGrid,
 } from './VirtualItemGrid';
@@ -115,6 +116,8 @@ describe('When getColumnCount is called', () => {
   describe('If the grid fills a 1440px wide window', () => {
     it('Then at least ten compact tiles fit into a row', () => {
       // Arrange
+      // Content width of the grid: window 1440 - 2 x 24 (page padding p-6) + 2 x 16 (wrapper -mx-4)
+      // - 2 x 16 (grid padding p-4) = 1392. A little less leaves room for a scrollbar.
       const gridWidth = 1376;
 
       // Act
@@ -211,6 +214,28 @@ function stubLayout({ height = 600, width = 0 }: { height?: number; width?: numb
 function widthForColumns(columns: number) {
   return columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
 }
+
+describe('When getItemRowHeightEstimate is called', () => {
+  describe('If ethereal tracking is off', () => {
+    it('Then the estimate is the 112px tile plus the row gap', () => {
+      // Act
+      const estimate = getItemRowHeightEstimate(false);
+
+      // Assert
+      expect(estimate).toBe(112 + COLUMN_GUTTER);
+    });
+  });
+
+  describe('If ethereal tracking is on', () => {
+    it('Then the estimate also covers the reserved 6px + 18px version pill row', () => {
+      // Act
+      const estimate = getItemRowHeightEstimate(true);
+
+      // Assert
+      expect(estimate).toBe(112 + 6 + 18 + COLUMN_GUTTER);
+    });
+  });
+});
 
 describe('When createGridRows is called', () => {
   describe('If a group has more items than fit into one row', () => {

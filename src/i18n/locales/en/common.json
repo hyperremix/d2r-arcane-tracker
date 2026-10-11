@@ -219,7 +219,6 @@
       "subCategoryChip": "{{category}}: {{subCategory}}",
       "resultCount_one": "{{shown}} of {{count}} item",
       "resultCount_other": "{{shown}} of {{count}} items",
-      "typeChipLabel": "{{type}}, {{found}} of {{total}} found",
       "subCategory": {
         "1h_swords": "1H Swords",
         "2h_swords": "2H Swords",

@@ -33,19 +33,24 @@ export interface ItemCardViewProps {
   isFound: boolean;
   allProgress: GrailProgress[];
   characters: Character[];
-  discoveringCharacters: Character[];
   /** Found state per tracked version; empty when only the normal version is tracked */
   versionStatuses: VersionStatus[];
   /** Date of a recent find, shown as a "New" badge; undefined hides the badge */
   recentFindDate: Date | undefined;
   showItemIcons: boolean;
-  /**
-   * Grid only: reserves the version pill row on every tile while ethereal tracking is on, so
-   * tiles with and without pills are equally tall and the rows of the wall line up.
-   */
-  reserveVersionRow?: boolean;
   className: string | undefined;
   interactiveProps?: InteractiveCardProps;
+}
+
+/**
+ * Props of the grid tile.
+ */
+export interface GridViewProps extends ItemCardViewProps {
+  /**
+   * Reserves the version pill row on every tile while ethereal tracking is on, so tiles with and
+   * without pills are equally tall and the rows of the wall line up.
+   */
+  reserveVersionRow?: boolean;
 }
 
 /**
@@ -122,7 +127,7 @@ export function GridView({
   reserveVersionRow = false,
   className,
   interactiveProps,
-}: ItemCardViewProps) {
+}: GridViewProps) {
   // Tooltip triggers are only taken out of the tab order when the card itself is the focusable button.
   // Trade-off: on clickable cards the tooltip content (category, characters, find dates) is
   // mouse-only by design: nested focusable elements are invalid inside a button, and keyboard and
@@ -177,7 +182,12 @@ export function GridView({
               </h3>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-sm">
-              <ItemTooltipBody item={item} allProgress={allProgress} characters={characters} />
+              <ItemTooltipBody
+                item={item}
+                allProgress={allProgress}
+                characters={characters}
+                showSetName
+              />
             </TooltipContent>
           </Tooltip>
 

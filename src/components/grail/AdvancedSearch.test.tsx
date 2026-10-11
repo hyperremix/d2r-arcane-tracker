@@ -444,7 +444,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       .asNormal()
       .build();
 
-    it('Then each type chip shows its found and total count and names it accessibly', () => {
+    it('Then each type chip shows its found and total count and its name contains the counter', () => {
       // Arrange
       useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
 
@@ -453,12 +453,12 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
       // Assert
       const types = screen.getByRole('group', { name: 'Types' });
-      const uniqueToggle = within(types).getByRole('button', { name: 'Unique, 1 of 2 found' });
-      expect(uniqueToggle).toHaveTextContent('Unique1/2');
+      // The accessible name starts with the visible label text ("Unique 1/2"), so voice control
+      // users can say what they see
+      const uniqueToggle = within(types).getByRole('button', { name: /^Unique 1\/2/ });
+      expect(uniqueToggle).toHaveTextContent('Unique 1/2');
       expect(uniqueToggle).toHaveAttribute('aria-pressed', 'false');
-      expect(within(types).getByRole('button', { name: 'Set, 0 of 1 found' })).toHaveTextContent(
-        'Set0/1',
-      );
+      expect(within(types).getByRole('button', { name: /^Set 0\/1/ })).toHaveTextContent('Set 0/1');
     });
 
     it('Then the counts include tracked ethereal versions, like the overall progress', () => {
@@ -470,7 +470,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       render(<AdvancedSearch />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Unique, 1 of 3 found' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Unique 1\/3/ })).toBeInTheDocument();
     });
 
     it('Then the counts do not change when filters narrow the shown items', () => {
@@ -482,11 +482,11 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       render(<AdvancedSearch />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Unique, 1 of 2 found' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: /^Unique 1\/2/ })).toHaveAttribute(
         'aria-pressed',
         'false',
       );
-      expect(screen.getByRole('button', { name: 'Set, 0 of 1 found' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: /^Set 0\/1/ })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
@@ -496,7 +496,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
       render(<AdvancedSearch />);
-      const uniqueToggle = screen.getByRole('button', { name: 'Unique, 1 of 2 found' });
+      const uniqueToggle = screen.getByRole('button', { name: /^Unique 1\/2/ });
 
       // Act
       fireEvent.click(uniqueToggle);

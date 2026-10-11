@@ -28,8 +28,9 @@ import { ViewOptionsPopover } from './search/ViewOptionsPopover';
 /**
  * AdvancedSearch renders the Holy Grail toolbar shown above the item grid.
  * It provides search (with a `/` / Ctrl+F shortcut), a found-status segmented control, item type
- * toggle chips that also show the progress of each type, a filters popover (fuzzy search, categories and sub-categories), a view popover
- * (grid/list, sorting and grouping) and a live result count.
+ * toggle chips that also show the progress of each type, a filters popover (fuzzy search,
+ * categories and sub-categories), a view popover (grid/list, sorting and grouping) and a live
+ * result count.
  * The grail store is the single source of truth for all filter values.
  * @returns {JSX.Element} The grail toolbar with active filter chips
  */

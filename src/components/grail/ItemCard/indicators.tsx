@@ -187,17 +187,15 @@ export function VersionPills({
           >
             <span
               aria-hidden="true"
-              className={cn('inline-flex min-w-0 items-center', compact ? 'gap-0.5' : 'gap-1')}
+              className={cn('inline-flex items-center', compact ? 'min-w-0 gap-0.5' : 'gap-1')}
             >
               {status.isFound ? (
-                <Check
-                  className={cn('shrink-0', compact ? 'size-2.5' : 'size-3')}
-                  strokeWidth={3}
-                />
+                <Check className={compact ? 'size-2.5 shrink-0' : 'size-3'} strokeWidth={3} />
               ) : (
-                <Circle className={cn('shrink-0', compact ? 'size-2' : 'size-2.5')} />
+                <Circle className={compact ? 'size-2 shrink-0' : 'size-2.5'} />
               )}
-              <span className="truncate">{pillLabel}</span>
+              {/* Compact pills may be squeezed by narrow tiles: the label truncates, not the icon */}
+              {compact ? <span className="truncate">{pillLabel}</span> : pillLabel}
             </span>
             <span className="sr-only">{getVersionStatusLabel(status, t)}</span>
           </li>
