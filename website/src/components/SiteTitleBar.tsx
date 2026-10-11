@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { BookOpen, Download, Github, LayoutGrid } from 'lucide-react';
+import { BookOpen, CircleHelp, Download, Github, LayoutGrid } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { links } from '../content';
@@ -11,9 +11,11 @@ interface SectionLink {
   icon: LucideIcon;
 }
 
+// In page order: the active section is the last one scrolled past
 const SECTION_LINKS: SectionLink[] = [
   { id: 'features', label: 'Features', icon: LayoutGrid },
   { id: 'install', label: 'Install', icon: Download },
+  { id: 'faq', label: 'FAQ', icon: CircleHelp },
   { id: 'guides', label: 'Guides', icon: BookOpen },
 ];
 
