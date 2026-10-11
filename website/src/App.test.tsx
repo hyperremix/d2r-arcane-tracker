@@ -119,8 +119,14 @@ describe('When the website is rendered', () => {
     const runTracker = features.find((feature) => feature.id === 'run-tracker');
     if (!runTracker) throw new Error('Run Tracker feature not found');
 
+    // Following the link would add an entry to jsdom's history, which the test files run after
+    // this one share (the app's TitleBar tests count history entries), so only the click is tested.
+    const preventNavigation = (event: Event) => event.preventDefault();
+    document.addEventListener('click', preventNavigation);
+
     // Act
     fireEvent.click(screen.getByText(runTracker.summary));
+    document.removeEventListener('click', preventNavigation);
 
     // Assert
     expect(screen.getByRole('tab', { name: 'Runs' })).toHaveAttribute('aria-selected', 'true');
