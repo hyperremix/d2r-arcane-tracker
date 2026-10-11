@@ -102,7 +102,7 @@ function AvailabilityFilter({ value, onChange }: AvailabilityFilterProps) {
             aria-pressed={pressed}
             onClick={() => onChange(filter)}
             className={cn(
-              'inline-flex min-h-7 flex-1 items-center justify-center rounded-[5px] px-2 py-1 text-center font-medium text-muted-foreground text-xs outline-none transition-colors',
+              'inline-flex min-h-7 flex-1 items-center justify-center whitespace-nowrap rounded-[5px] px-3 py-1 text-center font-medium text-muted-foreground text-xs outline-none transition-colors',
               'hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
               pressed && 'bg-background text-foreground shadow-xs',
             )}
@@ -196,54 +196,20 @@ export function RunewordCalculator() {
   const hasActiveFilters = searchTerm.trim() !== '' || selectedRunes.length > 0;
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[20rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 p-6">
+    // The page fits the window: the sidebar stays in place and only the runeword grid scrolls.
+    // The grid's scroll container reaches the right and bottom window edges, so its scrollbar
+    // reads as the page scrollbar.
+    <div className="grid min-h-0 flex-1 grid-cols-[20rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6">
       <PageHeader
-        className="col-span-2"
+        className="col-span-2 pr-6"
         title={t(translations.runeword.calculator.title)}
         description={t(translations.runeword.calculator.subtitle)}
       />
 
-      {/* Left Sidebar - Filters */}
-      <div className="flex min-h-0 flex-col gap-6">
-        <Card className="flex flex-1 flex-col overflow-hidden">
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-            {/* Search Bar */}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={searchInputId}>
-                {t(translations.runeword.calculator.searchLabel)}
-              </Label>
-              <Input
-                id={searchInputId}
-                type="text"
-                placeholder={t(translations.runeword.calculator.searchPlaceholder)}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <AvailabilityFilter value={availability} onChange={setAvailability} />
-            {/* Results Count and Refresh */}
-            <div className="flex items-center justify-between gap-2">
-              {!isLoading && (
-                <div className="text-muted-foreground text-sm" aria-live="polite">
-                  {t(translations.runeword.calculator.showingResults, {
-                    filtered: filteredRunewords.length,
-                    total: allRunewords.length,
-                  })}
-                </div>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="ml-auto"
-                disabled={isLoading || isRefreshing}
-                aria-busy={isRefreshing}
-                onClick={handleRefresh}
-              >
-                <RefreshCw aria-hidden="true" className={cn(isRefreshing && 'animate-spin')} />
-                {t(translations.runeword.calculator.refreshRunes)}
-              </Button>
-            </div>
+      {/* Left Sidebar - Rune filters, as tall as its content but never taller than the window */}
+      <div className="flex min-h-0 flex-col pb-6">
+        <Card data-testid="runeword-sidebar" className="flex min-h-0 flex-col overflow-hidden">
+          <CardContent className="flex min-h-0 flex-1 flex-col">
             <RuneFilters
               selectedRunes={selectedRunes}
               onRuneSelectionChange={setSelectedRunes}
@@ -253,62 +219,112 @@ export function RunewordCalculator() {
         </Card>
       </div>
 
-      {/* Right Content - Runewords */}
-      <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto">
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
-              <p className="font-medium text-muted-foreground">
-                {isScanning
-                  ? t(translations.runeword.calculator.scanningSaveFiles)
-                  : t(translations.runeword.calculator.loadingRuneData)}
-              </p>
-              {isScanning && (
-                <p className="mt-2 text-muted-foreground text-sm">
-                  {t(translations.runeword.calculator.thisMayTake)}
+      {/* Right Content - Toolbar and runewords */}
+      <div className="flex min-h-0 min-w-0 flex-col gap-4">
+        <div
+          data-testid="runeword-toolbar"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-6"
+        >
+          <Label htmlFor={searchInputId} className="sr-only">
+            {t(translations.runeword.calculator.searchLabel)}
+          </Label>
+          <Input
+            id={searchInputId}
+            type="text"
+            className="w-64"
+            placeholder={t(translations.runeword.calculator.searchPlaceholder)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <AvailabilityFilter value={availability} onChange={setAvailability} />
+          <div className="ml-auto flex items-center gap-4">
+            {!isLoading && (
+              <div className="text-muted-foreground text-sm" aria-live="polite">
+                {t(translations.runeword.calculator.showingResults, {
+                  filtered: filteredRunewords.length,
+                  total: allRunewords.length,
+                })}
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isLoading || isRefreshing}
+              aria-busy={isRefreshing}
+              onClick={handleRefresh}
+            >
+              <RefreshCw aria-hidden="true" className={cn(isRefreshing && 'animate-spin')} />
+              {t(translations.runeword.calculator.refreshRunes)}
+            </Button>
+          </div>
+        </div>
+
+        {/* Page scroll container; the sidebar rune list only scrolls in short windows */}
+        <div
+          data-testid="runeword-scroll-area"
+          className="min-h-0 flex-1 overflow-y-auto pr-6 pb-6"
+        >
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+                <p className="font-medium text-muted-foreground">
+                  {isScanning
+                    ? t(translations.runeword.calculator.scanningSaveFiles)
+                    : t(translations.runeword.calculator.loadingRuneData)}
                 </p>
+                {isScanning && (
+                  <p className="mt-2 text-muted-foreground text-sm">
+                    {t(translations.runeword.calculator.thisMayTake)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Runeword Grid: columns follow the available width, not the viewport. Each card spans
+            three rows (header, runes, footer) via subgrid; the row gap must match the card's gap. */}
+          {!isLoading && filteredRunewords.length > 0 && (
+            <div
+              data-testid="runeword-grid"
+              className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4"
+            >
+              {filteredRunewords.map((runeword) => (
+                <RunewordCard
+                  key={runeword.id}
+                  runeword={runeword}
+                  availableRunes={availableRunes}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && filteredRunewords.length === 0 && (
+            <div className="py-12 text-center">
+              <p className="text-lg text-muted-foreground">
+                {availability === 'craftable' && !hasActiveFilters
+                  ? t(translations.runeword.calculator.noCraftable)
+                  : t(translations.runeword.calculator.noRunewordsFound)}
+              </p>
+              <p className="mt-2 text-muted-foreground text-sm">
+                {t(translations.runeword.calculator.adjustFilters)}
+              </p>
+              {nextAvailability && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setAvailability(nextAvailability)}
+                >
+                  {t(showAvailabilityLabelKeys[nextAvailability])}
+                </Button>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Runeword Grid: columns follow the available width, not the viewport */}
-        {!isLoading && filteredRunewords.length > 0 && (
-          <div
-            data-testid="runeword-grid"
-            className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 pb-7"
-          >
-            {filteredRunewords.map((runeword) => (
-              <RunewordCard key={runeword.id} runeword={runeword} availableRunes={availableRunes} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!isLoading && filteredRunewords.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-lg text-muted-foreground">
-              {availability === 'craftable' && !hasActiveFilters
-                ? t(translations.runeword.calculator.noCraftable)
-                : t(translations.runeword.calculator.noRunewordsFound)}
-            </p>
-            <p className="mt-2 text-muted-foreground text-sm">
-              {t(translations.runeword.calculator.adjustFilters)}
-            </p>
-            {nextAvailability && (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4"
-                onClick={() => setAvailability(nextAvailability)}
-              >
-                {t(showAvailabilityLabelKeys[nextAvailability])}
-              </Button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

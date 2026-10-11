@@ -63,7 +63,7 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('Then the root is a shrinkable flex column and the rune list is the scroll container', () => {
+  it('Then the root is a shrinkable flex column and the rune list is a two-column scroll fallback', () => {
     // Arrange & Act
     const { container } = renderRuneFilters([]);
 
@@ -71,10 +71,10 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     // The root must shrink to the space left in the sidebar so the list below gets a bounded height
     expect(container.firstElementChild).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
     const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
-    expect(runeList).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    expect(runeList).toHaveClass('grid', 'grid-cols-2', 'min-h-0', 'flex-1', 'overflow-y-auto');
   });
 
-  it('Then every rune, including the highest runes, is inside the scrollable list', () => {
+  it('Then every rune, including the highest runes, is inside the rune list', () => {
     // Arrange & Act
     renderRuneFilters([]);
 

@@ -1089,7 +1089,8 @@
     },
     "card": {
       "viewDetails": "View details",
-      "allRunesAvailable": "All runes available",
+      "sockets_one": "{{count}} socket",
+      "sockets_other": "{{count}} sockets",
       "runesOwned": "{{available}}/{{total}} runes",
       "runesOwnedLabel": "{{available}} of {{total}} runes available",
       "missingRuneTooltip": "{{rune}} (missing)"
