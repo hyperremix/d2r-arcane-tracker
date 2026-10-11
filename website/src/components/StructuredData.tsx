@@ -8,7 +8,7 @@ const AUTHOR_URL = 'https://github.com/hyperremix';
  * schema.org data for search engines: the site and the app it is about. The app version comes
  * from package.json, so it follows each release.
  */
-export const structuredData = {
+const structuredData = {
   '@context': 'https://schema.org',
   '@graph': [
     {
@@ -24,7 +24,7 @@ export const structuredData = {
       '@id': `${SITE_URL}#app`,
       name: 'D2R Arcane Tracker',
       description:
-        'Free Holy Grail tracker for Diablo II: Resurrected (D2R). Reads your save files and records every unique, set item, rune and runeword you find.',
+        'Free Holy Grail tracker for Diablo II: Resurrected (D2R) on Windows. Reads your save files and records every unique, set item, rune and runeword you find.',
       applicationCategory: 'GameApplication',
       operatingSystem: 'Windows 10 or later (64-bit)',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -49,7 +49,7 @@ export const structuredData = {
 };
 
 /** Escapes `<` so the JSON can't close the script element it is embedded in. */
-function toScriptJson(data: unknown): string {
+export function toScriptJson(data: unknown): string {
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }
 
