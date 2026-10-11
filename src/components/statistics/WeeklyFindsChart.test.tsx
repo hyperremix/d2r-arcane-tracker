@@ -38,6 +38,15 @@ describe('When the finds per week chart is rendered', () => {
     );
   });
 
+  it('If only one week is shown, Then the texts use the singular', () => {
+    // Arrange & Act
+    const chart = renderChart([4]);
+
+    // Assert
+    expect(chart).toHaveAccessibleName('Finds per week over the last week: 4 in total');
+    expect(screen.getByText('Finds in the last week, ending today')).toBeInTheDocument();
+  });
+
   it('If weeks have finds, Then the data table lists every week with its finds', () => {
     // Arrange & Act
     renderChart([2, 0, 1_500]);

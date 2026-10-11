@@ -53,33 +53,70 @@ export interface CumulativeFindsPoint {
 }
 
 /**
+ * Grail entries that startup save file scans found on the first day of the chart, before the
+ * tracker could see them being found.
+ */
+export interface TrackingBaseline {
+  /** Day index of the scan, the first day of the chart. */
+  day: number;
+  /** Number of grail entries the scans found that day. */
+  count: number;
+}
+
+/** Cumulative grail finds over time. */
+export interface CumulativeFinds {
+  /** One point per day with at least one new entry, in chronological order. */
+  points: CumulativeFindsPoint[];
+  /**
+   * Entries that startup save file scans found on the first day of the chart, if any. This is the
+   * first scan that found items, which is not necessarily the very first scan. They are included
+   * in the totals of the points.
+   */
+  baseline: TrackingBaseline | undefined;
+}
+
+/**
  * Builds the cumulative number of grail entries found, one point per day with at least one new
- * entry. Each tracked item version counts once, on the day it was first found; finds from the
- * initial save file scan count on the day of the scan.
+ * entry. Each tracked item version counts once, on the day it was first found; finds from startup
+ * save file scans count on the day of the scan. The entries that scans found on the first day of the
+ * chart are reported as the baseline, since they were found before the tracker saw anything; later
+ * scans count on their own day. Scans are not recorded when they find nothing, so the baseline is
+ * from the first scan that found items.
  * @param progress - All progress records
  * @param items - Tracked items
  * @param settings - Which item versions are tracked
- * @returns Points in chronological order
+ * @returns The points and the baseline
  */
 export function buildCumulativeFinds(
   progress: GrailProgress[],
   items: Item[],
   settings: GrailStatisticsSettings,
-): CumulativeFindsPoint[] {
+): CumulativeFinds {
   const newEntriesByDay = new Map<number, number>();
+  const initialScanEntriesByDay = new Map<number, number>();
   for (const record of findFirstDiscoveries(progress, items, settings).values()) {
     if (!record.foundDate) continue;
     const day = toLocalDayIndex(new Date(record.foundDate));
     newEntriesByDay.set(day, (newEntriesByDay.get(day) ?? 0) + 1);
+    if (record.fromInitialScan) {
+      initialScanEntriesByDay.set(day, (initialScanEntriesByDay.get(day) ?? 0) + 1);
+    }
   }
 
   let total = 0;
-  return [...newEntriesByDay]
+  const points = [...newEntriesByDay]
     .sort(([a], [b]) => a - b)
     .map(([day, count]) => {
       total += count;
       return { day, total };
     });
+
+  const firstDay = points[0]?.day;
+  const baselineCount = firstDay === undefined ? 0 : (initialScanEntriesByDay.get(firstDay) ?? 0);
+  return {
+    points,
+    baseline: baselineCount > 0 ? { day: firstDay, count: baselineCount } : undefined,
+  };
 }
 
 /** Number of finds in a week (seven calendar days). */
@@ -181,26 +218,44 @@ export function buildSessionDurations(sessions: SessionRuns[]): SessionDurationS
   return summaries.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 }
 
+/** Options of {@link niceTicks}. */
+export interface NiceTicksOptions {
+  /** Smallest value to cover; defaults to zero. */
+  min?: number;
+  /** Approximate number of intervals; defaults to four. */
+  targetCount?: number;
+}
+
 /**
- * Returns evenly spaced, round axis ticks from zero that cover the maximum value
- * (e.g. 0, 5, 10, 15 for a maximum of 13).
+ * Returns evenly spaced, round axis ticks that cover a range. With a minimum above zero the ticks
+ * start at the largest round value below it, so the minimum is not on the bottom edge (e.g. 185,
+ * 190, 195, 200, 205 for 186 to 205). A range above zero that is empty or very small is widened to
+ * the number of intervals, so the axis is never degenerate.
  * @param max - Largest value to cover
- * @param targetCount - Approximate number of intervals
- * @returns Ticks in ascending order, starting at zero
+ * @param options - Smallest value to cover and the approximate number of intervals
+ * @returns Ticks in ascending order
  */
-export function niceTicks(max: number, targetCount = 4): number[] {
-  if (!(max > 0)) return [0, 1];
-  const roughStep = max / targetCount;
+export function niceTicks(
+  max: number,
+  { min = 0, targetCount = 4 }: NiceTicksOptions = {},
+): number[] {
+  const isRanged = min > 0;
+  const coveredMax = isRanged ? Math.max(max, min + targetCount) : max;
+  const span = coveredMax - min;
+  if (!(span > 0)) return [min, min + 1];
+  const roughStep = span / targetCount;
   const magnitude = 10 ** Math.floor(Math.log10(roughStep));
   const step =
     [1, 2, 5, 10].map((factor) => factor * magnitude).find((value) => value >= roughStep) ??
     10 * magnitude;
   // Counts are whole numbers, so never step by less than one
   const roundedStep = Math.max(step, 1);
+  // Start below a ranged minimum, so the line that starts there does not sit on the bottom edge
+  const start = Math.floor((isRanged ? min - 1 : min) / roundedStep) * roundedStep;
   const ticks: number[] = [];
-  for (let value = 0; ; value += roundedStep) {
+  for (let value = start; ; value += roundedStep) {
     ticks.push(value);
-    if (value >= max) break;
+    if (value >= coveredMax) break;
   }
   return ticks;
 }

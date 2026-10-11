@@ -16,6 +16,7 @@ import {
   type CumulativeFindsPoint,
   formatDayIndex,
   niceTicks,
+  type TrackingBaseline,
 } from '@/components/statistics/chartData';
 import { translations } from '@/i18n/translations';
 
@@ -35,14 +36,23 @@ interface GrailProgressChartProps {
   today: number;
   /** Number of tracked item versions */
   totalItems: number;
+  /** Entries startup scans found on the first day of the chart; the chart starts from them */
+  baseline?: TrackingBaseline;
 }
 
 /**
  * Step area chart of the number of grail entries found over time, ending today. Each step is a day
- * with new grail entries.
+ * with new grail entries. With a baseline (the entries startup save file scans found on the first
+ * day of the chart), the value axis starts near the baseline instead of zero, so the finds made
+ * since stay visible, and a note says how many entries the first scan that found items found.
  * @returns {JSX.Element} The chart card
  */
-export function GrailProgressChart({ points, today, totalItems }: GrailProgressChartProps) {
+export function GrailProgressChart({
+  points,
+  today,
+  totalItems,
+  baseline,
+}: GrailProgressChartProps) {
   const { t, i18n } = useTranslation();
   const [chartRef, width] = useChartWidth();
   const chartT = translations.statistics.charts;
@@ -65,19 +75,22 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
   const lastDay = Math.max(today, points[points.length - 1].day);
   const startDay = Math.min(firstDay, lastDay - MIN_DAY_SPAN);
   const latest = points[points.length - 1];
-  const ticks = niceTicks(latest.total);
+  const startTotal = baseline?.count ?? 0;
+  const ticks = niceTicks(latest.total, { min: startTotal });
+  const axisMin = ticks[0];
   const toX = linearScale([startDay, lastDay], [plot.left, plot.right]);
-  const toY = linearScale([0, ticks[ticks.length - 1]], [plot.bottom, plot.top]);
+  const toY = linearScale([axisMin, ticks[ticks.length - 1]], [plot.bottom, plot.top]);
 
-  // Step line: flat until the day of the next find, then up to the new total
+  // Step line: from the baseline (or zero), flat until the day of the next find, then up to the
+  // new total
   const linePath = [
-    `M${toX(firstDay)},${toY(0)}`,
+    `M${toX(firstDay)},${toY(startTotal)}`,
     ...points.map((point, index) =>
       index === 0 ? `V${toY(point.total)}` : `H${toX(point.day)}V${toY(point.total)}`,
     ),
     `H${toX(lastDay)}`,
   ].join('');
-  const areaPath = `${linePath}V${toY(0)}Z`;
+  const areaPath = `${linePath}V${toY(axisMin)}H${toX(firstDay)}Z`;
 
   const anchors = points.map((point) => ({ x: toX(point.day), y: toY(point.total) }));
 
@@ -93,11 +106,17 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
     };
   };
 
-  const label = t(chartT.grailProgressSummary, {
+  const summaryValues = {
     found: formatCount(latest.total),
     total: formatCount(totalItems),
     date: formatDay(firstDay),
-  });
+  };
+  const label = baseline
+    ? t(chartT.grailProgressSummaryWithBaseline, {
+        ...summaryValues,
+        baseline: formatCount(baseline.count),
+      })
+    : t(chartT.grailProgressSummary, summaryValues);
 
   return (
     <ChartCard title={title} description={description}>
@@ -127,6 +146,21 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
           <>
             <ChartGrid ticks={ticks} toY={toY} plot={plot} format={formatCount} />
             <path d={areaPath} className="fill-chart-1/10" />
+            {baseline && (
+              // biome-ignore lint/a11y/noAriaHiddenOnFocusable: an SVG line is never focusable; it only decorates the chart
+              <line
+                aria-hidden="true"
+                x1={toX(firstDay)}
+                x2={toX(lastDay)}
+                y1={toY(baseline.count)}
+                y2={toY(baseline.count)}
+                className="stroke-muted-foreground"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+                vectorEffect="non-scaling-stroke"
+                data-testid="grail-progress-baseline"
+              />
+            )}
             <path
               d={linePath}
               fill="none"
@@ -180,6 +214,15 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
           </>
         )}
       </InteractiveChart>
+      {baseline && (
+        <p className="mt-2 text-muted-foreground text-xs">
+          {t(chartT.grailProgressBaseline, {
+            count: baseline.count,
+            found: formatCount(baseline.count),
+            date: formatDay(baseline.day),
+          })}
+        </p>
+      )}
     </ChartCard>
   );
 }

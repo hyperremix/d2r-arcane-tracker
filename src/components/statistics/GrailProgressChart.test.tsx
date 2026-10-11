@@ -85,4 +85,77 @@ describe('When the grail progress chart is rendered', () => {
     fireEvent.keyDown(chart, { key: 'Escape' });
     expect(screen.queryByTestId('chart-tooltip')).not.toBeInTheDocument();
   });
+
+  it('If the first save scan found items, Then the chart notes them and its axis starts near them', () => {
+    // Arrange
+    const points = buildPoints([190, 192, 195]);
+    const baseline = { day: points[0].day, count: 190 };
+
+    // Act
+    render(
+      <GrailProgressChart points={points} baseline={baseline} today={today} totalItems={500} />,
+    );
+
+    // Assert
+    const chart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    expect(chart).toHaveAccessibleName(
+      'Grail progress over time: 195 of 500 found, 190 of them by the first scan that found items, on Oct 8, 2026',
+    );
+    expect(
+      screen.getByText('190 items were found by the first scan that found items, on Oct 8, 2026'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('grail-progress-baseline')).toHaveAttribute('aria-hidden', 'true');
+    const chartTexts = [...chart.querySelectorAll('text')].map((text) => text.textContent);
+    expect(chartTexts).toContain('190');
+    expect(chartTexts).not.toContain('0');
+  });
+
+  it('If the first save scan found one item, Then the note uses the singular', () => {
+    // Arrange
+    const points = buildPoints([1, 2]);
+
+    // Act
+    render(
+      <GrailProgressChart
+        points={points}
+        baseline={{ day: points[0].day, count: 1 }}
+        today={today}
+        totalItems={10}
+      />,
+    );
+
+    // Assert
+    expect(
+      screen.getByText('1 item was found by the first scan that found items, on Oct 9, 2026'),
+    ).toBeInTheDocument();
+  });
+
+  it('If there is no baseline, Then there is no note', () => {
+    // Arrange & Act
+    render(<GrailProgressChart points={buildPoints([1, 2])} today={today} totalItems={10} />);
+
+    // Assert
+    expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('grail-progress-baseline')).not.toBeInTheDocument();
+  });
+
+  it('If no item was found since the first scan, Then the axis is not collapsed onto the baseline', () => {
+    // Arrange
+    const points = buildPoints([190]);
+
+    // Act
+    render(
+      <GrailProgressChart
+        points={points}
+        baseline={{ day: points[0].day, count: 190 }}
+        today={today}
+        totalItems={500}
+      />,
+    );
+
+    // Assert
+    const chart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    const chartTexts = [...chart.querySelectorAll('text')].map((text) => text.textContent);
+    expect(chartTexts).toEqual(expect.arrayContaining(['189', '190', '191', '192', '193', '194']));
+  });
 });

@@ -90,7 +90,7 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
   });
 
   const label = t(chartT.weeklyFindsSummary, {
-    weeks: weeks.length,
+    count: weeks.length,
     total: formatCount(totalFinds),
     latest: formatCount(latest.count),
   });

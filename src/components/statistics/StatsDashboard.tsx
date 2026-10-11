@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
+import { BarChart3, Clock, Gem, History, Layers, Trophy, Users } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
@@ -8,6 +8,11 @@ import {
   buildWeeklyFinds,
   toLocalDayIndex,
 } from '@/components/statistics/chartData';
+import {
+  findLastTrackedFind,
+  summarizeRunes,
+  summarizeSets,
+} from '@/components/statistics/dashboardHighlights';
 import { GrailProgressChart } from '@/components/statistics/GrailProgressChart';
 import { StatTile } from '@/components/statistics/StatTile';
 import { WeeklyFindsChart } from '@/components/statistics/WeeklyFindsChart';
@@ -46,8 +51,9 @@ function SectionTitle({ icon: Icon, children }: SectionTitleProps) {
 
 /**
  * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.
- * Shows headline statistics, progress over time, finds per week, category breakdowns, a character
- * comparison and recent activity.
+ * Shows headline statistics that stay meaningful when nothing was found recently (total progress,
+ * last find, closest set and missing runes), progress over time, finds per week, category
+ * breakdowns, a character comparison and recent activity.
  * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
  */
@@ -81,6 +87,17 @@ export const StatsDashboard = memo(function StatsDashboard() {
     };
   }, [progress, items, grailNormal, grailEthereal, currentDay]);
 
+  // Headline statistics that stay meaningful when nothing was found recently
+  const highlights = useMemo(() => {
+    const versions = { grailNormal, grailEthereal };
+    return {
+      lastTrackedFind: findLastTrackedFind(items, progress, versions),
+      sets: summarizeSets(items, progress, versions),
+      runes: summarizeRunes(items, progress, versions),
+    };
+  }, [items, progress, grailNormal, grailEthereal]);
+  const { lastTrackedFind, sets, runes } = highlights;
+
   // Shared stashes are not characters, so they are not compared
   const characterStats = stats.characterStats.filter(
     (charStat) => charStat.character.characterClass !== 'shared_stash',
@@ -99,29 +116,56 @@ export const StatsDashboard = memo(function StatsDashboard() {
           })}
         />
         <StatTile
-          label={t(translations.statistics.dashboard.recentFinds)}
-          icon={TrendingUp}
-          value={stats.recentFinds}
-          hint={t(translations.statistics.dashboard.last7Days)}
+          label={t(translations.statistics.dashboard.lastTrackedFind)}
+          icon={History}
+          value={
+            lastTrackedFind
+              ? formatTimeAgo(lastTrackedFind.foundDate, t, i18n.language)
+              : t(translations.statistics.dashboard.noTrackedFindYet)
+          }
+          hint={
+            lastTrackedFind
+              ? lastTrackedFind.item.name
+              : t(translations.statistics.dashboard.sinceTrackingBegan)
+          }
         />
-        <StatTile
-          label={t(translations.statistics.dashboard.currentStreak)}
-          icon={Zap}
-          value={stats.currentStreak}
-          hint={t(translations.statistics.dashboard.maxStreak, { count: stats.maxStreak })}
-        />
-        <StatTile
-          label={t(translations.statistics.dashboard.avgPerDay)}
-          icon={Target}
-          value={stats.averageItemsPerDay.toFixed(1)}
-          hint={t(translations.statistics.dashboard.recentAverage)}
-        />
+        {sets && (
+          <StatTile
+            label={t(translations.statistics.dashboard.closestSet)}
+            icon={Layers}
+            value={
+              sets.closest
+                ? `${sets.closest.found}/${sets.closest.total}`
+                : `${sets.setCount}/${sets.setCount}`
+            }
+            hint={
+              sets.closest
+                ? sets.closest.setName
+                : t(translations.statistics.dashboard.allSetsComplete)
+            }
+          />
+        )}
+        {runes && (
+          <StatTile
+            label={t(translations.statistics.dashboard.runesMissing)}
+            icon={Gem}
+            value={runes.missing}
+            hint={
+              runes.highestMissing
+                ? t(translations.statistics.dashboard.highestMissingRune, {
+                    rune: runes.highestMissing.name,
+                  })
+                : t(translations.statistics.dashboard.allRunesFound)
+            }
+          />
+        )}
       </div>
 
       {/* Progress over time */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GrailProgressChart
-          points={chartData.cumulativeFinds}
+          points={chartData.cumulativeFinds.points}
+          baseline={chartData.cumulativeFinds.baseline}
           today={chartData.today}
           totalItems={stats.totalItems}
         />
