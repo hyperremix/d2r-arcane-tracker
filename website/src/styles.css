@@ -2,8 +2,10 @@
 @import '../../src/index.css';
 
 /* index.css lets Tailwind detect sources from the Vite root (website/); the shared shadcn
-   components live in the app's source. */
-@source '../../src/components/ui';
+   components live in the app's source. Only the ones the site imports are scanned, so the classes
+   of the app's other components stay out of the site's CSS. Add a component to this list when the
+   site starts using it (styles.test.ts checks this). */
+@source '../../src/components/ui/{alert,button,tabs,tooltip}.tsx';
 
 @layer base {
   html {
