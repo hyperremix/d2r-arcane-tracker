@@ -99,12 +99,12 @@ describe('When the grail progress chart is rendered', () => {
     // Assert
     const chart = screen.getByRole('img', { name: /^Grail progress over time/ });
     expect(chart).toHaveAccessibleName(
-      'Grail progress over time: 195 of 500 found, 190 of them before tracking began on Oct 8, 2026',
+      'Grail progress over time: 195 of 500 found, 190 of them by the first scan that found items, on Oct 8, 2026',
     );
     expect(
-      screen.getByText('190 items were found before tracking began on Oct 8, 2026'),
+      screen.getByText('190 items were found by the first scan that found items, on Oct 8, 2026'),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('grail-progress-baseline')).toBeInTheDocument();
+    expect(screen.getByTestId('grail-progress-baseline')).toHaveAttribute('aria-hidden', 'true');
     const chartTexts = [...chart.querySelectorAll('text')].map((text) => text.textContent);
     expect(chartTexts).toContain('190');
     expect(chartTexts).not.toContain('0');
@@ -126,7 +126,7 @@ describe('When the grail progress chart is rendered', () => {
 
     // Assert
     expect(
-      screen.getByText('1 item was found before tracking began on Oct 9, 2026'),
+      screen.getByText('1 item was found by the first scan that found items, on Oct 9, 2026'),
     ).toBeInTheDocument();
   });
 
@@ -135,7 +135,27 @@ describe('When the grail progress chart is rendered', () => {
     render(<GrailProgressChart points={buildPoints([1, 2])} today={today} totalItems={10} />);
 
     // Assert
-    expect(screen.queryByText(/before tracking began/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('grail-progress-baseline')).not.toBeInTheDocument();
+  });
+
+  it('If no item was found since the first scan, Then the axis is not collapsed onto the baseline', () => {
+    // Arrange
+    const points = buildPoints([190]);
+
+    // Act
+    render(
+      <GrailProgressChart
+        points={points}
+        baseline={{ day: points[0].day, count: 190 }}
+        today={today}
+        totalItems={500}
+      />,
+    );
+
+    // Assert
+    const chart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    const chartTexts = [...chart.querySelectorAll('text')].map((text) => text.textContent);
+    expect(chartTexts).toEqual(expect.arrayContaining(['189', '190', '191', '192', '193', '194']));
   });
 });

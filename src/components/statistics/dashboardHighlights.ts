@@ -1,4 +1,5 @@
 import type { GrailProgress, Item, ItemSet } from 'electron/types/grail';
+import { canItemBeEthereal, canItemBeNormal, filterItemsByTrackedVersions } from '@/lib/ethereal';
 import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
 
 /** Progress of one item set. */
@@ -31,32 +32,40 @@ export interface LastTrackedFind {
 }
 
 /**
- * Returns whether a record is a find of a tracked item version.
+ * Returns whether a record is a find of a tracked version of its item: the version must be tracked
+ * and the item must be able to have it (sets and runes, for example, cannot be ethereal).
  */
 const isTrackedFind = (
   record: GrailProgress,
+  item: Item,
   settings: GrailStatisticsSettings,
 ): record is GrailProgress & { foundDate: Date } =>
   record.foundDate !== undefined &&
-  (record.isEthereal ? settings.grailEthereal : settings.grailNormal);
+  (record.isEthereal
+    ? settings.grailEthereal && canItemBeEthereal(item)
+    : settings.grailNormal && canItemBeNormal(item));
 
 /**
- * Returns the IDs of the items with at least one found record of a tracked version.
+ * Returns the IDs of the given items with at least one found record of a tracked version.
  */
 function findFoundItemIds(
+  items: Item[],
   progress: GrailProgress[],
   settings: GrailStatisticsSettings,
 ): Set<string> {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
   const found = new Set<string>();
   for (const record of progress) {
-    if (isTrackedFind(record, settings)) found.add(record.itemId);
+    const item = itemsById.get(record.itemId);
+    if (item && isTrackedFind(record, item, settings)) found.add(item.id);
   }
   return found;
 }
 
 /**
  * Summarizes the progress of the tracked item sets: an item counts as found once any tracked
- * version of it was found.
+ * version of it was found. Items without a tracked version (for example sets, which cannot be
+ * ethereal, when only ethereal items are tracked) are not part of the grail and are left out.
  * @param items - Tracked items
  * @param progress - All progress records
  * @param settings - Which item versions are tracked
@@ -67,9 +76,10 @@ export function summarizeSets(
   progress: GrailProgress[],
   settings: GrailStatisticsSettings,
 ): SetsSummary | undefined {
-  const foundItemIds = findFoundItemIds(progress, settings);
+  const grailItems = filterItemsByTrackedVersions(items, settings);
+  const foundItemIds = findFoundItemIds(grailItems, progress, settings);
   const sets = new Map<ItemSet, SetProgress>();
-  for (const item of items) {
+  for (const item of grailItems) {
     if (!item.setName) continue;
     const set = sets.get(item.setName) ?? { setName: item.setName, found: 0, total: 0 };
     set.total++;
@@ -99,7 +109,8 @@ function runeOrder(item: Item): number {
 }
 
 /**
- * Summarizes the tracked runes that were not found yet.
+ * Summarizes the tracked runes that were not found yet. Runes cannot be ethereal, so none are
+ * tracked when only ethereal items are.
  * @param items - Tracked items
  * @param progress - All progress records
  * @param settings - Which item versions are tracked
@@ -110,10 +121,12 @@ export function summarizeRunes(
   progress: GrailProgress[],
   settings: GrailStatisticsSettings,
 ): RunesSummary | undefined {
-  const runes = items.filter((item) => item.type === 'rune');
+  const runes = filterItemsByTrackedVersions(items, settings).filter(
+    (item) => item.type === 'rune',
+  );
   if (runes.length === 0) return undefined;
 
-  const foundItemIds = findFoundItemIds(progress, settings);
+  const foundItemIds = findFoundItemIds(runes, progress, settings);
   const missing = runes.filter((rune) => !foundItemIds.has(rune.id));
   const highestMissing = missing.reduce<Item | undefined>(
     (highest, rune) => (!highest || runeOrder(rune) > runeOrder(highest) ? rune : highest),
@@ -138,9 +151,8 @@ export function findLastTrackedFind(
   const itemsById = new Map(items.map((item) => [item.id, item]));
   let latest: LastTrackedFind | undefined;
   for (const record of progress) {
-    if (!isTrackedFind(record, settings) || record.fromInitialScan) continue;
     const item = itemsById.get(record.itemId);
-    if (!item) continue;
+    if (!item || !isTrackedFind(record, item, settings) || record.fromInitialScan) continue;
     const foundDate = new Date(record.foundDate);
     if (!latest || foundDate.getTime() > latest.foundDate.getTime()) {
       latest = { item, foundDate };

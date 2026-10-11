@@ -52,11 +52,14 @@ export interface CumulativeFindsPoint {
   total: number;
 }
 
-/** Grail entries the first save file scan found, before the tracker could see them being found. */
+/**
+ * Grail entries that startup save file scans found on the first day of the chart, before the
+ * tracker could see them being found.
+ */
 export interface TrackingBaseline {
-  /** Day index of the first save file scan. */
+  /** Day index of the scan, the first day of the chart. */
   day: number;
-  /** Number of grail entries the scan found. */
+  /** Number of grail entries the scans found that day. */
   count: number;
 }
 
@@ -65,17 +68,20 @@ export interface CumulativeFinds {
   /** One point per day with at least one new entry, in chronological order. */
   points: CumulativeFindsPoint[];
   /**
-   * Entries from the initial save file scan on the first day of the chart, if any. They are
-   * included in the totals of the points.
+   * Entries that startup save file scans found on the first day of the chart, if any. This is the
+   * first scan that found items, which is not necessarily the very first scan. They are included
+   * in the totals of the points.
    */
   baseline: TrackingBaseline | undefined;
 }
 
 /**
  * Builds the cumulative number of grail entries found, one point per day with at least one new
- * entry. Each tracked item version counts once, on the day it was first found; finds from the
- * initial save file scan count on the day of the scan. The entries the scan found on the first day
- * are reported as the baseline, since they were found before tracking began.
+ * entry. Each tracked item version counts once, on the day it was first found; finds from startup
+ * save file scans count on the day of the scan. The entries that scans found on the first day of the
+ * chart are reported as the baseline, since they were found before the tracker saw anything; later
+ * scans count on their own day. Scans are not recorded when they find nothing, so the baseline is
+ * from the first scan that found items.
  * @param progress - All progress records
  * @param items - Tracked items
  * @param settings - Which item versions are tracked
@@ -212,16 +218,30 @@ export function buildSessionDurations(sessions: SessionRuns[]): SessionDurationS
   return summaries.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 }
 
+/** Options of {@link niceTicks}. */
+export interface NiceTicksOptions {
+  /** Smallest value to cover; defaults to zero. */
+  min?: number;
+  /** Approximate number of intervals; defaults to four. */
+  targetCount?: number;
+}
+
 /**
- * Returns evenly spaced, round axis ticks that cover a range, starting at the largest round value
- * at or below the minimum (e.g. 0, 5, 10, 15 for 0 to 13, or 180, 190, 200, 210 for 186 to 205).
+ * Returns evenly spaced, round axis ticks that cover a range. With a minimum above zero the ticks
+ * start at the largest round value below it, so the minimum is not on the bottom edge (e.g. 185,
+ * 190, 195, 200, 205 for 186 to 205). A range above zero that is empty or very small is widened to
+ * the number of intervals, so the axis is never degenerate.
  * @param max - Largest value to cover
- * @param targetCount - Approximate number of intervals
- * @param min - Smallest value to cover; defaults to zero
+ * @param options - Smallest value to cover and the approximate number of intervals
  * @returns Ticks in ascending order
  */
-export function niceTicks(max: number, targetCount = 4, min = 0): number[] {
-  const span = max - min;
+export function niceTicks(
+  max: number,
+  { min = 0, targetCount = 4 }: NiceTicksOptions = {},
+): number[] {
+  const isRanged = min > 0;
+  const coveredMax = isRanged ? Math.max(max, min + targetCount) : max;
+  const span = coveredMax - min;
   if (!(span > 0)) return [min, min + 1];
   const roughStep = span / targetCount;
   const magnitude = 10 ** Math.floor(Math.log10(roughStep));
@@ -230,10 +250,12 @@ export function niceTicks(max: number, targetCount = 4, min = 0): number[] {
     10 * magnitude;
   // Counts are whole numbers, so never step by less than one
   const roundedStep = Math.max(step, 1);
+  // Start below a ranged minimum, so the line that starts there does not sit on the bottom edge
+  const start = Math.floor((isRanged ? min - 1 : min) / roundedStep) * roundedStep;
   const ticks: number[] = [];
-  for (let value = Math.floor(min / roundedStep) * roundedStep; ; value += roundedStep) {
+  for (let value = start; ; value += roundedStep) {
     ticks.push(value);
-    if (value >= max) break;
+    if (value >= coveredMax) break;
   }
   return ticks;
 }

@@ -36,15 +36,15 @@ interface GrailProgressChartProps {
   today: number;
   /** Number of tracked item versions */
   totalItems: number;
-  /** Entries the first save file scan found; the chart starts from them */
+  /** Entries startup scans found on the first day of the chart; the chart starts from them */
   baseline?: TrackingBaseline;
 }
 
 /**
  * Step area chart of the number of grail entries found over time, ending today. Each step is a day
- * with new grail entries. With a baseline (the entries of the first save file scan), the value axis
- * starts near the baseline instead of zero, so the finds made since tracking began stay visible,
- * and a note says how many entries were found before.
+ * with new grail entries. With a baseline (the entries startup save file scans found on the first
+ * day of the chart), the value axis starts near the baseline instead of zero, so the finds made
+ * since stay visible, and a note says how many entries the first scan that found items found.
  * @returns {JSX.Element} The chart card
  */
 export function GrailProgressChart({
@@ -76,7 +76,7 @@ export function GrailProgressChart({
   const startDay = Math.min(firstDay, lastDay - MIN_DAY_SPAN);
   const latest = points[points.length - 1];
   const startTotal = baseline?.count ?? 0;
-  const ticks = niceTicks(latest.total, undefined, startTotal);
+  const ticks = niceTicks(latest.total, { min: startTotal });
   const axisMin = ticks[0];
   const toX = linearScale([startDay, lastDay], [plot.left, plot.right]);
   const toY = linearScale([axisMin, ticks[ticks.length - 1]], [plot.bottom, plot.top]);
@@ -147,7 +147,9 @@ export function GrailProgressChart({
             <ChartGrid ticks={ticks} toY={toY} plot={plot} format={formatCount} />
             <path d={areaPath} className="fill-chart-1/10" />
             {baseline && (
+              // biome-ignore lint/a11y/noAriaHiddenOnFocusable: an SVG line is never focusable; it only decorates the chart
               <line
+                aria-hidden="true"
                 x1={toX(firstDay)}
                 x2={toX(lastDay)}
                 y1={toY(baseline.count)}

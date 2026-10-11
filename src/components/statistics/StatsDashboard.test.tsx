@@ -5,6 +5,7 @@ import type {
   GrailProgress,
   Item,
   ItemCategory,
+  Settings,
 } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
@@ -25,6 +26,7 @@ vi.mock('@/components/grail/ItemCard', () => ({
 
 interface SetupOptions {
   categories?: ItemCategory[];
+  settings?: Pick<Settings, 'grailNormal' | 'grailEthereal'>;
   characters?: Character[];
   items?: Item[];
   progress?: GrailProgress[];
@@ -35,12 +37,13 @@ function setupStatistics({
   characters = [],
   items = [],
   progress = [],
+  settings = { grailNormal: true, grailEthereal: false },
 }: SetupOptions = {}) {
   mockStoreState(vi.mocked(useGrailStore), {
     items,
     progress,
     characters,
-    settings: { grailNormal: true, grailEthereal: false },
+    settings,
   } as unknown as ReturnType<typeof useGrailStore>);
   vi.mocked(useGrailStatistics).mockReturnValue({
     totalItems: 10,
@@ -66,11 +69,11 @@ function setupStatistics({
   } as unknown as ReturnType<typeof useGrailStatistics>);
 }
 
-/** Returns the text of the stat tile with the given label. */
-function getTileText(label: string): string | null {
-  const tile = screen.getByText(label).closest('[data-slot="card"]');
+/** Returns the stat tile with the given label. */
+function getTile(label: string): HTMLElement {
+  const tile = screen.getByText(label).closest<HTMLElement>('[data-slot="card"]');
   expect(tile).not.toBeNull();
-  return tile?.textContent ?? null;
+  return tile as HTMLElement;
 }
 
 function buildRune(id: string, name: string, code: string): Item {
@@ -127,13 +130,19 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(getTileText('Total Progress')).toContain('5/10');
-    expect(getTileText('Last Find')).toBe('Last FindNone yetSince tracking began');
-    expect(getTileText('Closest Set')).toBe("Closest Set3/4Arcanna's Tricks");
-    expect(getTileText('Runes Missing')).toBe('Runes Missing1Highest missing: Zod');
+    const lastFind = within(getTile('Last Find While Tracking'));
+    expect(within(getTile('Total Progress')).getByText('5/10')).toBeInTheDocument();
+    expect(lastFind.getByText('None yet')).toBeInTheDocument();
+    expect(lastFind.getByText('Since tracking began')).toBeInTheDocument();
+    const closestSet = within(getTile('Closest Set'));
+    expect(closestSet.getByText('3/4')).toBeInTheDocument();
+    expect(closestSet.getByText("Arcanna's Tricks")).toBeInTheDocument();
+    const runesMissing = within(getTile('Runes Missing'));
+    expect(runesMissing.getByText('1')).toBeInTheDocument();
+    expect(runesMissing.getByText('Highest missing: Zod')).toBeInTheDocument();
     expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
     expect(
-      screen.getByText('4 items were found before tracking began on Oct 1, 2026'),
+      screen.getByText('4 items were found by the first scan that found items, on Oct 1, 2026'),
     ).toBeInTheDocument();
   });
 
@@ -166,10 +175,16 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(getTileText('Last Find')).toBe('Last Find3 days agoAngelic Halo');
-    expect(getTileText('Closest Set')).toBe('Closest Set1/1All sets complete');
-    expect(getTileText('Runes Missing')).toBe('Runes Missing0All runes found');
-    expect(screen.queryByText(/before tracking began/)).not.toBeInTheDocument();
+    const lastFind = within(getTile('Last Find While Tracking'));
+    expect(lastFind.getByText('3 days ago')).toBeInTheDocument();
+    expect(lastFind.getByText('Angelic Halo')).toBeInTheDocument();
+    const closestSet = within(getTile('Closest Set'));
+    expect(closestSet.getByText('1/1')).toBeInTheDocument();
+    expect(closestSet.getByText('All sets complete')).toBeInTheDocument();
+    const runesMissing = within(getTile('Runes Missing'));
+    expect(runesMissing.getByText('0')).toBeInTheDocument();
+    expect(runesMissing.getByText('All runes found')).toBeInTheDocument();
+    expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
   });
 
   it('If no sets or runes are tracked, Then their tiles are hidden', () => {
@@ -182,6 +197,87 @@ describe('When StatsDashboard shows the headline statistics', () => {
     // Assert
     expect(screen.queryByText('Closest Set')).not.toBeInTheDocument();
     expect(screen.queryByText('Runes Missing')).not.toBeInTheDocument();
+  });
+
+  it('If only ethereal items are tracked, Then the set and rune tiles are hidden because sets and runes cannot be ethereal', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new()
+        .withId('set-item')
+        .withType('set')
+        .withSetName('Angelic Raiment')
+        .build(),
+      buildRune('el', 'El', 'r01'),
+      HolyGrailItemBuilder.new().withId('ethereal').withEtherealType('optional').build(),
+    ];
+    setupStatistics({ items, settings: { grailNormal: false, grailEthereal: true } });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(screen.queryByText('Closest Set')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runes Missing')).not.toBeInTheDocument();
+    expect(screen.getByText('Last Find While Tracking')).toBeInTheDocument();
+  });
+
+  it('If only ethereal items are tracked, Then a normal find of a set item is not the last find', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new()
+        .withId('ethereal')
+        .withName('Ethereal Helm')
+        .withEtherealType('optional')
+        .build(),
+      HolyGrailItemBuilder.new()
+        .withId('set-item')
+        .withName('Angelic Halo')
+        .withType('set')
+        .withSetName('Angelic Raiment')
+        .build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withItemId('ethereal')
+        .withFoundDate(new Date(2026, 9, 5, 12))
+        .asEthereal()
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('p2')
+        .withItemId('set-item')
+        .withFoundDate(new Date(2026, 9, 8, 12))
+        .build(),
+    ];
+    setupStatistics({ items, progress, settings: { grailNormal: false, grailEthereal: true } });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    const lastFind = within(getTile('Last Find While Tracking'));
+    expect(lastFind.getByText('5 days ago')).toBeInTheDocument();
+    expect(lastFind.getByText('Ethereal Helm')).toBeInTheDocument();
+  });
+
+  it('If both versions are tracked, Then the set and rune tiles are shown', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new()
+        .withId('set-item')
+        .withType('set')
+        .withSetName('Angelic Raiment')
+        .build(),
+      buildRune('el', 'El', 'r01'),
+    ];
+    setupStatistics({ items, settings: { grailNormal: true, grailEthereal: true } });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(within(getTile('Closest Set')).getByText('0/1')).toBeInTheDocument();
+    expect(within(getTile('Runes Missing')).getByText('Highest missing: El')).toBeInTheDocument();
   });
 });
 

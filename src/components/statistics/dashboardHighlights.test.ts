@@ -4,6 +4,8 @@ import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { findLastTrackedFind, summarizeRunes, summarizeSets } from './dashboardHighlights';
 
 const NORMAL_ONLY = { grailNormal: true, grailEthereal: false };
+const ETHEREAL_ONLY = { grailNormal: false, grailEthereal: true };
+const BOTH_VERSIONS = { grailNormal: true, grailEthereal: true };
 
 function buildSetItem(id: string, setName: string): Item {
   return HolyGrailItemBuilder.new().withId(id).withType('set').withSetName(setName).build();
@@ -95,6 +97,63 @@ describe('When summarizing the item sets', () => {
     expect(summary?.closest?.found).toBe(0);
   });
 
+  it('If only ethereal items are tracked, Then sets that cannot be ethereal are not summarized', () => {
+    // Arrange
+    const items = ['a1', 'a2'].map((id) => buildSetItem(id, 'Angelic Raiment'));
+    const progress = [buildFind('a1')];
+
+    // Act
+    const summary = summarizeSets(items, progress, ETHEREAL_ONLY);
+
+    // Assert
+    expect(summary).toBeUndefined();
+  });
+
+  it('If only ethereal items are tracked, Then only sets with an ethereal version are summarized', () => {
+    // Arrange
+    const items = [
+      buildSetItem('a1', 'Angelic Raiment'),
+      HolyGrailItemBuilder.new()
+        .withId('b1')
+        .withType('set')
+        .withSetName('Arctic Gear')
+        .withEtherealType('optional')
+        .build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('b1-ethereal')
+        .withItemId('b1')
+        .withFoundDate(new Date(2026, 0, 1))
+        .asEthereal()
+        .build(),
+    ];
+
+    // Act
+    const summary = summarizeSets(items, progress, ETHEREAL_ONLY);
+
+    // Assert
+    expect(summary).toEqual({ closest: undefined, setCount: 1 });
+  });
+
+  it('If both versions are tracked, Then an ethereal record of an item that cannot be ethereal does not count', () => {
+    // Arrange
+    const items = ['a1', 'a2'].map((id) => buildSetItem(id, 'Angelic Raiment'));
+    const progress = [
+      GrailProgressBuilder.new()
+        .withItemId('a1')
+        .withFoundDate(new Date(2026, 0, 1))
+        .asEthereal()
+        .build(),
+    ];
+
+    // Act
+    const summary = summarizeSets(items, progress, BOTH_VERSIONS);
+
+    // Assert
+    expect(summary?.closest?.found).toBe(0);
+  });
+
   it('If no set is tracked, Then there is no summary', () => {
     // Arrange
     const items = [HolyGrailItemBuilder.new().withoutSetName().build()];
@@ -136,6 +195,18 @@ describe('When summarizing the runes', () => {
 
     // Assert
     expect(summary).toEqual({ total: 1, missing: 0, highestMissing: undefined });
+  });
+
+  it('If only ethereal items are tracked, Then runes that cannot be ethereal are not summarized', () => {
+    // Arrange
+    const items = [buildRune('el', 'El', 'r01'), buildRune('zod', 'Zod', 'r33')];
+    const progress = [buildFind('el')];
+
+    // Act
+    const summary = summarizeRunes(items, progress, ETHEREAL_ONLY);
+
+    // Assert
+    expect(summary).toBeUndefined();
   });
 
   it('If runes are not tracked, Then there is no summary', () => {
@@ -196,6 +267,72 @@ describe('When finding the last find made while tracking', () => {
 
     // Act
     const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
+
+    // Assert
+    expect(lastFind).toBeUndefined();
+  });
+});
+
+describe('When the last find respects the tracked item versions', () => {
+  it('If the latest find is a version that is not tracked, Then the latest tracked version is returned', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new().withId('a').withName('a').withEtherealType('optional').build(),
+      HolyGrailItemBuilder.new().withId('b').withName('b').withEtherealType('optional').build(),
+    ];
+    const progress = [
+      buildFind('a', new Date(2026, 0, 5)),
+      GrailProgressBuilder.new()
+        .withId('b-ethereal')
+        .withItemId('b')
+        .withFoundDate(new Date(2026, 0, 9))
+        .asEthereal()
+        .build(),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
+
+    // Assert
+    expect(lastFind?.item.id).toBe('a');
+  });
+
+  it('If only ethereal items are tracked, Then a later find of an item that cannot be ethereal is skipped', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new().withId('ethereal').withEtherealType('optional').build(),
+      buildSetItem('set-item', 'Angelic Raiment'),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('ethereal-find')
+        .withItemId('ethereal')
+        .withFoundDate(new Date(2026, 0, 5))
+        .asEthereal()
+        .build(),
+      buildFind('set-item', new Date(2026, 0, 9)),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, ETHEREAL_ONLY);
+
+    // Assert
+    expect(lastFind?.item.id).toBe('ethereal');
+  });
+
+  it('If both versions are tracked, Then an ethereal record of an item that cannot be ethereal is skipped', () => {
+    // Arrange
+    const items = [buildSetItem('set-item', 'Angelic Raiment')];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withItemId('set-item')
+        .withFoundDate(new Date(2026, 0, 9))
+        .asEthereal()
+        .build(),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, BOTH_VERSIONS);
 
     // Assert
     expect(lastFind).toBeUndefined();
