@@ -35,13 +35,14 @@ describe('When building the cumulative grail finds', () => {
     ];
 
     // Act
-    const points = buildCumulativeFinds(progress, items, NORMAL_ONLY);
+    const { points, baseline } = buildCumulativeFinds(progress, items, NORMAL_ONLY);
 
     // Assert
     expect(points).toEqual([
       { day: toLocalDayIndex(new Date(2026, 0, 1)), total: 2 },
       { day: toLocalDayIndex(new Date(2026, 0, 5)), total: 3 },
     ]);
+    expect(baseline).toBeUndefined();
   });
 
   it('If an item was found again later, Then only its first find counts', () => {
@@ -61,7 +62,7 @@ describe('When building the cumulative grail finds', () => {
     ];
 
     // Act
-    const points = buildCumulativeFinds(progress, items, NORMAL_ONLY);
+    const { points } = buildCumulativeFinds(progress, items, NORMAL_ONLY);
 
     // Assert
     expect(points).toEqual([{ day: toLocalDayIndex(new Date(2026, 0, 2)), total: 1 }]);
@@ -73,10 +74,71 @@ describe('When building the cumulative grail finds', () => {
     const progress = [GrailProgressBuilder.new().withItemId('a').withoutFoundDate().build()];
 
     // Act
-    const points = buildCumulativeFinds(progress, items, NORMAL_ONLY);
+    const { points, baseline } = buildCumulativeFinds(progress, items, NORMAL_ONLY);
 
     // Assert
     expect(points).toEqual([]);
+    expect(baseline).toBeUndefined();
+  });
+
+  it('If the initial scan found items on the first day, Then they form the baseline and later finds add to it', () => {
+    // Arrange
+    const items = ['a', 'b', 'c', 'd'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
+    const progress = [
+      ...['a', 'b'].map((itemId) =>
+        GrailProgressBuilder.new()
+          .withId(`scan-${itemId}`)
+          .withItemId(itemId)
+          .withFoundDate(new Date(2026, 0, 1, 10))
+          .asFromInitialScan()
+          .build(),
+      ),
+      GrailProgressBuilder.new()
+        .withId('same-day')
+        .withItemId('c')
+        .withFoundDate(new Date(2026, 0, 1, 20))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('later')
+        .withItemId('d')
+        .withFoundDate(new Date(2026, 0, 4, 9))
+        .build(),
+    ];
+
+    // Act
+    const { points, baseline } = buildCumulativeFinds(progress, items, NORMAL_ONLY);
+
+    // Assert
+    expect(baseline).toEqual({ day: toLocalDayIndex(new Date(2026, 0, 1)), count: 2 });
+    expect(points).toEqual([
+      { day: toLocalDayIndex(new Date(2026, 0, 1)), total: 3 },
+      { day: toLocalDayIndex(new Date(2026, 0, 4)), total: 4 },
+    ]);
+  });
+
+  it('If only a later startup scan found items, Then there is no baseline', () => {
+    // Arrange
+    const items = ['a', 'b'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('tracked')
+        .withItemId('a')
+        .withFoundDate(new Date(2026, 0, 1))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('rescan')
+        .withItemId('b')
+        .withFoundDate(new Date(2026, 0, 3))
+        .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const { points, baseline } = buildCumulativeFinds(progress, items, NORMAL_ONLY);
+
+    // Assert
+    expect(baseline).toBeUndefined();
+    expect(points.map((point) => point.total)).toEqual([1, 2]);
   });
 });
 
@@ -177,6 +239,13 @@ describe('When computing axis ticks', () => {
     expect(niceTicks(13)).toEqual([0, 5, 10, 15]);
     expect(niceTicks(2)).toEqual([0, 1, 2]);
     expect(niceTicks(0)).toEqual([0, 1]);
+  });
+
+  it('If the range starts above zero, Then the ticks start at the round value below the minimum', () => {
+    // Arrange & Act & Assert
+    expect(niceTicks(205, 4, 186)).toEqual([185, 190, 195, 200, 205]);
+    expect(niceTicks(190, 4, 190)).toEqual([190, 191]);
+    expect(niceTicks(300, 4, 5)).toEqual([0, 100, 200, 300]);
   });
 
   it('If durations are shown, Then the ticks use round time steps covering the maximum', () => {

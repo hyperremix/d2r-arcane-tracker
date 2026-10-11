@@ -66,6 +66,20 @@ function setupStatistics({
   } as unknown as ReturnType<typeof useGrailStatistics>);
 }
 
+/** Returns the text of the stat tile with the given label. */
+function getTileText(label: string): string | null {
+  const tile = screen.getByText(label).closest('[data-slot="card"]');
+  expect(tile).not.toBeNull();
+  return tile?.textContent ?? null;
+}
+
+function buildRune(id: string, name: string, code: string): Item {
+  return {
+    ...HolyGrailItemBuilder.new().withId(id).withName(name).withType('rune').build(),
+    code,
+  };
+}
+
 function buildCharacter(id: string, name: string, characterClass: CharacterClass) {
   return CharacterBuilder.new()
     .withId(id)
@@ -74,6 +88,102 @@ function buildCharacter(id: string, name: string, characterClass: CharacterClass
     .withLevel(80)
     .build();
 }
+
+describe('When StatsDashboard shows the headline statistics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 10, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('If everything came from the first save scan, Then the tiles still show the sets and runes left', () => {
+    // Arrange
+    const items = [
+      ...['a1', 'a2', 'a3', 'a4'].map((id) =>
+        HolyGrailItemBuilder.new()
+          .withId(id)
+          .withType('set')
+          .withSetName("Arcanna's Tricks")
+          .build(),
+      ),
+      buildRune('el', 'El', 'r01'),
+      buildRune('zod', 'Zod', 'r33'),
+    ];
+    const progress = ['a1', 'a2', 'a3', 'el'].map((itemId) =>
+      GrailProgressBuilder.new()
+        .withId(`scan-${itemId}`)
+        .withItemId(itemId)
+        .withFoundDate(new Date(2026, 9, 1, 9))
+        .asFromInitialScan()
+        .build(),
+    );
+    setupStatistics({ items, progress });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getTileText('Total Progress')).toContain('5/10');
+    expect(getTileText('Last Find')).toBe('Last FindNone yetSince tracking began');
+    expect(getTileText('Closest Set')).toBe("Closest Set3/4Arcanna's Tricks");
+    expect(getTileText('Runes Missing')).toBe('Runes Missing1Highest missing: Zod');
+    expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('4 items were found before tracking began on Oct 1, 2026'),
+    ).toBeInTheDocument();
+  });
+
+  it('If an item was found while tracking and everything is complete, Then the tiles say so', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new()
+        .withId('set-item')
+        .withName('Angelic Halo')
+        .withType('set')
+        .withSetName('Angelic Raiment')
+        .build(),
+      buildRune('el', 'El', 'r01'),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withItemId('el')
+        .withFoundDate(new Date(2026, 9, 1, 9))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('p2')
+        .withItemId('set-item')
+        .withFoundDate(new Date(2026, 9, 7, 12))
+        .build(),
+    ];
+    setupStatistics({ items, progress });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getTileText('Last Find')).toBe('Last Find3 days agoAngelic Halo');
+    expect(getTileText('Closest Set')).toBe('Closest Set1/1All sets complete');
+    expect(getTileText('Runes Missing')).toBe('Runes Missing0All runes found');
+    expect(screen.queryByText(/before tracking began/)).not.toBeInTheDocument();
+  });
+
+  it('If no sets or runes are tracked, Then their tiles are hidden', () => {
+    // Arrange
+    setupStatistics({ items: [HolyGrailItemBuilder.new().build()] });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(screen.queryByText('Closest Set')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runes Missing')).not.toBeInTheDocument();
+  });
+});
 
 describe('When StatsDashboard shows the category breakdown', () => {
   beforeEach(() => {

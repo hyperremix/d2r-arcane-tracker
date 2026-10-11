@@ -52,34 +52,65 @@ export interface CumulativeFindsPoint {
   total: number;
 }
 
+/** Grail entries the first save file scan found, before the tracker could see them being found. */
+export interface TrackingBaseline {
+  /** Day index of the first save file scan. */
+  day: number;
+  /** Number of grail entries the scan found. */
+  count: number;
+}
+
+/** Cumulative grail finds over time. */
+export interface CumulativeFinds {
+  /** One point per day with at least one new entry, in chronological order. */
+  points: CumulativeFindsPoint[];
+  /**
+   * Entries from the initial save file scan on the first day of the chart, if any. They are
+   * included in the totals of the points.
+   */
+  baseline: TrackingBaseline | undefined;
+}
+
 /**
  * Builds the cumulative number of grail entries found, one point per day with at least one new
  * entry. Each tracked item version counts once, on the day it was first found; finds from the
- * initial save file scan count on the day of the scan.
+ * initial save file scan count on the day of the scan. The entries the scan found on the first day
+ * are reported as the baseline, since they were found before tracking began.
  * @param progress - All progress records
  * @param items - Tracked items
  * @param settings - Which item versions are tracked
- * @returns Points in chronological order
+ * @returns The points and the baseline
  */
 export function buildCumulativeFinds(
   progress: GrailProgress[],
   items: Item[],
   settings: GrailStatisticsSettings,
-): CumulativeFindsPoint[] {
+): CumulativeFinds {
   const newEntriesByDay = new Map<number, number>();
+  const initialScanEntriesByDay = new Map<number, number>();
   for (const record of findFirstDiscoveries(progress, items, settings).values()) {
     if (!record.foundDate) continue;
     const day = toLocalDayIndex(new Date(record.foundDate));
     newEntriesByDay.set(day, (newEntriesByDay.get(day) ?? 0) + 1);
+    if (record.fromInitialScan) {
+      initialScanEntriesByDay.set(day, (initialScanEntriesByDay.get(day) ?? 0) + 1);
+    }
   }
 
   let total = 0;
-  return [...newEntriesByDay]
+  const points = [...newEntriesByDay]
     .sort(([a], [b]) => a - b)
     .map(([day, count]) => {
       total += count;
       return { day, total };
     });
+
+  const firstDay = points[0]?.day;
+  const baselineCount = firstDay === undefined ? 0 : (initialScanEntriesByDay.get(firstDay) ?? 0);
+  return {
+    points,
+    baseline: baselineCount > 0 ? { day: firstDay, count: baselineCount } : undefined,
+  };
 }
 
 /** Number of finds in a week (seven calendar days). */
@@ -182,15 +213,17 @@ export function buildSessionDurations(sessions: SessionRuns[]): SessionDurationS
 }
 
 /**
- * Returns evenly spaced, round axis ticks from zero that cover the maximum value
- * (e.g. 0, 5, 10, 15 for a maximum of 13).
+ * Returns evenly spaced, round axis ticks that cover a range, starting at the largest round value
+ * at or below the minimum (e.g. 0, 5, 10, 15 for 0 to 13, or 180, 190, 200, 210 for 186 to 205).
  * @param max - Largest value to cover
  * @param targetCount - Approximate number of intervals
- * @returns Ticks in ascending order, starting at zero
+ * @param min - Smallest value to cover; defaults to zero
+ * @returns Ticks in ascending order
  */
-export function niceTicks(max: number, targetCount = 4): number[] {
-  if (!(max > 0)) return [0, 1];
-  const roughStep = max / targetCount;
+export function niceTicks(max: number, targetCount = 4, min = 0): number[] {
+  const span = max - min;
+  if (!(span > 0)) return [min, min + 1];
+  const roughStep = span / targetCount;
   const magnitude = 10 ** Math.floor(Math.log10(roughStep));
   const step =
     [1, 2, 5, 10].map((factor) => factor * magnitude).find((value) => value >= roughStep) ??
@@ -198,7 +231,7 @@ export function niceTicks(max: number, targetCount = 4): number[] {
   // Counts are whole numbers, so never step by less than one
   const roundedStep = Math.max(step, 1);
   const ticks: number[] = [];
-  for (let value = 0; ; value += roundedStep) {
+  for (let value = Math.floor(min / roundedStep) * roundedStep; ; value += roundedStep) {
     ticks.push(value);
     if (value >= max) break;
   }
