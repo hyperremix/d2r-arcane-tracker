@@ -43,8 +43,6 @@ export interface GrailStatisticsSummary extends GrailStatistics {
   normalItems: ProgressCount;
   etherealItems: ProgressCount;
   averageItemsPerDay: number;
-  /** Most recently found progress record, if anything was found. */
-  lastFind: GrailProgress | undefined;
   /** Categories sorted by completion, highest first. */
   categoryStats: CategoryStatistics[];
   /** Characters sorted by number of finds, highest first. */
@@ -234,13 +232,6 @@ export function computeGrailStatistics({
     now,
   );
 
-  let lastFind: (typeof foundProgress)[number] | undefined;
-  for (const p of foundProgress) {
-    if (!lastFind || new Date(p.foundDate).getTime() > new Date(lastFind.foundDate).getTime()) {
-      lastFind = p;
-    }
-  }
-
   // Category breakdown, in the order the categories first appear in the items
   const itemsByCategory = new Map<ItemCategory, Item[]>();
   const categoryByItemId = new Map<string, ItemCategory>();
@@ -289,7 +280,6 @@ export function computeGrailStatistics({
     currentStreak,
     maxStreak,
     averageItemsPerDay: recentFinds.length / RECENT_FIND_DAYS,
-    lastFind,
     categoryStats,
     characterStats,
   };

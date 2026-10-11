@@ -39,7 +39,6 @@ describe('When computeGrailStatistics is called', () => {
         currentStreak: 0,
         maxStreak: 0,
         averageItemsPerDay: 0,
-        lastFind: undefined,
         categoryStats: [],
         characterStats: [],
       });
@@ -150,30 +149,6 @@ describe('When computeGrailStatistics is called', () => {
 
       // Assert
       expect(stats.recentFinds).toBe(0);
-    });
-  });
-
-  describe('If several items were found', () => {
-    it('Then the most recent find is the last find', () => {
-      // Arrange
-      const items = [
-        HolyGrailItemBuilder.new().withId('item1').build(),
-        HolyGrailItemBuilder.new().withId('item2').build(),
-      ];
-      const latest = find('p2', 'item2', daysAgo(2)).build();
-      const progress = [find('p1', 'item1', daysAgo(5)).build(), latest];
-
-      // Act
-      const stats = computeGrailStatistics({
-        items,
-        progress,
-        characters: [],
-        settings: NORMAL_ONLY,
-        now: NOW,
-      });
-
-      // Assert
-      expect(stats.lastFind).toBe(latest);
     });
   });
 
