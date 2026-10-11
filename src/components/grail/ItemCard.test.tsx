@@ -379,6 +379,7 @@ describe('When ItemCard is rendered', () => {
 
     it.each([
       [3, 'items-center', '[&_img]:size-[18px]'],
+      [4, 'items-end', '[&_img]:size-4'],
       [6, 'items-end', '[&_img]:size-4'],
     ])('Then %i runes sit in a slot aligned %s with %s runes', (runeCount, alignment, runeSize) => {
       // Arrange
@@ -1327,7 +1328,7 @@ describe('When ItemCard is rendered', () => {
       expect(screen.getByTestId('recent-discovery-indicator')).toBeInTheDocument();
     });
 
-    it('Then the grid "New" badge is a small corner tab that stays above the artwork content', () => {
+    it('Then the grid "New" badge is a small corner tab flush right and at the top edge', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       const normalProgress = GrailProgressBuilder.new()
@@ -1341,8 +1342,14 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode="grid" />);
 
       // Assert
-      // The 12px high tab ends 13px below the card top, the 4+ rune artwork starts 15px below it
-      expect(screen.getByTestId('recent-badge-slot')).toHaveClass('absolute', 'top-0', 'right-0');
+      // The wrapper is a flex container, so the tab is flush right and at the top edge (12px high,
+      // ending 13px below the card top); the 4+ rune artwork starts 15px below the card top
+      expect(screen.getByTestId('recent-badge-slot')).toHaveClass(
+        'absolute',
+        'top-0',
+        'right-0',
+        'flex',
+      );
       expect(screen.getByTestId('recent-discovery-indicator')).toHaveClass('leading-3', 'px-1');
     });
 

@@ -73,7 +73,8 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
     // Up to three runes sit in one centered row. Longer runewords wrap into two rows of three:
     // smaller runes (34px high) sit at the bottom of the 40px slot, so the top 6px of the slot
-    // stay free for the corner "New" badge.
+    // stay free. The corner "New" badge (12px high at the card's top edge) ends 13px below the
+    // card top, the slot starts 9px and the top rune row 15px below it, so the rune rows clear it.
     const isOneRow = item.runes.length <= 3;
     return (
       <div
@@ -157,9 +158,10 @@ export function GridView({
           getCardStateClasses(item.type, isFound, !!interactiveProps),
         )}
       >
-        {/* Corner tab: 12px high and above the artwork slot's content, so it covers no artwork */}
+        {/* Corner tab flush right and at the top edge, 12px high. The wrapper is a flex container so
+            the inline-flex tooltip trigger does not sit in a line box with a 24px strut. */}
         {recentFindDate && (
-          <div data-testid="recent-badge-slot" className="absolute top-0 right-0 z-10">
+          <div data-testid="recent-badge-slot" className="absolute top-0 right-0 z-10 flex">
             <RecentDiscoveryIndicator
               className="rounded-none rounded-bl-md px-1 text-[0.625rem] leading-3 tracking-normal"
               focusableTriggers={focusableTriggers}
