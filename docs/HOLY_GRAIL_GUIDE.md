@@ -86,7 +86,7 @@ Things to know:
 
 ### Manual entry
 
-In **Manual Entry** mode, or for finds the app can't see (another PC, older finds), open an item and use **Mark as Found**. **Mark as Not Found** undoes it.
+In **Manual Entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there.
 
 ## Browsing your grail
 
@@ -113,11 +113,11 @@ The grail works like a collection wall. Found items light up: as in the game, th
 
 When you track ethereal items, cards for items that can be ethereal show one pill per tracked version, **Normal** and **Ethereal** (or **Ethereal Only**). A found version has a solid pill with a check mark; a missing version has a dashed pill with an empty circle, so you can see which version you still need. Items found in the last 7 days while the tracker was running have a **New** badge. Screen readers announce the same information: the item name, whether it is found (or the status of each version, such as "Normal found, Ethereal missing") and whether it was found recently.
 
-Click an item to see its details, which characters found it and when, and links to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/).
+Click an item to open its details, laid out like the in-game item tooltip. At the top are the rune images of a runeword (or the item icon, when item icons are on), the name in its quality color, the base item (for example "Shako") and whether you found it. For items that can be ethereal, the normal and the ethereal version each show their own status. Below that are the item's type, category, treasure class and ethereal type, its set or required runes where they apply, and a link to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/). The character progress table shows, for each character, when they found the item and whether the find was detected automatically or added manually.
 
 ### Bookmarks
 
-The item dialog also has a **Bookmark** button (**Remove Bookmark** once set) and a **Bookmark Status** badge. A bookmark only records the item as one you care about in the app's own database. It never reads or changes a save file, and it doesn't count as finding the item. Bookmarks are not shown in the [Inventory Browser](INVENTORY_BROWSER_GUIDE.md).
+The item dialog also has a **Bookmark** button. Once the item is bookmarked, the button reads **Remove bookmark** and its icon is filled. A bookmark only records the item as one you care about in the app's own database. It never reads or changes a save file, and it doesn't count as finding the item. Bookmarks are not shown in the [Inventory Browser](INVENTORY_BROWSER_GUIDE.md).
 
 ### Item icons
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -17,7 +18,7 @@ import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.svg';
 import { getItemQualityTextClass } from '../ItemCard/styles';
 import { RuneImages } from '../RuneImages';
-import { BookmarkAction, BookmarkStatusSection } from './BookmarkControls';
+import { BookmarkAction } from './BookmarkControls';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';
 import { MarkAsFoundDialog } from './MarkAsFoundDialog';
@@ -48,9 +49,43 @@ function MarkAsFoundAction({ item }: { item: Item }) {
 }
 
 /**
+ * The item's artwork above its name: the runes of a runeword, or the item icon when item icons
+ * are enabled. The icon is decorative because the dialog title already names the item.
+ */
+function ItemArtwork({ item, showItemIcons }: { item: Item; showItemIcons: boolean }) {
+  // Hooks must run unconditionally, so the icon is resolved even when it isn't shown
+  const { iconUrl, isLoading } = useItemIcon(item);
+
+  if (item.type === 'runeword') {
+    return item.runes && item.runes.length > 0 ? (
+      <RuneImages runeIds={item.runes} viewMode="grid" />
+    ) : null;
+  }
+
+  if (!showItemIcons) return null;
+
+  return (
+    <div className="relative h-20 w-20">
+      <img
+        src={iconUrl}
+        alt=""
+        className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
+        onError={(e) => {
+          if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
+            e.currentTarget.src = placeholderUrl;
+          }
+        }}
+      />
+      {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
+    </div>
+  );
+}
+
+/**
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
- * Shows item metadata, icon, and per-character progress, and lets the user manually
- * record or remove finds.
+ * It reads like the in-game item tooltip: artwork, the name in its quality color, the base item
+ * and found status, then the item's facts as plain text lines. Below that it lists per-character
+ * progress and lets the user manually record or remove finds.
  */
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
@@ -74,20 +109,6 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     [item, progressLookup],
   );
 
-  // Get icon for the item (must be called before early return)
-  // Create a placeholder item for the hook when item is null
-  const placeholderItem: Item = {
-    id: '',
-    name: '',
-    link: '',
-    etherealType: 'none',
-    type: 'unique',
-    category: 'weapons',
-    subCategory: '1h_swords',
-    treasureClass: 'normal',
-  };
-  const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
-
   // Hook must be called before early return
   const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);
 
@@ -95,69 +116,52 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     return null;
   }
 
+  // Runes are named after their base ("El Rune"), so the base line would only repeat the name
+  const baseType = item.type === 'rune' ? undefined : item.itemBase;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex justify-between gap-4">
-            {/* Item Icon or Rune Images */}
-            {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
-              <div className="flex items-center">
-                <RuneImages runeIds={item.runes} viewMode="grid" />
-              </div>
-            ) : settings.showItemIcons && item.type !== 'runeword' ? (
-              <div className="relative h-20 w-20">
-                <img
-                  src={iconUrl}
-                  alt={item.name}
-                  className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
-                  onError={(e) => {
-                    if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
-                      e.currentTarget.src = placeholderUrl;
-                    }
-                  }}
-                />
-                {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
-              </div>
-            ) : null}
-
-            <div>
-              <DialogTitle
-                className={cn(
-                  'font-bold font-display text-2xl',
-                  getItemQualityTextClass(item.type),
-                )}
-              >
-                {item.name}
-              </DialogTitle>
-            </div>
-            {((item.type === 'runeword' && item.runes && item.runes.length > 0) ||
-              (settings.showItemIcons && item.type !== 'runeword')) && (
-              <div className="relative w-20" />
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl">
+        <DialogHeader className="shrink-0 items-center gap-1 text-center">
+          <div className="mb-2 flex justify-center empty:hidden">
+            <ItemArtwork item={item} showItemIcons={settings.showItemIcons} />
+          </div>
+          <DialogTitle
+            className={cn(
+              'text-balance font-display font-semibold text-2xl leading-tight',
+              getItemQualityTextClass(item.type),
             )}
+          >
+            {item.name}
+          </DialogTitle>
+          {baseType && (
+            <DialogDescription className="text-base text-muted-foreground">
+              {baseType}
+            </DialogDescription>
+          )}
+          <div className="mt-2">
+            <ProgressStatusSection item={item} itemProgress={itemProgress} />
           </div>
         </DialogHeader>
 
-        {/* Item Information and Progress Status */}
-        <div className="-mx-6 max-h-[60vh] overflow-y-auto">
-          <div className="grid grid-cols-1 gap-4 px-6">
+        <div className="-mx-6 min-h-0 flex-1 overflow-y-auto">
+          <div className="grid gap-6 px-6">
             <ItemInfoSection item={item} />
-            <ProgressStatusSection item={item} itemProgress={itemProgress} />
-
-            <BookmarkStatusSection linkedBookmark={linkedBookmark} />
 
             {characters.length > 0 && (
-              <CharacterProgressTable
-                characters={characters}
-                progress={progress}
-                item={item}
-                onRemoveProgress={removeProgress}
-              />
+              <div className="border-t pt-4">
+                <CharacterProgressTable
+                  characters={characters}
+                  progress={progress}
+                  item={item}
+                  onRemoveProgress={removeProgress}
+                />
+              </div>
             )}
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <BookmarkAction
             linkedBookmark={linkedBookmark}
             isPending={isBookmarkActionPending}

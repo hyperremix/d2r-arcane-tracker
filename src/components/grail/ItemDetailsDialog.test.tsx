@@ -177,7 +177,101 @@ describe('When ItemDetailsDialog is rendered', () => {
       );
     });
 
-    it('Then renders translated type, category and treasure class badges', () => {
+    it('Then the item name is the accessible name of the dialog', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName("Aldur's Deception")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByRole('dialog', { name: "Aldur's Deception" })).toBeInTheDocument();
+    });
+
+    it('Then the dialog is wide enough for item names to fit on one line', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName("Aldur's Deception")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const dialog = screen.getByRole('dialog', { name: "Aldur's Deception" });
+      expect(dialog).toHaveClass('sm:max-w-2xl');
+      expect(dialog).not.toHaveClass('sm:max-w-md');
+    });
+
+    it('Then the header, including the item name, is centred', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName("Aldur's Deception")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const header = screen.getByRole('heading', { name: "Aldur's Deception" }).parentElement;
+      expect(header).toHaveClass('items-center', 'text-center');
+    });
+
+    it('Then the dialog is capped to the viewport and only the body scrolls', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const dialog = screen.getByRole('dialog', { name: 'Windforce' });
+      const heading = screen.getByRole('heading', { name: 'Windforce' });
+      const footerButtons = screen.getAllByRole('button', { name: 'Close' });
+      const body = screen
+        .getByRole('region', { name: 'Character progress' })
+        .closest('.overflow-y-auto');
+      expect(dialog).toHaveClass('flex', 'flex-col', 'max-h-[calc(100vh-2rem)]');
+      expect(body).toHaveClass('min-h-0', 'flex-1');
+      expect(body).toContainElement(screen.getByText('TestSorc'));
+      expect(body).not.toContainElement(heading);
+      for (const button of footerButtons) {
+        expect(body).not.toContainElement(button);
+      }
+    });
+
+    it('Then the item facts are plain text lines, not badges or nested cards', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('set')
+        .withSetName("Aldur's Watchtower")
+        .withEtherealType('optional')
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const dialog = screen.getByRole('dialog');
+      expect(screen.getByText('Type:').tagName).toBe('DT');
+      expect(screen.getByText('Type:').nextElementSibling).toHaveTextContent('Set');
+      expect(dialog.querySelector('.rounded-4xl')).toBeNull();
+      expect(dialog.querySelector('[data-slot="card"]')).toBeNull();
+    });
+
+    it('Then renders translated type, category and treasure class lines', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
         .withId('item-1')
@@ -199,13 +293,13 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
 
     it.each([
-      { etherealType: 'none', label: 'Cannot Be Ethereal', variantClass: 'bg-secondary' },
-      { etherealType: 'optional', label: 'Can Be Ethereal', variantClass: 'text-ethereal' },
-      { etherealType: 'only', label: 'Ethereal Only', variantClass: 'text-ethereal' },
+      { etherealType: 'none', label: 'Cannot Be Ethereal', isEtherealColored: false },
+      { etherealType: 'optional', label: 'Can Be Ethereal', isEtherealColored: true },
+      { etherealType: 'only', label: 'Ethereal Only', isEtherealColored: true },
     ] as const)('Then renders the $etherealType ethereal type as $label without destructive styling', ({
       etherealType,
       label,
-      variantClass,
+      isEtherealColored,
     }) => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
@@ -218,9 +312,49 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      const badge = screen.getByText(label);
-      expect(badge).toHaveClass(variantClass);
-      expect(badge).not.toHaveClass('text-destructive');
+      const value = screen.getByText(label);
+      expect(screen.getByText('Ethereal type:').nextElementSibling).toBe(value);
+      expect(value.classList.contains('text-ethereal')).toBe(isEtherealColored);
+      expect(value).not.toHaveClass('text-destructive');
+    });
+  });
+
+  describe('If the item has a base item', () => {
+    it('Then the base item is shown beneath the name and describes the dialog', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName('Harlequin Crest')
+        .withItemBase('Shako')
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByRole('dialog', { name: 'Harlequin Crest' })).toHaveAccessibleDescription(
+        'Shako',
+      );
+    });
+  });
+
+  describe('If the item is a rune', () => {
+    it('Then its base item is not repeated beneath the name', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('rune')
+        .withName('El')
+        .withItemBase('El Rune')
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByText('El Rune')).not.toBeInTheDocument();
     });
   });
 
@@ -241,7 +375,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If item has setName', () => {
-    it('Then shows set name badge', () => {
+    it('Then shows the set name as a labelled line in the set colour', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
         .withId('item-1')
@@ -254,7 +388,8 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText("Tal Rasha's Wrappings")).toBeInTheDocument();
+      expect(screen.getByText('Set:').tagName).toBe('DT');
+      expect(screen.getByText("Tal Rasha's Wrappings")).toHaveClass('text-item-set');
     });
   });
 
@@ -306,10 +441,48 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByTestId('rune-images')).toBeInTheDocument();
       expect(screen.getByText('El + Eld + Tir')).toBeInTheDocument();
     });
+
+    it('Then the required runes line uses the rune colour', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Required runes:').tagName).toBe('DT');
+      expect(screen.getByText('El + Eld')).toHaveClass('text-item-rune');
+    });
+  });
+
+  describe('If item is a runeword without runes', () => {
+    it('Then no artwork is rendered, even when item icons are enabled', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = [];
+      setupStoreMock({ items: [item], settings: { showItemIcons: true } });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByTestId('rune-images')).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog').querySelector('img')).toBeNull();
+    });
   });
 
   describe('If showItemIcons enabled', () => {
-    it('Then renders item icon image', () => {
+    it('Then renders the item icon as decorative artwork', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withType('unique').build();
       setupStoreMock({ items: [item], settings: { showItemIcons: true } });
@@ -318,12 +491,28 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      const icon = screen.getByRole('dialog').querySelector('img');
+      expect(icon).toHaveAttribute('src', '/mock-icon.png');
+      expect(icon).toHaveAttribute('alt', '');
+    });
+  });
+
+  describe('If showItemIcons disabled', () => {
+    it('Then no item icon is rendered', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withType('unique').build();
+      setupStoreMock({ items: [item], settings: { showItemIcons: false } });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByRole('dialog').querySelector('img')).toBeNull();
     });
   });
 
   describe('If progress shows found', () => {
-    it('Then shows Found badge', () => {
+    it('Then shows a Found status line instead of a badge', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       setupStoreMock({ items: [item] });
@@ -346,14 +535,14 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      const badge = screen.getByText('Found');
-      expect(badge).toHaveClass('text-found');
-      expect(badge).not.toHaveClass('bg-primary');
+      const status = screen.getByText('Found');
+      expect(status).toHaveClass('text-found');
+      expect(status).not.toHaveClass('rounded-4xl');
     });
   });
 
   describe('If progress shows not found', () => {
-    it('Then shows Not Found badge', () => {
+    it('Then shows a Not Found status line', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       setupStoreMock({ items: [item] });
@@ -389,7 +578,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       { normalFound: false, etherealFound: true, normal: missing, ethereal: found },
       { normalFound: true, etherealFound: true, normal: found, ethereal: found },
       { normalFound: false, etherealFound: false, normal: missing, ethereal: missing },
-    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge', ({
+    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound show the matching status', ({
       normalFound,
       etherealFound,
       normal,
@@ -417,14 +606,30 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      const normalBadge = screen.getByText('Normal:').nextElementSibling;
-      const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
-      expect(normalBadge).toHaveTextContent(normal.text);
-      expect(normalBadge).toHaveClass(normal.present);
-      expect(normalBadge).not.toHaveClass(normal.absent);
-      expect(etherealBadge).toHaveTextContent(ethereal.text);
-      expect(etherealBadge).toHaveClass(ethereal.present);
-      expect(etherealBadge).not.toHaveClass(ethereal.absent);
+      const normalStatus = screen.getByText('Normal:').nextElementSibling;
+      const etherealStatus = screen.getByText('Ethereal:').nextElementSibling;
+      expect(normalStatus).toHaveTextContent(normal.text);
+      expect(normalStatus).toHaveClass(normal.present);
+      expect(normalStatus).not.toHaveClass(normal.absent);
+      expect(etherealStatus).toHaveTextContent(ethereal.text);
+      expect(etherealStatus).toHaveClass(ethereal.present);
+      expect(etherealStatus).not.toHaveClass(ethereal.absent);
+    });
+  });
+
+  describe('If an item with optional ethereal type is shown', () => {
+    it('Then the Normal and Ethereal statuses sit side by side in one row', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const statuses = screen.getByText('Normal:').closest('dl');
+      expect(statuses).toContainElement(screen.getByText('Ethereal:'));
+      expect(statuses).toHaveClass('flex', 'flex-wrap', 'justify-center');
     });
   });
 
@@ -463,8 +668,11 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Character Progress')).toBeInTheDocument();
-      expect(screen.getByText('TestSorc')).toBeInTheDocument();
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      const heading = within(section).getByRole('heading', { name: 'Character progress' });
+      expect(heading).toBeVisible();
+      expect(heading).toHaveClass('font-display');
+      expect(within(section).getByText('TestSorc')).toBeInTheDocument();
     });
   });
 
@@ -478,7 +686,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.queryByText('Character Progress')).not.toBeInTheDocument();
+      expect(screen.queryByText('Character progress')).not.toBeInTheDocument();
     });
   });
 
@@ -505,19 +713,6 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText(/1-5 of 7/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Previous/ })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Next/ })).toBeEnabled();
-    });
-
-    it('Then the pagination range opts out of the display title font with font-ui', () => {
-      // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      const characters = CharacterBuilder.new().withId('char').withName('Char').buildMany(7);
-      setupStoreMock({ items: [item], characters });
-
-      // Act
-      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-
-      // Assert
-      expect(screen.getByText(/1-5 of 7/)).toHaveClass('font-ui', 'font-normal');
     });
 
     it('Then Next click advances page', () => {
@@ -583,7 +778,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If etherealType "none"', () => {
-    it('Then no Normal/Ethereal rows in ProgressStatusSection', () => {
+    it('Then a single status line is shown without Normal/Ethereal labels', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
       setupStoreMock({ items: [item] });
@@ -591,15 +786,15 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
-      // Assert — "Overall Status" exists, but "Normal:" and "Ethereal:" labels do not
-      expect(screen.getByText('Overall Status:')).toBeInTheDocument();
+      // Assert
+      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
       expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
     });
   });
 
   describe('If etherealType "optional"', () => {
-    it('Then both Normal and Ethereal rows are shown', () => {
+    it('Then both the Normal and Ethereal statuses are shown', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       setupStoreMock({ items: [item] });
@@ -660,7 +855,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If a bookmark exists for the item', () => {
-    it('Then it shows the bookmarked status badge', async () => {
+    it('Then the bookmark button offers to remove the bookmark', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
@@ -690,7 +885,24 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Remove bookmark' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: 'Bookmark' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the dialog shows the bookmark state', () => {
+    it('Then no separate bookmark status row repeats it', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      await screen.findByRole('button', { name: 'Bookmark' });
+
+      // Assert
+      expect(screen.queryByText(/Bookmark Status/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Not Bookmarked/i)).not.toBeInTheDocument();
     });
   });
 
@@ -712,7 +924,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If the item is bookmarked', () => {
-    it('Then clicking Remove Bookmark calls vault removeItem API for the bookmark row', async () => {
+    it('Then clicking Remove bookmark calls vault removeItem API for the bookmark row', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
@@ -739,7 +951,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       });
       mockVaultRemoveItem.mockResolvedValue(undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const removeButton = await screen.findByRole('button', { name: 'Remove Bookmark' });
+      const removeButton = await screen.findByRole('button', { name: 'Remove bookmark' });
 
       // Act
       fireEvent.click(removeButton);
@@ -785,7 +997,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       fireEvent.click(bookmarkButton);
 
       // Assert
-      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove bookmark' })).not.toBeInTheDocument();
       expect(mockVaultRemoveItem).not.toHaveBeenCalled();
       expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
     });
@@ -841,7 +1053,7 @@ describe('When ItemDetailsDialog is rendered', () => {
         ),
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update bookmark', failure);
-      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove bookmark' })).not.toBeInTheDocument();
       consoleErrorSpy.mockRestore();
     });
   });
@@ -895,7 +1107,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       const { rerender } = render(
         <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
       );
-      await screen.findByRole('button', { name: 'Remove Bookmark' });
+      await screen.findByRole('button', { name: 'Remove bookmark' });
 
       // Act
       rerender(<ItemDetailsDialog itemId="item-a" open={false} onOpenChange={vi.fn()} />);
@@ -906,8 +1118,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       );
 
       // Assert
-      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove bookmark' })).not.toBeInTheDocument();
       expect(mockVaultRemoveItem).not.toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });
@@ -926,14 +1137,14 @@ describe('When ItemDetailsDialog is rendered', () => {
       const { rerender } = render(
         <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
       );
-      await screen.findByRole('button', { name: 'Remove Bookmark' });
+      await screen.findByRole('button', { name: 'Remove bookmark' });
       mockVaultSearch.mockReturnValue(new Promise(() => undefined));
 
       // Act
       rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove bookmark' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Bookmark' })).toBeInTheDocument();
     });
   });
@@ -967,8 +1178,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Assert
-      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove bookmark' })).not.toBeInTheDocument();
     });
   });
 
@@ -995,7 +1205,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Remove bookmark' })).toBeInTheDocument();
       expect(mockVaultSearch.mock.calls.map(([filter]) => filter.page)).toEqual([1, 2]);
     });
   });
@@ -1026,7 +1236,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If the item is shown without any found records', () => {
-    it('Then the Mark as Found action is always available', () => {
+    it('Then the Mark as found action is always available', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       setupStoreMock({ items: [item] });
@@ -1035,15 +1245,15 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Mark as Found' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Mark as found' })).toBeEnabled();
       expect(screen.queryByRole('button', { name: /Not Found/ })).not.toBeInTheDocument();
     });
   });
 });
 
 function openMarkAsFoundPrompt() {
-  fireEvent.click(screen.getByRole('button', { name: 'Mark as Found' }));
-  return screen.getByRole('dialog', { name: 'Mark as Found' });
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as found' }));
+  return screen.getByRole('dialog', { name: 'Mark as found' });
 }
 
 describe('When the user marks an item as found', () => {
@@ -1066,7 +1276,7 @@ describe('When the user marks an item as found', () => {
 
       // Assert
       expect(within(prompt).getByRole('combobox', { name: 'Character' })).toHaveTextContent('Sorc');
-      expect(within(prompt).getByLabelText('Found Date')).toHaveValue(toLocalIsoDate());
+      expect(within(prompt).getByLabelText('Found date')).toHaveValue(toLocalIsoDate());
       expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
     });
 
@@ -1077,12 +1287,12 @@ describe('When the user marks an item as found', () => {
       setupStoreMock({ items: [item], characters: [character] });
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
       const prompt = openMarkAsFoundPrompt();
-      fireEvent.change(within(prompt).getByLabelText('Found Date'), {
+      fireEvent.change(within(prompt).getByLabelText('Found date'), {
         target: { value: '2024-06-15' },
       });
 
       // Act
-      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
 
       // Assert
       await waitFor(() => expect(mockAddManualProgress).toHaveBeenCalledTimes(1));
@@ -1090,7 +1300,7 @@ describe('When the user marks an item as found', () => {
       expect(input).toMatchObject({ itemId: 'item-1', characterId: 'char-1', isEthereal: false });
       expect(toLocalIsoDate(input.foundDate)).toBe('2024-06-15');
       await waitFor(() =>
-        expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument(),
+        expect(screen.queryByRole('dialog', { name: 'Mark as found' })).not.toBeInTheDocument(),
       );
     });
 
@@ -1105,12 +1315,12 @@ describe('When the user marks an item as found', () => {
       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
       // Act
-      fireEvent.change(within(prompt).getByLabelText('Found Date'), {
+      fireEvent.change(within(prompt).getByLabelText('Found date'), {
         target: { value: toLocalIsoDate(tomorrow) },
       });
 
       // Assert
-      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+      expect(within(prompt).getByRole('button', { name: 'Mark as found' })).toBeDisabled();
       expect(
         within(prompt).getByText('Choose a date that is not in the future.'),
       ).toBeInTheDocument();
@@ -1127,13 +1337,13 @@ describe('When the user marks an item as found', () => {
       const prompt = openMarkAsFoundPrompt();
 
       // Act
-      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
 
       // Assert
       expect(await within(prompt).findByRole('alert')).toHaveTextContent(
         'Could not save this find. Please try again.',
       );
-      expect(screen.getByRole('dialog', { name: 'Mark as Found' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Mark as found' })).toBeInTheDocument();
     });
   });
 
@@ -1159,7 +1369,7 @@ describe('When the user marks an item as found', () => {
       expect(
         within(prompt).getByText('Sorc already has this version recorded.'),
       ).toBeInTheDocument();
-      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+      expect(within(prompt).getByRole('button', { name: 'Mark as found' })).toBeDisabled();
     });
 
     it('Then the message is associated with the controls it explains', () => {
@@ -1185,7 +1395,7 @@ describe('When the user marks an item as found', () => {
         within(prompt).getByRole('combobox', { name: 'Character' }),
       ).toHaveAccessibleDescription(message);
       expect(
-        within(prompt).getByRole('button', { name: 'Mark as Found' }),
+        within(prompt).getByRole('button', { name: 'Mark as found' }),
       ).toHaveAccessibleDescription(message);
     });
   });
@@ -1203,7 +1413,7 @@ describe('When the user marks an item as found', () => {
       // Assert
       expect(within(prompt).getByText(/No characters available yet/)).toBeInTheDocument();
       expect(within(prompt).queryByRole('combobox')).not.toBeInTheDocument();
-      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+      expect(within(prompt).getByRole('button', { name: 'Mark as found' })).toBeDisabled();
     });
 
     it('Then the message is associated with the disabled submit button', () => {
@@ -1217,13 +1427,13 @@ describe('When the user marks an item as found', () => {
 
       // Assert
       expect(
-        within(prompt).getByRole('button', { name: 'Mark as Found' }),
+        within(prompt).getByRole('button', { name: 'Mark as found' }),
       ).toHaveAccessibleDescription(/No characters available yet/);
     });
   });
 
   describe('If the details dialog is closed and reopened or switched to another item', () => {
-    it('Then the Mark as Found prompt does not carry over', () => {
+    it('Then the Mark as found prompt does not carry over', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
       const other = HolyGrailItemBuilder.new().withId('item-2').withEtherealType('none').build();
@@ -1238,7 +1448,7 @@ describe('When the user marks an item as found', () => {
       rerender(<ItemDetailsDialog itemId="item-2" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Mark as found' })).not.toBeInTheDocument();
 
       // Act
       openMarkAsFoundPrompt();
@@ -1246,7 +1456,7 @@ describe('When the user marks an item as found', () => {
       rerender(<ItemDetailsDialog itemId="item-2" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Mark as found' })).not.toBeInTheDocument();
     });
   });
 
@@ -1267,7 +1477,7 @@ describe('When the user marks an item as found', () => {
       fireEvent.mouseMove(etherealOption);
       fireEvent.click(etherealOption);
       await waitFor(() => expect(versionSelect).toHaveTextContent('Ethereal'));
-      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
 
       // Assert
       await waitFor(() =>
@@ -1292,7 +1502,7 @@ describe('When the user marks an item as found', () => {
       const prompt = openMarkAsFoundPrompt();
 
       // Act
-      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
 
       // Assert
       expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
@@ -1314,7 +1524,7 @@ describe('When the user marks an item as found', () => {
       const prompt = openMarkAsFoundPrompt();
 
       // Act
-      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
 
       // Assert
       expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
