@@ -31,6 +31,35 @@ describe('When DialogContent is rendered', () => {
   });
 });
 
+describe('When DialogTitle is rendered', () => {
+  it('Then it uses the semibold Inter heading style without the display serif', () => {
+    // Arrange & Act
+    renderDialog();
+
+    // Assert
+    const title = screen.getByText('Title');
+    expect(title).toHaveClass('font-semibold', 'text-lg');
+    expect(title).not.toHaveClass('font-display');
+  });
+
+  it('If a className is given, Then it is merged over the default title style', () => {
+    // Arrange & Act
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle className="font-display text-2xl">Item name</DialogTitle>
+          <DialogDescription>Description</DialogDescription>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    // Assert
+    const title = screen.getByText('Item name');
+    expect(title).toHaveClass('font-display', 'text-2xl');
+    expect(title).not.toHaveClass('text-lg');
+  });
+});
+
 describe('When DialogFooter is rendered with showCloseButton', () => {
   it('Then the footer close button is labelled with the translated text', () => {
     // Arrange & Act

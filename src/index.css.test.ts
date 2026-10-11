@@ -16,9 +16,9 @@ describe('When the global stylesheet source is read (stylesheet guard)', () => {
     expect(css).toMatch(/--font-display:\s*'Cinzel Variable'/);
   });
 
-  it('Then h1 and h2 headings are set in the display font', () => {
+  it('Then no global heading rule sets the display font, so headings default to Inter', () => {
     // Assert
-    expect(css).toMatch(/h1,\s*h2\s*\{[^}]*font-family:\s*var\(--font-display\)/);
+    expect(css).not.toMatch(/h[1-6][^{]*\{[^}]*font-family:\s*var\(--font-display\)/);
   });
 
   it('Then the font-ui utility switches back to the sans font', () => {

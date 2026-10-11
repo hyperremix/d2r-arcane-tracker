@@ -7,7 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Inter for body/UI text; Cinzel (D2-style display serif) for headings via `font-display` */
+  /* Inter for body/UI text and headings; Cinzel (D2-style display serif) only where opted in via `font-display` */
   --font-sans: 'Inter Variable', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   --font-display: 'Cinzel Variable', 'Cinzel', Georgia, 'Times New Roman', serif;
   --color-gray-50: #f9fafb;
@@ -34,15 +34,13 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
   }
-  /* Page, section and dialog headings use the display serif; dense UI text stays in Inter */
-  h1,
-  h2 {
-    font-family: var(--font-display);
-    letter-spacing: 0.02em;
-  }
 }
 
-/* Opts inline content (counts, toggles, meta text) out of the display serif a heading wrapper such as CardTitle sets */
+/*
+ * The display serif is reserved for page titles (PageHeader), the app brand and item names, which
+ * opt in with `font-display`. Section, card and dialog headings stay in Inter.
+ * `font-ui` opts inline content (counts, badges, meta text) inside a display-serif heading back out.
+ */
 @utility font-ui {
   font-family: var(--font-sans);
   letter-spacing: normal;

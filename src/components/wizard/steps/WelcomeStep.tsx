@@ -21,7 +21,7 @@ export function WelcomeStep() {
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-4 text-center">
         <img src={logoUrl} alt={t(translations.app.title)} className="h-20 w-20" />
-        <h2 className="font-bold text-2xl">{t(translations.wizard.welcome.title)}</h2>
+        <h2 className="font-bold font-display text-2xl">{t(translations.wizard.welcome.title)}</h2>
         <p className="max-w-lg text-muted-foreground">
           {t(translations.wizard.welcome.description)}
         </p>
