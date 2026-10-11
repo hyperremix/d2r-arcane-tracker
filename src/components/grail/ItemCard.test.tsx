@@ -533,6 +533,24 @@ describe('When ItemCard is rendered', () => {
       expect(ethereal).toHaveTextContent('Ethereal missing');
     });
 
+    it('Then the grid tile pills use the tight compact sizing that fits the narrowest column', () => {
+      // Arrange
+      setupStoreMock({ grailEthereal: true });
+      const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} />);
+
+      // Assert
+      const pills = container.querySelectorAll('[data-version]');
+      expect(pills).toHaveLength(2);
+      for (const pill of pills) {
+        expect(pill).toHaveClass('px-1', 'text-[0.625rem]');
+        expect(pill).not.toHaveClass('px-1.5', 'px-2');
+      }
+      expect(container.querySelector('ul')).toHaveClass('flex-nowrap', 'gap-0.5');
+    });
+
     it('Then the list row keeps the full version labels and the regular pill markup', () => {
       // Arrange
       setupStoreMock({ grailEthereal: true });
@@ -546,6 +564,7 @@ describe('When ItemCard is rendered', () => {
       expect(ethereal).toHaveTextContent('Ethereal');
       expect(ethereal).not.toHaveTextContent('Eth missing');
       expect(ethereal?.querySelector('.truncate')).toBeNull();
+      expect(ethereal).toHaveClass('px-2', 'py-0.5', 'text-xs');
     });
   });
 

@@ -162,11 +162,14 @@ export function VersionPills({
   const { t } = useTranslation();
   if (versionStatuses.length === 0) return null;
 
+  // Compact width at the 128px minimum column (110px tile content), with a pessimistic 0.6em per
+  // glyph at 10px (wider than Arial and Verdana): Normal 2 border + 8 padding + 8 icon + 1 gap +
+  // 36 text = 55px, Eth 2 + 8 + 8 + 1 + 18 = 37px, plus 2px between pills = 94px, 16px to spare.
   return (
     <ul
       className={cn(
         'flex items-center justify-center',
-        compact ? 'flex-nowrap gap-1' : 'flex-wrap gap-1.5',
+        compact ? 'flex-nowrap gap-0.5' : 'flex-wrap gap-1.5',
         className,
       )}
     >
@@ -179,18 +182,16 @@ export function VersionPills({
             data-found={status.isFound}
             className={cn(
               'inline-flex items-center rounded-full border font-medium',
-              compact
-                ? 'min-w-0 px-1.5 text-[0.6875rem] leading-4'
-                : 'px-2 py-0.5 text-xs leading-4',
+              compact ? 'min-w-0 px-1 text-[0.625rem] leading-4' : 'px-2 py-0.5 text-xs leading-4',
               getVersionPillClasses(item.type, status.isFound),
             )}
           >
             <span
               aria-hidden="true"
-              className={cn('inline-flex items-center', compact ? 'min-w-0 gap-0.5' : 'gap-1')}
+              className={cn('inline-flex items-center', compact ? 'min-w-0 gap-px' : 'gap-1')}
             >
               {status.isFound ? (
-                <Check className={compact ? 'size-2.5 shrink-0' : 'size-3'} strokeWidth={3} />
+                <Check className={compact ? 'size-2 shrink-0' : 'size-3'} strokeWidth={3} />
               ) : (
                 <Circle className={compact ? 'size-2 shrink-0' : 'size-2.5'} />
               )}
