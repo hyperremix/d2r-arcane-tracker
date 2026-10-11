@@ -13,7 +13,8 @@ interface LiveRunTimerProps {
 }
 
 /**
- * Large, glanceable current-run timer with tabular numerals so digits do not shift while ticking.
+ * Large, glanceable current-run timer in the body font with tabular numerals so digits do not
+ * shift while ticking.
  * A paused run's timer is shown in the paused state color. The timer is intentionally not a live
  * region; state changes are announced by the session state badge.
  */
@@ -33,7 +34,7 @@ export function LiveRunTimer({ elapsedMs, runNumber, paused = false }: LiveRunTi
       </p>
       <p
         className={cn(
-          'font-mono font-semibold text-5xl tabular-nums leading-none tracking-tight',
+          'font-semibold text-5xl tabular-nums leading-none tracking-tight sm:text-6xl',
           !hasRun && 'text-muted-foreground',
           hasRun && paused && 'text-warning',
         )}

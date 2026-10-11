@@ -27,10 +27,15 @@ import type { RunTrackerAction } from '@/stores/runTrackerStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { getLiveSessionState } from '../liveSession';
 import { SessionStateBadge } from '../SessionStateBadge';
-import type { ControlButtonsPending, RunTrackerShortcuts } from './ControlButtons';
-import { ControlButtons, ShortcutsInfo } from './ControlButtons';
+import type {
+  ControlButtonsPending,
+  RunTrackerAriaShortcuts,
+  RunTrackerShortcuts,
+} from './ControlButtons';
+import { ControlButtons, GlobalHotkeysBadge } from './ControlButtons';
 import { LiveRunTimer } from './LiveRunTimer';
 import { ManualItemEntry } from './ManualItemEntry';
+import { toAriaKeyShortcuts } from './ShortcutKey';
 
 // Helper function to check if user is typing in input fields
 // Used in SessionControls component
@@ -102,6 +107,16 @@ function _getDisplayShortcuts(shortcuts: RunTrackerShortcuts): RunTrackerShortcu
   };
 }
 
+// Helper function to expose the stored shortcuts to assistive technology (e.g. "Meta+R" on macOS)
+function _getAriaShortcuts(shortcuts: RunTrackerShortcuts): RunTrackerAriaShortcuts {
+  return {
+    startRun: toAriaKeyShortcuts(shortcuts.startRun),
+    pauseRun: toAriaKeyShortcuts(shortcuts.pauseRun),
+    endRun: toAriaKeyShortcuts(shortcuts.endRun),
+    endSession: toAriaKeyShortcuts(shortcuts.endSession),
+  };
+}
+
 // Helper function to map store action pending flags to the control buttons
 function _getControlsPending(
   pendingActions: Partial<Record<RunTrackerAction, boolean>>,
@@ -117,9 +132,9 @@ function _getControlsPending(
 
 /**
  * SessionControls component that renders the live session area: a large current-run timer
- * (or, without a session, a one-line invitation to start one),
- * a session state badge and the state-dependent run actions (with keyboard shortcuts),
- * plus auto mode and manual item entry.
+ * (or, without a session, a short invitation to start one directly above the start button),
+ * a session state badge and the state-dependent run actions with their keyboard shortcuts as
+ * key chips, plus auto mode and manual item entry.
  */
 export function SessionControls() {
   const { t } = useTranslation();
@@ -163,6 +178,7 @@ export function SessionControls() {
     endSession: 'Ctrl+Shift+E',
   };
   const displayShortcuts = useMemo(() => _getDisplayShortcuts(shortcuts), [shortcuts]);
+  const ariaShortcuts = useMemo(() => _getAriaShortcuts(shortcuts), [shortcuts]);
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
@@ -370,53 +386,60 @@ export function SessionControls() {
     autoModeEnabled && activeSession && memoryStatus && !memoryStatus.available,
   );
 
+  const controlButtons = (
+    <ControlButtons
+      shortcuts={displayShortcuts}
+      ariaShortcuts={ariaShortcuts}
+      hasSession={Boolean(activeSession)}
+      hasActiveRun={Boolean(activeRun)}
+      autoModeEnabled={autoTrackingActive}
+      canStartSession={canStartSession}
+      canStartRun={canStartRun}
+      canPauseResume={canPauseResume}
+      canEndRun={canEndRun}
+      canEndSession={canEndSession}
+      isPaused={isPaused}
+      pending={pending}
+      onStartSession={handleStartSession}
+      onStartRun={handleStartRun}
+      onPauseRun={handlePauseRun}
+      onResumeRun={handleResumeRun}
+      onEndRun={handleEndRun}
+      onEndSession={() => setShowEndSessionDialog(true)}
+    />
+  );
+
   return (
     <>
       <Card>
         <CardHeader>
           <CardTitle>{t(translations.runTracker.controls.liveSession)}</CardTitle>
-          <CardAction>
+          <CardAction className="flex flex-wrap items-center justify-end gap-2">
+            {globalHotkeysActive && <GlobalHotkeysBadge />}
             <SessionStateBadge state={liveState} />
           </CardAction>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-6">
-            {/* Live top row: the current run timer (or, without a session, a short invitation to
-                start one) and the state-dependent actions. The row keeps its minimum height in
-                both states; starting a session still adds the Auto Mode toggle and manual item
-                entry below it. */}
-            <div className="flex min-h-24 flex-wrap items-end justify-between gap-4">
-              {activeSession ? (
+            {activeSession ? (
+              // Live top row: the large current run timer, with the state-dependent actions beside it
+              <div className="flex min-h-24 flex-wrap items-end justify-between gap-x-8 gap-y-4">
                 <LiveRunTimer
                   elapsedMs={runElapsed}
                   runNumber={activeRun?.runNumber}
                   paused={isPaused}
                 />
-              ) : (
-                <p className="max-w-prose self-center text-muted-foreground text-sm">
+                {controlButtons}
+              </div>
+            ) : (
+              // Without a session, the explanation and the action that resolves it stay together
+              <div className="flex min-h-24 flex-col items-start justify-center gap-4">
+                <p className="max-w-prose text-muted-foreground">
                   {t(translations.runTracker.sessionCard.startSessionPrompt)}
                 </p>
-              )}
-              <ControlButtons
-                shortcuts={displayShortcuts}
-                hasSession={Boolean(activeSession)}
-                hasActiveRun={Boolean(activeRun)}
-                autoModeEnabled={autoTrackingActive}
-                canStartSession={canStartSession}
-                canStartRun={canStartRun}
-                canPauseResume={canPauseResume}
-                canEndRun={canEndRun}
-                canEndSession={canEndSession}
-                isPaused={isPaused}
-                pending={pending}
-                onStartSession={handleStartSession}
-                onStartRun={handleStartRun}
-                onPauseRun={handlePauseRun}
-                onResumeRun={handleResumeRun}
-                onEndRun={handleEndRun}
-                onEndSession={() => setShowEndSessionDialog(true)}
-              />
-            </div>
+                {controlButtons}
+              </div>
+            )}
 
             {/* Auto Mode Toggle - Windows only */}
             {isWindows && activeSession && (
@@ -458,8 +481,6 @@ export function SessionControls() {
                 addManualRunItem={addManualRunItem}
               />
             )}
-
-            <ShortcutsInfo shortcuts={displayShortcuts} globalHotkeysActive={globalHotkeysActive} />
           </div>
         </CardContent>
       </Card>

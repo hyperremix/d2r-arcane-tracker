@@ -390,4 +390,77 @@ describe('SessionDetailView', () => {
       expect(screen.getByLabelText('Session Notes')).toHaveValue('live notes');
     });
   });
+
+  describe('When the session statistics are shown', () => {
+    it('Then the outcome comes first, followed by the pace and then the times', () => {
+      // Arrange
+      vi.mocked(useSessionStats).mockReturnValue({
+        sessionId: 'session-1',
+        totalRuns: 3,
+        totalTime: 300000,
+        totalRunTime: 300000,
+        averageRunDuration: 100000,
+        fastestRun: 80000,
+        slowestRun: 120000,
+        itemsFound: 12,
+        newGrailItems: 2,
+      });
+
+      // Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      const labels = screen.getAllByRole('term').map((term) => term.textContent);
+      expect(labels).toEqual([
+        'Items Found',
+        'New Grail Items',
+        'Run Count',
+        'Average Run Time',
+        'Fastest Run',
+        'Efficiency',
+        'Start Time',
+        'End Time',
+        'Session Duration',
+      ]);
+    });
+
+    it('Then efficiency is explained in plain words', () => {
+      // Arrange & Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      const efficiencyStat = screen.getByText('Efficiency').parentElement as HTMLElement;
+      expect(within(efficiencyStat).getByText('50.0%')).toBeInTheDocument();
+      expect(
+        within(efficiencyStat).getByText('Share of the session spent in runs'),
+      ).toBeInTheDocument();
+    });
+
+    it('Then numbers use tabular numerals of the body font instead of a monospace font', () => {
+      // Arrange & Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      const values = screen
+        .getAllByRole('definition')
+        .filter((value) => value.textContent !== 'Share of the session spent in runs');
+      for (const value of values) {
+        expect(value).toHaveClass('tabular-nums');
+        expect(value).not.toHaveClass('font-mono');
+      }
+    });
+
+    it('If the session is still running, Then its end time reads In progress', () => {
+      // Arrange
+      const activeSession: Session = { ...mockSession, id: 'session-live', endTime: undefined };
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ sessions: [], activeSession }));
+
+      // Act
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Assert
+      const endTimeStat = screen.getByText('End Time').parentElement as HTMLElement;
+      expect(within(endTimeStat).getByText('In progress')).toBeInTheDocument();
+    });
+  });
 });

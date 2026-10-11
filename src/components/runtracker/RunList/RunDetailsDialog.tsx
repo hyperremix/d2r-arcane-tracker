@@ -62,13 +62,13 @@ export function RunDetailsDialog({
               <p className="font-medium text-muted-foreground text-sm">
                 {t(translations.runTracker.table.startTime)}
               </p>
-              <p className="font-mono text-sm">{formatTimestamp(run.startTime)}</p>
+              <p className="text-sm tabular-nums">{formatTimestamp(run.startTime)}</p>
             </div>
             <div className="space-y-1">
               <p className="font-medium text-muted-foreground text-sm">
                 {t(translations.runTracker.table.duration)}
               </p>
-              <p className="font-mono text-sm">
+              <p className="text-sm tabular-nums">
                 {run.duration
                   ? formatDuration(run.duration)
                   : t(translations.runTracker.runDetails.inProgress)}
@@ -79,7 +79,7 @@ export function RunDetailsDialog({
                 <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.runTracker.table.endTime)}
                 </p>
-                <p className="font-mono text-sm">{formatTimestamp(run.endTime)}</p>
+                <p className="text-sm tabular-nums">{formatTimestamp(run.endTime)}</p>
               </div>
             )}
             <div className="space-y-1">

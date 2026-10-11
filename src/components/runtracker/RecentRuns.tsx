@@ -66,9 +66,7 @@ export function RecentRuns({ runs, onViewAllRuns, limit = RECENT_RUNS_LIMIT }: R
                 <span className="font-medium text-sm">
                   {t(translations.runTracker.sessionCard.runNumber, { number: run.runNumber })}
                 </span>
-                <span className="font-mono text-sm tabular-nums">
-                  {formatDuration(run.duration)}
-                </span>
+                <span className="text-sm tabular-nums">{formatDuration(run.duration)}</span>
                 <span className="text-muted-foreground text-sm">
                   {foundItems.length > 0
                     ? t(translations.runTracker.sessionCard.runItems, {

@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { ShortcutKey } from './ShortcutKey';
 
 export interface ControlButtonsPending {
   startSession: boolean;
@@ -21,8 +21,14 @@ export interface RunTrackerShortcuts {
   endSession: string;
 }
 
+/** The run tracker shortcuts as `aria-keyshortcuts` values (undefined if a shortcut has no key). */
+export type RunTrackerAriaShortcuts = Record<keyof RunTrackerShortcuts, string | undefined>;
+
 export interface ControlButtonsProps {
+  /** Platform-formatted shortcut labels shown as key chips. */
   shortcuts: RunTrackerShortcuts;
+  /** The same shortcuts exposed to assistive technology. */
+  ariaShortcuts: RunTrackerAriaShortcuts;
   hasSession: boolean;
   hasActiveRun: boolean;
   autoModeEnabled: boolean;
@@ -44,7 +50,10 @@ export interface ControlButtonsProps {
 interface ActionButtonProps {
   icon: ReactNode;
   label: string;
-  tooltip?: string;
+  /** Platform-formatted shortcut shown as a key chip inside the button. */
+  shortcut?: string;
+  /** The same shortcut as an `aria-keyshortcuts` value. */
+  ariaShortcut?: string;
   variant: 'default' | 'outline' | 'destructive';
   size: 'sm' | 'lg';
   disabled: boolean;
@@ -52,53 +61,44 @@ interface ActionButtonProps {
   onClick: () => void;
 }
 
-// Button that swaps its icon for a spinner while pending and optionally shows a shortcut tooltip
+// Button that swaps its icon for a spinner while pending and shows its keyboard shortcut as a key chip
 function ActionButton({
   icon,
   label,
-  tooltip,
+  shortcut,
+  ariaShortcut,
   variant,
   size,
   disabled,
   pending,
   onClick,
 }: ActionButtonProps) {
-  const content = (
-    <>
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      onClick={onClick}
+      disabled={disabled || pending}
+      aria-busy={pending}
+      aria-keyshortcuts={ariaShortcut}
+      className={size === 'lg' ? 'min-w-36 gap-2 px-4' : 'gap-2'}
+    >
       {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : icon}
       {label}
-    </>
-  );
-  const buttonProps = {
-    variant,
-    size,
-    onClick,
-    disabled: disabled || pending,
-    'aria-busy': pending,
-    className: size === 'lg' ? 'min-w-36 gap-2 px-4' : 'gap-2',
-  };
-
-  if (!tooltip) {
-    return <Button {...buttonProps}>{content}</Button>;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<Button {...buttonProps} />}>{content}</TooltipTrigger>
-      <TooltipContent>
-        <p>{tooltip}</p>
-      </TooltipContent>
-    </Tooltip>
+      {shortcut && <ShortcutKey shortcut={shortcut} className="ml-1" />}
+    </Button>
   );
 }
 
 /**
  * Live session actions: one primary, state-dependent action (Start New Session, Start Run or End Run)
- * plus secondary Pause/Resume and End Session. In auto mode the manual run actions are replaced by
- * a notice explaining that runs are tracked automatically.
+ * plus secondary Pause/Resume and End Session. Each run action shows its keyboard shortcut as a key
+ * chip. In auto mode the manual run actions are replaced by a notice explaining that runs are
+ * tracked automatically.
  */
 export function ControlButtons({
   shortcuts,
+  ariaShortcuts,
   hasSession,
   hasActiveRun,
   autoModeEnabled,
@@ -120,17 +120,15 @@ export function ControlButtons({
 
   if (!hasSession) {
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <ActionButton
-          icon={<Play className="h-4 w-4" aria-hidden="true" />}
-          label={t(translations.runTracker.sessionCard.startNewSession)}
-          variant="default"
-          size="lg"
-          disabled={!canStartSession}
-          pending={pending.startSession}
-          onClick={onStartSession}
-        />
-      </div>
+      <ActionButton
+        icon={<Play className="h-4 w-4" aria-hidden="true" />}
+        label={t(translations.runTracker.sessionCard.startNewSession)}
+        variant="default"
+        size="lg"
+        disabled={!canStartSession}
+        pending={pending.startSession}
+        onClick={onStartSession}
+      />
     );
   }
 
@@ -143,9 +141,8 @@ export function ControlButtons({
           <ActionButton
             icon={<Play className="h-4 w-4" aria-hidden="true" />}
             label={t(translations.runTracker.controls.startRun)}
-            tooltip={t(translations.runTracker.controls.startRunTooltip, {
-              shortcut: shortcuts.startRun,
-            })}
+            shortcut={shortcuts.startRun}
+            ariaShortcut={ariaShortcuts.startRun}
             variant="default"
             size="lg"
             disabled={!canStartRun}
@@ -159,9 +156,8 @@ export function ControlButtons({
             <ActionButton
               icon={<Square className="h-4 w-4" aria-hidden="true" />}
               label={t(translations.runTracker.controls.endRun)}
-              tooltip={t(translations.runTracker.controls.endRunTooltip, {
-                shortcut: shortcuts.endRun,
-              })}
+              shortcut={shortcuts.endRun}
+              ariaShortcut={ariaShortcuts.endRun}
               variant="default"
               size="lg"
               disabled={!canEndRun}
@@ -181,15 +177,8 @@ export function ControlButtons({
                   ? t(translations.runTracker.controls.resume)
                   : t(translations.runTracker.controls.pause)
               }
-              tooltip={
-                isPaused
-                  ? t(translations.runTracker.controls.resumeRunTooltip, {
-                      shortcut: shortcuts.pauseRun,
-                    })
-                  : t(translations.runTracker.controls.pauseRunTooltip, {
-                      shortcut: shortcuts.pauseRun,
-                    })
-              }
+              shortcut={shortcuts.pauseRun}
+              ariaShortcut={ariaShortcuts.pauseRun}
               variant="outline"
               size="sm"
               disabled={!canPauseResume}
@@ -202,9 +191,8 @@ export function ControlButtons({
         <ActionButton
           icon={<StopCircle className="h-4 w-4" aria-hidden="true" />}
           label={t(translations.runTracker.controls.endSession)}
-          tooltip={t(translations.runTracker.controls.endSessionTooltip, {
-            shortcut: shortcuts.endSession,
-          })}
+          shortcut={shortcuts.endSession}
+          ariaShortcut={ariaShortcuts.endSession}
           variant="destructive"
           size="sm"
           disabled={!canEndSession}
@@ -230,34 +218,16 @@ export function ControlButtons({
   );
 }
 
-interface ShortcutsInfoProps {
-  shortcuts: RunTrackerShortcuts;
-  /** Whether the shortcuts are registered as OS-wide hotkeys (work while D2R is focused). */
-  globalHotkeysActive?: boolean;
-}
-
 /**
- * Compact reminder of the configured run tracker keyboard shortcuts.
+ * Indicator that the run tracker shortcuts are registered as OS-wide hotkeys, so they also work
+ * while D2R is focused.
  */
-export function ShortcutsInfo({ shortcuts, globalHotkeysActive = false }: ShortcutsInfoProps) {
+export function GlobalHotkeysBadge() {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted p-3">
-      <p className="text-muted-foreground text-xs">
-        <strong>{t(translations.runTracker.controls.shortcutsInfo)}</strong>{' '}
-        {t(translations.runTracker.controls.shortcutsDetail, {
-          startRun: shortcuts.startRun,
-          pauseRun: shortcuts.pauseRun,
-          endRun: shortcuts.endRun,
-          endSession: shortcuts.endSession,
-        })}
-      </p>
-      {globalHotkeysActive && (
-        <Badge variant="outline">
-          <Globe aria-hidden="true" />
-          {t(translations.runTracker.controls.globalHotkeysActive)}
-        </Badge>
-      )}
-    </div>
+    <Badge variant="outline">
+      <Globe aria-hidden="true" />
+      {t(translations.runTracker.controls.globalHotkeysActive)}
+    </Badge>
   );
 }
