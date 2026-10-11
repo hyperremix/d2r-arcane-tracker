@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createBrowserRouter, createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TitleBar } from './TitleBar';
@@ -193,6 +193,35 @@ describe('When TitleBar is rendered', () => {
     const name = screen.getByText('D2R Arcane Tracker');
     expect(name).toHaveClass('hidden', 'xl:block');
     expect(name).not.toHaveClass('lg:block');
+  });
+
+  it('If the platform is Linux, then the app name waits for the xl breakpoint like Windows', () => {
+    // Arrange
+    setPlatform('linux');
+
+    // Act
+    renderTitleBar();
+
+    // Assert
+    const name = screen.getByText('D2R Arcane Tracker');
+    expect(name).toHaveClass('hidden', 'xl:block');
+    expect(name).not.toHaveClass('lg:block');
+  });
+
+  it('If an icon-only link receives keyboard focus, then its tooltip shows the label', async () => {
+    // Arrange
+    renderTitleBar();
+    const link = within(getNavigation()).getByRole('link', { name: 'Terror zones' });
+
+    // Act
+    act(() => {
+      link.focus();
+    });
+
+    // Assert
+    expect(
+      await screen.findByText('Terror zones', { selector: '[data-slot="tooltip-content"]' }),
+    ).toBeInTheDocument();
   });
 
   it('If there is no history, then the labeled back and forward buttons are disabled', () => {

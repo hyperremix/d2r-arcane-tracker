@@ -94,17 +94,40 @@ describe('When TitleBarFrame is rendered', () => {
     expect(children[2]).toHaveClass('w-36');
   });
 
-  it('If the platform is macOS or unknown, Then isMacPlatform is true, otherwise false', () => {
-    // Arrange & Act & Assert
+  it('If the platform is macOS, Then isMacPlatform is true', () => {
+    // Arrange
     setPlatform('darwin');
-    expect(isMacPlatform()).toBe(true);
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If the platform is Linux, Then isMacPlatform is false', () => {
+    // Arrange
     setPlatform('linux');
-    expect(isMacPlatform()).toBe(false);
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If electronAPI is unavailable, Then isMacPlatform defaults to true', () => {
+    // Arrange
     Object.defineProperty(window, 'electronAPI', {
       value: undefined,
       configurable: true,
       writable: true,
     });
-    expect(isMacPlatform()).toBe(true);
+
+    // Act
+    const result = isMacPlatform();
+
+    // Assert
+    expect(result).toBe(true);
   });
 });

@@ -47,7 +47,8 @@ const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
 ];
 
 /**
- * Set-up destinations shown as icon-only links after the primary navigation.
+ * Secondary destinations (Terror zones and Settings) shown as icon-only links after the
+ * primary navigation.
  * Terror Zones uses `MapPinned` (a marked area on a map) rather than a warning
  * icon so it does not read as an error state.
  */
