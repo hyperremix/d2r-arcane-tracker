@@ -36,15 +36,27 @@ describe('When ShortcutRecorder shows a shortcut', () => {
     expect(screen.getByLabelText('Placeholder')).toHaveAttribute('placeholder', '⌘R');
   });
 
-  it('If the app runs on Windows, Then the value keeps Ctrl', () => {
+  it('If the app runs on Windows, Then the value and placeholder keep Ctrl', () => {
     // Arrange
     setPlatform('win32');
 
     // Act
-    render(<ShortcutRecorder id="value" label="Value" value="Ctrl+Shift+E" onChange={vi.fn()} />);
+    render(
+      <>
+        <ShortcutRecorder id="value" label="Value" value="Ctrl+Shift+E" onChange={vi.fn()} />
+        <ShortcutRecorder
+          id="placeholder"
+          label="Placeholder"
+          value=""
+          placeholder="Ctrl+R"
+          onChange={vi.fn()}
+        />
+      </>,
+    );
 
     // Assert
     expect(screen.getByLabelText('Value')).toHaveValue('Ctrl+Shift+E');
+    expect(screen.getByLabelText('Placeholder')).toHaveAttribute('placeholder', 'Ctrl+R');
   });
 
   it('When Command+R is recorded on macOS, Then the stored Ctrl+R form is reported', () => {

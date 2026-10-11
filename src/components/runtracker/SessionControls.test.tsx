@@ -94,6 +94,21 @@ const defaultGrailStoreState = {
   },
 };
 
+function setPlatform(platform: string) {
+  Object.defineProperty(window, 'electronAPI', {
+    value: {
+      platform,
+      runTracker: {
+        getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+        getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+        onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+      },
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
 describe('SessionControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -856,6 +871,7 @@ describe('SessionControls', () => {
       Object.defineProperty(navigator, 'platform', {
         value: 'MacIntel',
         writable: true,
+        configurable: true,
       });
 
       mockStoreState(mockUseRunTrackerStore, {
@@ -884,6 +900,7 @@ describe('SessionControls', () => {
       Object.defineProperty(navigator, 'platform', {
         value: originalPlatform,
         writable: true,
+        configurable: true,
       });
     });
 
@@ -1053,21 +1070,6 @@ describe('SessionControls', () => {
   describe('Shortcut labels', () => {
     const originalElectronAPI = window.electronAPI;
 
-    const setPlatform = (platform: string) => {
-      Object.defineProperty(window, 'electronAPI', {
-        value: {
-          platform,
-          runTracker: {
-            getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
-            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
-            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
-          },
-        },
-        writable: true,
-        configurable: true,
-      });
-    };
-
     afterEach(() => {
       Object.defineProperty(window, 'electronAPI', {
         value: originalElectronAPI,
@@ -1104,6 +1106,79 @@ describe('SessionControls', () => {
           'Ctrl+R (Start), Ctrl+Space (Pause/Resume), Ctrl+E (End Run), Ctrl+Shift+E (End Session)',
         ),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('Shortcut tooltips on macOS', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    const focusAndFindTooltip = async (buttonName: string, tooltipText: string) => {
+      fireEvent.focus(screen.getByRole('button', { name: buttonName }));
+      return screen.findByText(tooltipText);
+    };
+
+    beforeEach(() => {
+      setPlatform('darwin');
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('If a session has no active run, Then the Start Run tooltip shows the Command shortcut', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+      render(<SessionControls />);
+
+      // Act
+      const tooltip = await focusAndFindTooltip('Start Run', 'Start a new run (\u2318R)');
+
+      // Assert
+      expect(tooltip).toBeInTheDocument();
+    });
+
+    it('If a run is active, Then the End Run, Pause and End Session tooltips show Command shortcuts', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: mockRun,
+      });
+      render(<SessionControls />);
+
+      // Act
+      const endRunTooltip = await focusAndFindTooltip('End Run', 'End current run (\u2318E)');
+      const pauseTooltip = await focusAndFindTooltip('Pause', 'Pause run (\u2318Space)');
+      const endSessionTooltip = await focusAndFindTooltip(
+        'End Session',
+        'End current session (\u21E7\u2318E)',
+      );
+
+      // Assert
+      expect(endRunTooltip).toBeInTheDocument();
+      expect(pauseTooltip).toBeInTheDocument();
+      expect(endSessionTooltip).toBeInTheDocument();
+    });
+
+    it('If the run is paused, Then the Resume tooltip shows the Command shortcut', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, isPaused: true },
+        isPaused: true,
+      });
+      render(<SessionControls />);
+
+      // Act
+      const tooltip = await focusAndFindTooltip('Resume', 'Resume run (\u2318Space)');
+
+      // Assert
+      expect(tooltip).toBeInTheDocument();
     });
   });
 

@@ -593,7 +593,7 @@
       "globalHotkeysDescription": "Use these shortcuts while D2R or another app is focused. While the tracker is in the background, other apps can't use these key combinations.",
       "globalHotkeysRegistrationFailed": "Some shortcuts can't be used as global hotkeys:",
       "globalHotkeysConflict": "{{action}} {{shortcut}} is already used by another app or action. Choose a different shortcut.",
-      "globalHotkeysUnsupported": "{{action}} {{shortcut}} can't be used globally. Include Ctrl or Alt, or use a function key (F1\u2013F24).",
+      "globalHotkeysUnsupported": "{{action}} {{shortcut}} can't be used globally. Include {{primaryModifier}} or {{altModifier}}, or use a function key (F1\u2013F24).",
       "infoAutoMode": "Auto mode uses memory reading to detect game start/end instantly (Windows only)",
       "infoRequires": "Requires D2R.exe to be running and valid memory offsets configured",
       "infoFallback": "If auto mode cannot work, you can always use manual run controls (keyboard shortcuts)",

@@ -10,7 +10,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { translations } from '@/i18n/translations';
-import { formatShortcutForDisplay, normalizeShortcut } from '@/lib/hotkeys';
+import { formatShortcutForDisplay, getModifierKeyNames, normalizeShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { ShortcutRecorder } from './ShortcutRecorder';
 
@@ -263,6 +263,7 @@ export function RunTrackerSettings() {
                       {t(FAILURE_MESSAGE_KEYS[registration.state], {
                         action: t(SHORTCUT_LABEL_KEYS[registration.action]),
                         shortcut: formatShortcutForDisplay(registration.shortcut),
+                        ...getModifierKeyNames(),
                       })}
                     </li>
                   ))}

@@ -69,11 +69,11 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
 });
 
 describe('When RunTrackerSettings renders the global hotkeys option', () => {
-  function setupElectronAPI(status: GlobalHotkeyStatus) {
+  function setupElectronAPI(status: GlobalHotkeyStatus, platform = 'darwin') {
     window.electronAPI = {
-      platform: 'darwin',
+      platform,
       runTracker: {
-        getMemoryStatus: vi.fn(),
+        getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
         getGlobalHotkeyStatus: vi.fn().mockResolvedValue(status),
         onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
       },
@@ -141,6 +141,45 @@ describe('When RunTrackerSettings renders the global hotkeys option', () => {
     expect(screen.getByLabelText('Start Run:')).toHaveValue('\u2318R');
     expect(screen.getByLabelText('Pause/Resume Run:')).toHaveValue('\u2318Space');
     expect(screen.getByLabelText('End Session:')).toHaveValue('\u21E7\u2318E');
+  });
+
+  it('If an unsupported shortcut is reported on macOS, Then the hint names the Command and Option keys', async () => {
+    // Arrange
+    setupElectronAPI({
+      enabled: true,
+      registrations: [{ action: 'endSession', shortcut: 'E', state: 'unsupported' }],
+    });
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(
+      await screen.findByText(/Include Command or Option, or use a function key/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Ctrl or Alt/)).not.toBeInTheDocument();
+  });
+
+  it('If an unsupported shortcut is reported on Windows, Then the hint names the Ctrl and Alt keys', async () => {
+    // Arrange
+    setupElectronAPI(
+      {
+        enabled: true,
+        registrations: [{ action: 'endSession', shortcut: 'E', state: 'unsupported' }],
+      },
+      'win32',
+    );
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(
+      await screen.findByText(/Include Ctrl or Alt, or use a function key/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Command or Option/)).not.toBeInTheDocument();
   });
 
   it('If all shortcuts are registered, Then no error is shown', async () => {

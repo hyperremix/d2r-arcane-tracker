@@ -333,6 +333,26 @@ describe('When RunList is rendered', () => {
     });
   });
 
+  describe('If a run row shows its times', () => {
+    it.each([
+      ['start time', 1],
+      ['end time', 2],
+      ['duration', 3],
+    ])('Then the %s cell uses tabular numerals instead of a monospace font', (_name, cellIndex) => {
+      // Arrange
+      const runs = createRuns(1);
+      render(<RunList runs={runs} />);
+
+      // Act
+      const row = screen.getByRole('row', { name: 'View run #1 details' });
+      const cell = within(row).getAllByRole('cell')[cellIndex];
+
+      // Assert
+      expect(cell).toHaveClass('tabular-nums');
+      expect(cell).not.toHaveClass('font-mono');
+    });
+  });
+
   describe('If > 10 runs (pagination)', () => {
     it('Then pagination controls are visible', () => {
       // Arrange

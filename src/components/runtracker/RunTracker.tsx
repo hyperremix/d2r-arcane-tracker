@@ -14,7 +14,7 @@ import { SessionDetailView } from './SessionDetailView';
 import { SessionsList } from './SessionsList';
 
 /**
- * RunTracker component that serves as the main entry point for the Run Counter tab.
+ * RunTracker component that serves as the main entry point for the Runs page.
  * Integrates SessionCard, RunList, and SessionControls components, handles loading
  * and error states, and provides the overall layout for run tracking functionality.
  */

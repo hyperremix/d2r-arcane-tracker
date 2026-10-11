@@ -60,6 +60,16 @@ const isPlatformMac = () => {
   return navigator.platform.toLowerCase().includes('mac');
 };
 
+/**
+ * Names of the keys the stored "Ctrl" and "Alt" modifiers map to on the current platform, for
+ * use in sentences (e.g. "Command" and "Option" on macOS).
+ * @returns The primary and alt modifier key names
+ */
+export const getModifierKeyNames = () =>
+  isPlatformMac()
+    ? { primaryModifier: 'Command', altModifier: 'Option' }
+    : { primaryModifier: 'Ctrl', altModifier: 'Alt' };
+
 const normalizeToken = (token: string) => token.replace(/\s+/g, '').toLowerCase();
 
 type Modifier = 'ctrl' | 'shift' | 'alt';
@@ -134,7 +144,11 @@ const buildShortcutString = (parsed: ParsedShortcut) => {
   return parts.join('+');
 };
 
-const resolveIsMac = (options?: { isMac?: boolean }) => options?.isMac ?? isPlatformMac();
+interface PlatformOptions {
+  isMac?: boolean;
+}
+
+const resolveIsMac = (options?: PlatformOptions) => options?.isMac ?? isPlatformMac();
 
 const eventHasPrimaryModifier = (event: KeyboardEventLike, isMac: boolean) =>
   isMac ? event.metaKey : event.ctrlKey;
@@ -190,7 +204,7 @@ export const normalizeShortcut = (shortcut: string) => {
  * @param options - Optional platform override
  * @returns The display label, or the input unchanged if it has no usable key
  */
-export const formatShortcutForDisplay = (shortcut: string, options?: { isMac?: boolean }) => {
+export const formatShortcutForDisplay = (shortcut: string, options?: PlatformOptions) => {
   const parsed = parseShortcut(shortcut);
   if (!parsed.key) {
     return shortcut;
@@ -219,7 +233,7 @@ const parseEvent = (event: KeyboardEventLike, isMac: boolean): ParsedShortcut =>
   };
 };
 
-export const shortcutFromEvent = (event: KeyboardEventLike, options?: { isMac?: boolean }) => {
+export const shortcutFromEvent = (event: KeyboardEventLike, options?: PlatformOptions) => {
   const isMac = resolveIsMac(options);
   const parsed = parseEvent(event, isMac);
   if (!parsed.key) {
@@ -231,7 +245,7 @@ export const shortcutFromEvent = (event: KeyboardEventLike, options?: { isMac?: 
 export const matchesShortcut = (
   event: KeyboardEventLike,
   shortcut: string,
-  options?: { isMac?: boolean },
+  options?: PlatformOptions,
 ) => {
   if (!shortcut) {
     return false;

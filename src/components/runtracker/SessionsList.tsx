@@ -21,6 +21,7 @@ import {
   formatShortDate,
   formatTime,
   isRecentFind,
+  SESSION_RELATIVE_DAYS,
 } from '@/lib/date';
 import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { PageNavigation } from './PageNavigation';
@@ -33,8 +34,6 @@ interface SessionsListProps {
 type SortField = 'startTime' | 'duration' | 'runCount' | 'itemsFound';
 
 const ITEMS_PER_PAGE = 10;
-// Sessions younger than this many days show a relative day ("3 days ago") instead of a date
-const SESSION_DAY_RELATIVE_DAYS = 7;
 
 interface SessionTableRowProps {
   session: Session;
@@ -299,7 +298,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
   // compact localized date (e.g. "Feb 1, 2026") before that, so older rows stay short
   const formatSessionDay = useCallback(
     (date: Date) =>
-      isRecentFind(date, SESSION_DAY_RELATIVE_DAYS)
+      isRecentFind(date, SESSION_RELATIVE_DAYS)
         ? formatSessionDateRelative(date, t, i18n.language)
         : formatShortDate(date, i18n.language),
     [t, i18n.language],
