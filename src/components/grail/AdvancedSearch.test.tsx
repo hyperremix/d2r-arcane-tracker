@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GrailProgressBuilder } from '@/fixtures/GrailProgressBuilder';
 import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
 import { filterAndSortItems } from '@/lib/grailFilters';
 import { useGrailStore } from '@/stores/grailStore';
@@ -367,23 +366,8 @@ describe('When AdvancedSearch toolbar is rendered', () => {
     });
   });
 
-  describe('If the toolbar shows the item type toggles', () => {
-    it('Then shows Unique and Set but hides untracked rune and runeword types', () => {
-      // Arrange & Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      const types = screen.getByRole('group', { name: 'Types' });
-      expect(within(types).getByRole('button', { name: 'Unique' })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
-      expect(within(types).getByRole('button', { name: 'Set' })).toBeInTheDocument();
-      expect(within(types).queryByRole('button', { name: 'Rune' })).not.toBeInTheDocument();
-      expect(within(types).queryByRole('button', { name: 'Runeword' })).not.toBeInTheDocument();
-    });
-
-    it('Then includes rune and runeword types if they are tracked', () => {
+  describe('If rune and runeword types are tracked', () => {
+    it('Then the toolbar has no item type toggles, since the progress ledger filters by type', () => {
       // Arrange
       resetStore({ grailRunes: true, grailRunewords: true });
 
@@ -391,121 +375,10 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       render(<AdvancedSearch />);
 
       // Assert
-      const types = screen.getByRole('group', { name: 'Types' });
-      expect(within(types).getByRole('button', { name: 'Rune' })).toBeInTheDocument();
-      expect(within(types).getByRole('button', { name: 'Runeword' })).toBeInTheDocument();
-    });
-
-    it('Then clicking a type toggles it in the store and marks it as pressed', () => {
-      // Arrange
-      render(<AdvancedSearch />);
-      const setToggle = screen.getByRole('button', { name: 'Set' });
-
-      // Act
-      fireEvent.click(setToggle);
-
-      // Assert
-      expect(useGrailStore.getState().filter.types).toEqual(['set']);
-      expect(setToggle).toHaveAttribute('aria-pressed', 'true');
-    });
-
-    it('Then clicking a pressed type removes it from the store again', () => {
-      // Arrange
-      useGrailStore.getState().setFilter({ types: ['set'] });
-      render(<AdvancedSearch />);
-      const setToggle = screen.getByRole('button', { name: 'Set' });
-
-      // Act
-      fireEvent.click(setToggle);
-
-      // Assert
-      expect(useGrailStore.getState().filter.types).toEqual([]);
-      expect(setToggle).toHaveAttribute('aria-pressed', 'false');
-    });
-  });
-
-  describe('If the grail has items and progress', () => {
-    const progressItems: Item[] = [
-      HolyGrailItemBuilder.new()
-        .withId('shako')
-        .withType('unique')
-        .withEtherealType('optional')
-        .build(),
-      HolyGrailItemBuilder.new().withId('soj').withType('unique').withEtherealType('none').build(),
-      HolyGrailItemBuilder.new()
-        .withId('tal-armor')
-        .withType('set')
-        .withEtherealType('none')
-        .build(),
-    ];
-    const shakoFind = GrailProgressBuilder.new()
-      .withId('p1')
-      .withItemId('shako')
-      .withFoundDate(new Date(2024, 0, 1))
-      .asNormal()
-      .build();
-
-    it('Then each type chip shows its found and total count and its name contains the counter', () => {
-      // Arrange
-      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
-
-      // Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      const types = screen.getByRole('group', { name: 'Types' });
-      // The accessible name starts with the visible label text ("Unique 1/2"), so voice control
-      // users can say what they see
-      const uniqueToggle = within(types).getByRole('button', { name: /^Unique 1\/2/ });
-      expect(uniqueToggle).toHaveTextContent('Unique 1/2');
-      expect(uniqueToggle).toHaveAccessibleName(/^Unique 1\/2\s?Found$/);
-      expect(uniqueToggle).toHaveAttribute('aria-pressed', 'false');
-      expect(within(types).getByRole('button', { name: /^Set 0\/1/ })).toHaveTextContent('Set 0/1');
-    });
-
-    it('Then the counts include tracked ethereal versions, like the overall progress', () => {
-      // Arrange
-      resetStore({ grailEthereal: true });
-      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
-
-      // Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByRole('button', { name: /^Unique 1\/3/ })).toBeInTheDocument();
-    });
-
-    it('Then the counts do not change when filters narrow the shown items', () => {
-      // Arrange
-      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
-      useGrailStore.getState().setFilter({ foundStatus: 'missing', types: ['set'] });
-
-      // Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByRole('button', { name: /^Unique 1\/2/ })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
-      expect(screen.getByRole('button', { name: /^Set 0\/1/ })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-    });
-
-    it('Then a counter chip still toggles its type filter', () => {
-      // Arrange
-      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
-      render(<AdvancedSearch />);
-      const uniqueToggle = screen.getByRole('button', { name: /^Unique 1\/2/ });
-
-      // Act
-      fireEvent.click(uniqueToggle);
-
-      // Assert
-      expect(useGrailStore.getState().filter.types).toEqual(['unique']);
-      expect(uniqueToggle).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('group', { name: 'Types' })).not.toBeInTheDocument();
+      for (const type of ['Unique', 'Set', 'Rune', 'Runeword']) {
+        expect(screen.queryByRole('button', { name: new RegExp(`^${type}`) })).toBeNull();
+      }
     });
   });
 
@@ -617,6 +490,20 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Assert
       expect(await screen.findByRole('option', { name: 'By Type' })).toBeInTheDocument();
       expect(screen.queryByRole('option', { name: 'By Ethereal' })).not.toBeInTheDocument();
+    });
+
+    it('Then shows grouping by category if the grouping was not changed in this session', async () => {
+      // Arrange
+      useGrailStore.setState({ groupMode: initialStoreState.groupMode });
+      render(<AdvancedSearch />);
+
+      // Act
+      const viewOptions = await openViewPopover();
+
+      // Assert
+      expect(within(viewOptions).getByRole('combobox', { name: 'Group By' })).toHaveTextContent(
+        'By Category',
+      );
     });
   });
 
@@ -819,12 +706,12 @@ describe('When AdvancedSearch toolbar is rendered', () => {
   });
 
   describe('If a selected type becomes unavailable because its tracking setting is disabled', () => {
-    it('Then the type is removed from the filter, the type toggles and the chips', () => {
+    it('Then the type is removed from the filter and Clear all is no longer offered', () => {
       // Arrange
       resetStore({ grailRunes: true });
       useGrailStore.getState().setFilter({ types: ['rune'] });
       render(<AdvancedSearch />);
-      expect(screen.getByRole('button', { name: 'Rune' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Clear all' })).toBeInTheDocument();
 
       // Act
       act(() => {
@@ -833,7 +720,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
       // Assert
       expect(useGrailStore.getState().filter.types).toEqual([]);
-      expect(screen.queryByRole('button', { name: 'Rune' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
     });
   });

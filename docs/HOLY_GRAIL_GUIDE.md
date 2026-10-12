@@ -90,17 +90,19 @@ In **Manual Entry** mode, or for finds the app can't see (another PC, older find
 
 ## Browsing your grail
 
-The main screen lists every grail item with its found status. The search and filter bar lets you:
+The main screen lists every grail item with its found status. At the top, the progress ledger shows your overall completion and how many item versions you found, next to one segment per item type (Unique, Set, and Rune and Runeword when you track them). Each segment is as wide as that type's share of the grail and fills up in the type's color as you find items; it also shows the type's count, such as "Unique 142/385". The counts include the same item versions as the overall progress (with ethereal tracking on, ethereal versions count too) and don't change when you filter. With ethereal tracking on, your normal and ethereal progress are listed below the segments. Select a segment (or focus it and press Enter or Space) to show only items of that type; select more segments to combine types, and select a highlighted segment again to remove it from the filter.
+
+The search and filter bar lets you:
 
 - Search by item name, base item ("Shako", "Diadem"), set name ("Tal Rasha") or, for runewords, rune ("Ber"). Every word you type must match, so "tal lidless" narrows the results further. Turn on **Fuzzy Search** in **Filters** to also find items when you abbreviate words ("hrlqn") or make a small typo ("windfroce").
-- Filter by status (all, found, missing) and by type with the colored Unique, Set, Rune and Runeword toggles. Rune and runeword toggles only appear when you track them. Each type toggle also shows your progress for that type, such as "Unique 142/385". It counts the same item versions as the overall progress bar (with ethereal tracking on, ethereal versions count too) and does not change when you filter.
+- Filter by status (all, found, missing).
 - Open **Filters** to narrow by category (weapons, armor, jewelry, charms) and sub-category, such as helms, body armor or class-specific items, grouped by category.
 - Open **View** to switch between grid and list views, sort and group. The button's icon shows the current view.
   - Sort by name, category, type or found date, ascending or descending. Types sort in the game's quality order (unique, set, rune, runeword) and categories in the order weapons, armor, jewelry, charms, runes, runewords. Items with the same value, such as all missing items when sorting by found date, are listed alphabetically.
-  - Group by category, type or ethereal status (available when ethereal tracking is on). Groups always appear in a fixed order, whatever the sort field or direction (the sort only orders the items inside each group): category groups as weapons, armor, jewelry, charms, runes, runewords; type groups as unique, set, rune, runeword; ethereal groups from both versions found down to not tracked. Ethereal groups read, for example, "Both versions found", "Missing both versions" or "No ethereal version: found". Each group has a header with its found count and a small progress bar.
+  - Group by category (the default when you open the app), type or ethereal status (available when ethereal tracking is on), or turn grouping off. Groups always appear in a fixed order, whatever the sort field or direction (the sort only orders the items inside each group): category groups as weapons, armor, jewelry, charms, runes, runewords; type groups as unique, set, rune, runeword; ethereal groups from both versions found down to not tracked. Ethereal groups read, for example, "Both versions found", "Missing both versions" or "No ethereal version: found". Each group has a header with its found and total count (for example "Armor 12/40") and a small progress bar.
 - In the grid, items are shown as compact tiles of equal height in rows that read left to right and wrap to the next row, with as many columns as fit the window width.
 
-Below the bar, removable chips show the search text, fuzzy search and the categories and sub-categories picked in **Filters**; the status and type toggles already show their own state. **Clear all** resets the search, filters, fuzzy search and sorting. The count next to them shows how many items match your filters out of all tracked items.
+Below the bar, removable chips show the search text, fuzzy search and the categories and sub-categories picked in **Filters**; the status control and the ledger segments already show their own state. **Clear all** resets the search, filters, fuzzy search and sorting, and clears any selected ledger segments (type filters). The count next to them shows how many items match your filters out of all tracked items.
 
 Keyboard shortcuts:
 
@@ -175,7 +177,7 @@ If a background task fails, for example a save file can't be read or a database 
 - **All**: all three gauges. Requires ethereal tracking.
 - **Run Only**: a large timer for the current run with its number and whether it's running, paused or idle, the session's fastest and average run, and optionally a list of items found in this session's runs. Turning the item list on or off switches the widget to the matching default height.
 
-The progress gauges show the same numbers as the progress summary on the Holy Grail page. Only the versions you track count towards the totals: with **Include Ethereal Items** off there is no ethereal total, and with **Include Normal Items** off there is no normal total. The normal and ethereal split in the progress summary is only shown while both versions are tracked.
+The progress gauges show the same numbers as the progress ledger on the Holy Grail page. Only the versions you track count towards the totals: with **Include Ethereal Items** off there is no ethereal total, and with **Include Normal Items** off there is no normal total. The normal and ethereal split in the progress ledger is only shown while both versions are tracked.
 
 The widget remembers its size separately for each display mode. **Reset Size** restores the default for the current mode.
 

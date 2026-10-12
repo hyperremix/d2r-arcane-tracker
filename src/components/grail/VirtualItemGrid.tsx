@@ -315,8 +315,9 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
                   itemCount={row.itemCount}
                   className={cn(
                     'pb-4',
-                    // Extra space above every group but the first separates it from the previous one
-                    row.isFirstGroup ? 'pt-4' : 'pt-10',
+                    // Extra space above every group but the first separates it from the previous one; the scroll
+                    // container's own padding already spaces the first group from the toolbar
+                    row.isFirstGroup ? 'pt-0' : 'pt-10',
                   )}
                 />
               ) : (

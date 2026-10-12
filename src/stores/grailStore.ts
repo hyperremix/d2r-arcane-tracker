@@ -112,7 +112,9 @@ export const useGrailStore = create<GrailState>((set, get, store) => ({
   filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
   viewMode: 'grid',
-  groupMode: 'none',
+  // Grouped by category by default, so the group headers show what is left in each category.
+  // The group mode is not saved, so every session starts with this default.
+  groupMode: 'category',
   loading: false,
 
   // Simple setters

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COLUMN_GUTTER,
   createGridRows,
+  GroupHeader,
   getColumnCount,
   getItemRowHeightEstimate,
   MIN_COLUMN_WIDTH,
@@ -547,6 +548,33 @@ describe('When VirtualItemGrid is rendered', () => {
     });
   });
 
+  describe('If groupedItems has multiple groups and group headers are shown', () => {
+    it('Then only the headers after the first one get extra top padding', () => {
+      // Arrange
+      const groupedItems = [
+        { title: 'Unique Armor', items: [createMockItem({ id: 'item-1' })], foundCount: 1 },
+        { title: 'Unique Weapons', items: [createMockItem({ id: 'item-2' })], foundCount: 0 },
+      ];
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const first = screen.getByRole('heading', { name: 'Unique Armor' }).parentElement;
+      const second = screen.getByRole('heading', { name: 'Unique Weapons' }).parentElement;
+      expect(first).toHaveClass('pt-0');
+      expect(second).toHaveClass('pt-10');
+    });
+  });
+
   describe('If item click handler is provided', () => {
     it('Then should call onItemClick when item is clicked', () => {
       // Arrange
@@ -1023,6 +1051,20 @@ describe('When VirtualItemGrid rows are measured', () => {
 
       // Assert
       expect(contentObserver.disconnect).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('When GroupHeader is rendered', () => {
+  describe('If some items of the group are found', () => {
+    it('Then shows the group title with its found and total count and a labelled progress bar', () => {
+      // Arrange & Act
+      render(<GroupHeader title="Armor" foundCount={12} itemCount={40} />);
+
+      // Assert
+      expect(screen.getByRole('heading', { name: 'Armor' })).toBeInTheDocument();
+      expect(screen.getByText('12/40')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: 'Armor progress' })).toBeInTheDocument();
     });
   });
 });
