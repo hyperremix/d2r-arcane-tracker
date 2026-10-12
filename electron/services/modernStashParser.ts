@@ -52,7 +52,6 @@ export interface ModernStashParsedItem {
 
 export interface ModernStashParseResult {
   version: number;
-  hardcore: boolean;
   items: ModernStashParsedItem[];
   metadata: D2iMetadata;
   /**
@@ -464,7 +463,6 @@ export async function parseModernStash(buffer: Buffer): Promise<ModernStashParse
 
   return {
     version: metadata.version,
-    hardcore: metadata.hardcore,
     items,
     metadata,
     partial,

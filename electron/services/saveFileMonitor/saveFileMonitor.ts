@@ -59,6 +59,7 @@ export type SaveFileMonitorDatabase = VaultPresenceDatabase &
     | 'getAllSaveFileStates'
     | 'deleteSaveFileState'
     | 'getCharacterByName'
+    | 'getCharacterBySaveFilePath'
   >;
 
 /** The settings access the save file monitor uses. */
@@ -536,7 +537,11 @@ class SaveFileMonitor {
         { saveName, filePath, content: buffer, extension },
         this.createGameModeReader(),
       );
-      const characterId = this.grailDatabase.getCharacterByName(saveName)?.id;
+      // The save file identifies its character; the name only finds one stored before the file moved
+      const characterId = (
+        this.grailDatabase.getCharacterBySaveFilePath(filePath) ??
+        this.grailDatabase.getCharacterByName(saveName)
+      )?.id;
       const parsedItems = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
         characterId,

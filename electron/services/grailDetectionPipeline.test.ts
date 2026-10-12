@@ -50,7 +50,10 @@ describe('When the grail detection pipeline runs', () => {
     startMonitoring: Mock<() => Promise<void>>;
     stopMonitoringIfActive: Mock<() => Promise<void>>;
   };
-  let itemDetection: { analyzeSaveFile: ReturnType<typeof vi.fn> };
+  let itemDetection: {
+    analyzeSaveFile: ReturnType<typeof vi.fn>;
+    forgetFoundItems: ReturnType<typeof vi.fn>;
+  };
   let grailProgress: { recordSaveFile: ReturnType<typeof vi.fn> };
   const pipelines: GrailDetectionPipeline[] = [];
 
@@ -93,8 +96,11 @@ describe('When the grail detection pipeline runs', () => {
       startMonitoring: vi.fn().mockResolvedValue(undefined),
       stopMonitoringIfActive: vi.fn().mockResolvedValue(undefined),
     };
-    itemDetection = { analyzeSaveFile: vi.fn().mockResolvedValue([]) };
-    grailProgress = { recordSaveFile: vi.fn() };
+    itemDetection = {
+      analyzeSaveFile: vi.fn().mockResolvedValue([]),
+      forgetFoundItems: vi.fn(),
+    };
+    grailProgress = { recordSaveFile: vi.fn().mockReturnValue(true) };
   });
 
   afterEach(() => {
@@ -129,6 +135,44 @@ describe('When the grail detection pipeline runs', () => {
       // Assert
       expect(itemDetection.analyzeSaveFile).toHaveBeenCalledWith(file, parsedItems, true, true);
       expect(grailProgress.recordSaveFile).toHaveBeenCalledWith(file, [foundItem]);
+    });
+
+    it('Then the items found are forgotten again if the save file could not be recorded', async () => {
+      // Arrange
+      const file = D2SaveFileBuilder.new().withName('TestCharacter').build();
+      const foundItem = {
+        type: 'item-found',
+        item: D2ItemBuilder.new().withCharacterName('TestCharacter').build(),
+        grailItem: HolyGrailItemBuilder.new().withId('shako').build(),
+      } as ItemDetectionEvent;
+      itemDetection.analyzeSaveFile.mockResolvedValue([foundItem]);
+      grailProgress.recordSaveFile.mockReturnValue(false);
+      startPipeline();
+
+      // Act
+      await eventBus.emitAsync('save-file-event', { type: 'modified', file } as SaveFileEvent);
+
+      // Assert
+      expect(itemDetection.forgetFoundItems).toHaveBeenCalledWith([foundItem]);
+    });
+
+    it('Then the items found stay remembered if the save file was recorded', async () => {
+      // Arrange
+      const file = D2SaveFileBuilder.new().withName('TestCharacter').build();
+      const foundItem = {
+        type: 'item-found',
+        item: D2ItemBuilder.new().withCharacterName('TestCharacter').build(),
+        grailItem: HolyGrailItemBuilder.new().withId('shako').build(),
+      } as ItemDetectionEvent;
+      itemDetection.analyzeSaveFile.mockResolvedValue([foundItem]);
+      grailProgress.recordSaveFile.mockReturnValue(true);
+      startPipeline();
+
+      // Act
+      await eventBus.emitAsync('save-file-event', { type: 'modified', file } as SaveFileEvent);
+
+      // Assert
+      expect(itemDetection.forgetFoundItems).not.toHaveBeenCalled();
     });
 
     it('Then a save file without parsed items is analyzed with an empty item list', async () => {

@@ -5,6 +5,7 @@ import {
   buildSaveFileHeader,
   getCharacterClass,
   getSaveNameFromPath,
+  isHardcoreStashFileName,
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
@@ -153,6 +154,38 @@ describe('When a save name is derived from a file path', () => {
   });
 });
 
+describe('When the game mode of a stash is read from its file name', () => {
+  describe('If the path uses Windows separators', () => {
+    it('Then only the file name decides, not a folder name', () => {
+      // Arrange
+      const softcoreInHardcoreFolder =
+        'C:\\Users\\hardcore\\Saved Games\\SharedStashSoftCoreV2.d2i';
+      const hardcoreStash = 'C:\\Users\\x\\Saved Games\\SharedStashHardCoreV2.d2i';
+
+      // Act
+      const softcoreResult = isHardcoreStashFileName(softcoreInHardcoreFolder);
+      const hardcoreResult = isHardcoreStashFileName(hardcoreStash);
+
+      // Assert
+      expect(softcoreResult).toBe(false);
+      expect(hardcoreResult).toBe(true);
+    });
+  });
+
+  describe('If the path uses POSIX separators', () => {
+    it('Then only the file name decides, not a folder name', () => {
+      // Arrange
+      const softcoreInHardcoreFolder = '/saves/hardcore/SharedStashSoftCoreV2.d2i';
+
+      // Act
+      const result = isHardcoreStashFileName(softcoreInHardcoreFolder);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+});
+
 describe('When save file names are filtered', () => {
   describe('If backup-like stash filenames are evaluated', () => {
     it('Then backup-like .d2i files should be excluded from parsing', () => {
@@ -258,7 +291,7 @@ describe('When the header of a save file is built from its content', () => {
   });
 
   describe('If a modern shared stash is described', () => {
-    it('Then its hardcore flag and version come from the stash header', () => {
+    it('Then its version comes from the stash header and its hardcore flag from the file name', () => {
       // Arrange
       const content = readFileSync(MODERN_STASH_FIXTURE_PATH);
 
@@ -277,8 +310,40 @@ describe('When the header of a save file is built from its content', () => {
     });
   });
 
+  describe('If .d2i stashes are described whose header field after the signature differs', () => {
+    // D2R writes 1 into both SharedStashSoftCoreV2.d2i and SharedStashHardCoreV2.d2i, 0 into
+    // older v97 files and 2 into modern ones: the field is not a game mode flag.
+    function createStashHeader(headerField: number, version: number): Buffer {
+      const header = Buffer.alloc(68);
+      header.writeUInt32LE(0xaa55aa55, 0);
+      header.writeUInt32LE(headerField, 4);
+      header.writeUInt32LE(version, 8);
+      header.writeUInt32LE(68, 16);
+      return header;
+    }
+
+    it.each([
+      ['/saves/SharedStashHardCoreV2.d2i', 1, 99, 'Shared Stash Hardcore', true],
+      ['/saves/SharedStashSoftCoreV2.d2i', 1, 98, 'Shared Stash Softcore', false],
+      ['/saves/SharedStashSoftCoreV2.d2i', 0, 97, 'Shared Stash Softcore', false],
+      ['/saves/ModernSharedStashSoftCoreV2.d2i', 2, 105, 'Modern Shared Stash Softcore', false],
+      ['/saves/ModernSharedStashHardCoreV2.d2i', 2, 105, 'Modern Shared Stash Hardcore', true],
+    ])('Then %s (field %i, version %i) is named %s', (filePath, headerField, version, name, hardcore) => {
+      // Arrange
+      const content = createStashHeader(headerField, version);
+
+      // Act
+      const saveFile = buildSaveFileHeader(filePath, content, LAST_MODIFIED);
+
+      // Assert
+      expect(saveFile).toEqual(
+        expect.objectContaining({ name, hardcore, sourceFileVersion: version }),
+      );
+    });
+  });
+
   describe('If the header of a .d2i file cannot be read', () => {
-    it('Then the hardcore flag falls back to the file name and no version is known', () => {
+    it('Then the hardcore flag comes from the file name and no version is known', () => {
       // Arrange
       const content = Buffer.from('not a stash');
 

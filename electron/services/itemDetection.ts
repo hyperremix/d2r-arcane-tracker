@@ -119,6 +119,17 @@ class ItemDetectionService {
   }
 
   /**
+   * Stops treating items returned by {@link analyzeSaveFile} as seen, so the next analysis detects
+   * them again. Used when they could not be recorded, so a later scan retries instead of dropping them.
+   * @param {ItemDetectionEvent[]} foundItems - Events returned by analyzeSaveFile.
+   */
+  forgetFoundItems(foundItems: ItemDetectionEvent[]): void {
+    for (const { grailItem, item } of foundItems) {
+      this.previouslySeenItems.delete(`${grailItem.id}_${item.ethereal}`);
+    }
+  }
+
+  /**
    * Clears the tracking of previously seen items.
    * Useful when monitoring restarts or when you want to reset detection.
    */
