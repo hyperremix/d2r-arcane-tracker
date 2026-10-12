@@ -215,7 +215,7 @@ describe('SessionControls', () => {
       expect(screen.getByText('0:00')).not.toHaveClass('text-muted-foreground/60');
     });
 
-    it('If no session is active, Then the timer is hidden and a one-line invitation sits next to the start button', () => {
+    it('If no session is active, Then the timer is hidden and the invitation sits directly above the start button', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
@@ -229,8 +229,10 @@ describe('SessionControls', () => {
       expect(
         screen.getByText('Start a session to track your runs and the items you find.'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeInTheDocument();
-      expect(screen.getByText('Keyboard Shortcuts:')).toBeInTheDocument();
+      const prompt = screen.getByText('Start a session to track your runs and the items you find.');
+      const startButton = screen.getByRole('button', { name: 'Start New Session' });
+      expect(prompt.parentElement).toContainElement(startButton);
+      expect(screen.queryByText('Keyboard Shortcuts:')).not.toBeInTheDocument();
     });
 
     it('When the run is paused, Then the timer stays frozen at the time it was paused', () => {
@@ -315,6 +317,7 @@ describe('SessionControls', () => {
         // Assert
         const timer = screen.getByText('12:34');
         expect(timer).toHaveClass('tabular-nums');
+        expect(timer).not.toHaveClass('font-mono');
         expect(screen.getByText('Run #7')).toBeInTheDocument();
         expect(screen.getByRole('status')).not.toContainElement(timer);
       } finally {
@@ -1067,8 +1070,12 @@ describe('SessionControls', () => {
     });
   });
 
-  describe('Shortcut labels', () => {
+  describe('Shortcut key chips', () => {
     const originalElectronAPI = window.electronAPI;
+
+    // The key chip rendered inside the action button
+    const getShortcutKey = (buttonName: string) =>
+      screen.getByRole('button', { name: buttonName }).querySelector('kbd');
 
     afterEach(() => {
       Object.defineProperty(window, 'electronAPI', {
@@ -1078,107 +1085,146 @@ describe('SessionControls', () => {
       });
     });
 
-    it('When the app runs on macOS, Then the shortcut hint shows the Command key that actually fires', () => {
+    it('If a session has no active run on macOS, Then Start Run shows its Command shortcut as a key chip', () => {
       // Arrange
       setPlatform('darwin');
-
-      // Act
-      render(<SessionControls />);
-
-      // Assert
-      expect(
-        screen.getByText(
-          '\u2318R (Start), \u2318Space (Pause/Resume), \u2318E (End Run), \u21E7\u2318E (End Session)',
-        ),
-      ).toBeInTheDocument();
-    });
-
-    it('When the app runs on Windows, Then the shortcut hint shows Ctrl', () => {
-      // Arrange
-      setPlatform('win32');
-
-      // Act
-      render(<SessionControls />);
-
-      // Assert
-      expect(
-        screen.getByText(
-          'Ctrl+R (Start), Ctrl+Space (Pause/Resume), Ctrl+E (End Run), Ctrl+Shift+E (End Session)',
-        ),
-      ).toBeInTheDocument();
-    });
-  });
-
-  describe('Shortcut tooltips on macOS', () => {
-    const originalElectronAPI = window.electronAPI;
-
-    const focusAndFindTooltip = async (buttonName: string, tooltipText: string) => {
-      fireEvent.focus(screen.getByRole('button', { name: buttonName }));
-      return screen.findByText(tooltipText);
-    };
-
-    beforeEach(() => {
-      setPlatform('darwin');
-    });
-
-    afterEach(() => {
-      Object.defineProperty(window, 'electronAPI', {
-        value: originalElectronAPI,
-        writable: true,
-        configurable: true,
-      });
-    });
-
-    it('If a session has no active run, Then the Start Run tooltip shows the Command shortcut', async () => {
-      // Arrange
       mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
-      render(<SessionControls />);
 
       // Act
-      const tooltip = await focusAndFindTooltip('Start Run', 'Start a new run (\u2318R)');
+      render(<SessionControls />);
 
       // Assert
-      expect(tooltip).toBeInTheDocument();
+      expect(getShortcutKey('Start Run')).toHaveTextContent('\u2318R');
+      expect(getShortcutKey('End Session')).toHaveTextContent('\u21E7\u2318E');
     });
 
-    it('If a run is active, Then the End Run, Pause and End Session tooltips show Command shortcuts', async () => {
+    it('If a run is active on macOS, Then End Run, Pause and End Session show their Command shortcuts as key chips', () => {
       // Arrange
+      setPlatform('darwin');
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
       });
-      render(<SessionControls />);
 
       // Act
-      const endRunTooltip = await focusAndFindTooltip('End Run', 'End current run (\u2318E)');
-      const pauseTooltip = await focusAndFindTooltip('Pause', 'Pause run (\u2318Space)');
-      const endSessionTooltip = await focusAndFindTooltip(
-        'End Session',
-        'End current session (\u21E7\u2318E)',
-      );
+      render(<SessionControls />);
 
       // Assert
-      expect(endRunTooltip).toBeInTheDocument();
-      expect(pauseTooltip).toBeInTheDocument();
-      expect(endSessionTooltip).toBeInTheDocument();
+      expect(getShortcutKey('End Run')).toHaveTextContent('\u2318E');
+      expect(getShortcutKey('Pause')).toHaveTextContent('\u2318Space');
+      expect(getShortcutKey('End Session')).toHaveTextContent('\u21E7\u2318E');
     });
 
-    it('If the run is paused, Then the Resume tooltip shows the Command shortcut', async () => {
+    it('If the run is paused on macOS, Then Resume shows the Command shortcut as a key chip', () => {
       // Arrange
+      setPlatform('darwin');
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: { ...mockRun, isPaused: true },
         isPaused: true,
       });
-      render(<SessionControls />);
 
       // Act
-      const tooltip = await focusAndFindTooltip('Resume', 'Resume run (\u2318Space)');
+      render(<SessionControls />);
 
       // Assert
-      expect(tooltip).toBeInTheDocument();
+      expect(getShortcutKey('Resume')).toHaveTextContent('\u2318Space');
+    });
+
+    it('When the app runs on Windows, Then the key chips show Ctrl', () => {
+      // Arrange
+      setPlatform('win32');
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: mockRun,
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(getShortcutKey('End Run')).toHaveTextContent('Ctrl+E');
+      expect(getShortcutKey('Pause')).toHaveTextContent('Ctrl+Space');
+      expect(getShortcutKey('End Session')).toHaveTextContent('Ctrl+Shift+E');
+      expect(screen.getByRole('button', { name: 'End Run' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+E',
+      );
+      expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+Space',
+      );
+      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+Shift+E',
+      );
+    });
+
+    it('If a session has no active run on Windows, Then Start Run announces Control+R', () => {
+      // Arrange
+      setPlatform('win32');
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Start Run' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+R',
+      );
+    });
+
+    it('When a shortcut is shown as a key chip, Then the chip is hidden from assistive technology and the button exposes the shortcut instead', () => {
+      // Arrange
+      setPlatform('darwin');
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: mockRun,
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      const endRunButton = screen.getByRole('button', { name: 'End Run' });
+      expect(endRunButton.querySelector('kbd')?.closest('[aria-hidden="true"]')).not.toBeNull();
+      expect(endRunButton).toHaveAttribute('aria-keyshortcuts', 'Meta+E');
+      expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Meta+Space',
+      );
+      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Meta+Shift+E',
+      );
+      // The accessible name is unchanged; the shortcut is the accessible description
+      expect(endRunButton).toHaveAccessibleName('End Run');
+      expect(endRunButton).toHaveAccessibleDescription('\u2318E');
+      expect(screen.getByRole('button', { name: 'Pause' })).toHaveAccessibleDescription(
+        '\u2318Space',
+      );
+      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAccessibleDescription(
+        '\u21E7\u2318E',
+      );
+    });
+
+    it('If no session is active, Then no run shortcuts are shown', () => {
+      // Arrange
+      setPlatform('darwin');
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(
+        screen.getByRole('button', { name: 'Start New Session' }).querySelector('kbd'),
+      ).toBeNull();
+      expect(screen.queryByText('\u2318R')).not.toBeInTheDocument();
     });
   });
 
@@ -1364,19 +1410,20 @@ describe('SessionControls', () => {
     });
   });
 
-  describe('Tooltips', () => {
-    it('renders tooltip triggers for all buttons', () => {
+  describe('Run actions', () => {
+    it('When a run is active, Then End Run, Pause, End Session and Add Item are offered', () => {
+      // Arrange
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
       });
 
+      // Act
       render(<SessionControls />);
 
-      // Check that tooltip triggers are present (they have data-slot="tooltip-trigger")
-      const tooltipTriggers = screen.getAllByRole('button');
-      expect(tooltipTriggers).toHaveLength(4); // End Run, Pause/Resume, End Session, Add Item
+      // Assert
+      expect(screen.getAllByRole('button')).toHaveLength(4); // End Run, Pause/Resume, End Session, Add Item
     });
   });
 });

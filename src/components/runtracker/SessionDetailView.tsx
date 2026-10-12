@@ -1,6 +1,8 @@
-import type { Session } from 'electron/types/grail';
+import type { Run, Session } from 'electron/types/grail';
+import { getRunElapsedMs } from 'electron/utils/runClock';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,11 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDate } from '@/lib/date';
+import { cn } from '@/lib/utils';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
+import { calculateLiveEfficiency } from './liveSession';
 import { RunList } from './RunList';
 import { SessionControls } from './SessionControls';
 import { useSessionNotes } from './useSessionNotes';
@@ -28,6 +33,67 @@ const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   minute: '2-digit',
   second: '2-digit',
 };
+
+const STAT_VALUE_SIZES = {
+  lg: 'text-3xl',
+  md: 'text-lg',
+  sm: 'text-base',
+} as const;
+
+interface DetailStatProps {
+  label: string;
+  value: ReactNode;
+  /** Plain-language explanation shown below the value. */
+  description?: string;
+  size?: keyof typeof STAT_VALUE_SIZES;
+}
+
+/** One labelled session statistic; numbers use tabular figures of the body font. */
+function DetailStat({ label, value, description, size = 'md' }: DetailStatProps) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <dt className="text-muted-foreground text-sm">{label}</dt>
+      <dd className={cn('font-semibold tabular-nums leading-tight', STAT_VALUE_SIZES[size])}>
+        {value}
+      </dd>
+      {description && <dd className="text-muted-foreground text-xs">{description}</dd>}
+    </div>
+  );
+}
+
+const isSessionRunning = (session: Session | undefined) => Boolean(session && !session.endTime);
+
+// Time from the start of the session to its end, or to `now` while it is still running
+const getSessionDuration = (session: Session | undefined, now: number) =>
+  session ? (session.endTime?.getTime() ?? now) - session.startTime.getTime() : 0;
+
+interface EfficiencyInput {
+  session: Session | undefined;
+  /** The in-progress run of the session, if any. */
+  inProgressRun: Run | null;
+  now: number;
+  sessionDuration: number;
+}
+
+// Share of the session spent in runs. A running session counts its in-progress run (paused time
+// excluded), because the stored totals only change when a run ends; a finished session uses them.
+function getEfficiencyPercentage({
+  session,
+  inProgressRun,
+  now,
+  sessionDuration,
+}: EfficiencyInput): number {
+  if (!session) return 0;
+  if (!session.endTime) {
+    return calculateLiveEfficiency({
+      completedRunTime: session.totalRunTime,
+      currentRunElapsed: inProgressRun ? getRunElapsedMs(inProgressRun, now) : 0,
+      sessionElapsed: sessionDuration,
+    });
+  }
+  if (session.totalSessionTime === 0) return 0;
+  return (session.totalRunTime / session.totalSessionTime) * 100;
+}
 
 interface ArchiveButtonProps {
   isArchiving: boolean;
@@ -130,19 +196,16 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     }
   }, [sessionId, loadSessionRuns, runs]);
 
-  // Calculate session duration
-  const getSessionDuration = useCallback((session: Session) => {
-    if (session.endTime) {
-      return session.endTime.getTime() - session.startTime.getTime();
-    }
-    return Date.now() - session.startTime.getTime();
-  }, []);
+  // Live clock for the duration and efficiency of a session that is still running
+  const now = useNow(isSessionRunning(session));
+  const sessionDuration = getSessionDuration(session, now);
 
-  // Calculate efficiency percentage
-  const efficiencyPercentage = useMemo(() => {
-    if (!session || session.totalSessionTime === 0) return 0;
-    return (session.totalRunTime / session.totalSessionTime) * 100;
-  }, [session]);
+  const efficiencyPercentage = getEfficiencyPercentage({
+    session,
+    inProgressRun: hasActiveRun ? activeRun : null,
+    now,
+    sessionDuration,
+  });
 
   // Calculate average run time
   const averageRunTime = useMemo(() => {
@@ -218,8 +281,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     );
   }
 
-  const sessionDuration = getSessionDuration(session);
-
   return (
     <div className="space-y-6">
       {/* Header with back button */}
@@ -259,78 +320,62 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Session Statistics */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionDetail.sessionDuration)}
-              </p>
-              <p className="font-mono text-lg">{formatDuration(sessionDuration)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.runCount)}
-              </p>
-              <p className="font-semibold text-lg">{session.runCount}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.averageRunTime)}
-              </p>
-              <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.fastestRun)}
-              </p>
-              <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.efficiency)}
-              </p>
-              <p className="font-semibold text-lg">{efficiencyPercentage.toFixed(1)}%</p>
-            </div>
-          </div>
+          {/* Outcome first, then pace, then times */}
+          <div className="space-y-4">
+            <dl className="grid grid-cols-2 gap-4">
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.itemsFound)}
+                value={sessionStats?.itemsFound ?? 0}
+                size="lg"
+              />
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.newGrailItems)}
+                value={sessionStats?.newGrailItems ?? 0}
+                size="lg"
+              />
+            </dl>
 
-          {/* Items Found */}
-          {sessionStats && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">
-                  {t(translations.runTracker.sessionCard.itemsFound)}
-                </p>
-                <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">
-                  {t(translations.runTracker.sessionCard.newGrailItems)}
-                </p>
-                <p className="font-semibold text-lg">{sessionStats.newGrailItems}</p>
-              </div>
-            </div>
-          )}
+            <dl className="grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4">
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.runCount)}
+                value={session.runCount}
+              />
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.averageRunTime)}
+                value={formatDuration(averageRunTime)}
+              />
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.fastestRun)}
+                value={formatDuration(sessionStats?.fastestRun || 0)}
+              />
+              <DetailStat
+                label={t(translations.runTracker.sessionCard.efficiency)}
+                value={`${efficiencyPercentage.toFixed(1)}%`}
+                description={t(translations.runTracker.sessionCard.efficiencyDescription)}
+              />
+            </dl>
 
-          {/* Session Times */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.table.startTime)}
-              </p>
-              <p className="font-mono text-sm">
-                {session.startTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)}
-              </p>
-            </div>
-            {session.endTime && (
-              <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">
-                  {t(translations.runTracker.table.endTime)}
-                </p>
-                <p className="font-mono text-sm">
-                  {session.endTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)}
-                </p>
-              </div>
-            )}
+            <dl className="grid grid-cols-3 gap-4 border-t pt-4">
+              <DetailStat
+                label={t(translations.runTracker.table.startTime)}
+                value={session.startTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)}
+                size="sm"
+              />
+              <DetailStat
+                label={t(translations.runTracker.table.endTime)}
+                value={
+                  session.endTime
+                    ? session.endTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)
+                    : t(translations.runTracker.runDetails.inProgress)
+                }
+                size="sm"
+              />
+              <DetailStat
+                label={t(translations.runTracker.sessionDetail.sessionDuration)}
+                value={formatDuration(sessionDuration)}
+                size="sm"
+              />
+            </dl>
           </div>
 
           {/* Notes Editor */}

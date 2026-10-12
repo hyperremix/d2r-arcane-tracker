@@ -35,7 +35,7 @@ function CompactStat({ label, value }: CompactStatProps) {
   return (
     <div className="min-w-0 space-y-0.5">
       <dt className="truncate text-muted-foreground text-xs">{label}</dt>
-      <dd className="font-mono text-sm tabular-nums">{value}</dd>
+      <dd className="text-sm tabular-nums">{value}</dd>
     </div>
   );
 }
