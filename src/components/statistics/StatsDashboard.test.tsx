@@ -18,12 +18,6 @@ vi.mock('@/stores/grailStore', () => ({
   useGrailStatistics: vi.fn(),
   useGrailStore: vi.fn(),
 }));
-vi.mock('@/hooks/useProgressLookup', () => ({
-  useProgressLookup: () => new Map(),
-}));
-vi.mock('@/components/grail/ItemCard', () => ({
-  ItemCard: () => <div data-testid="item-card" />,
-}));
 
 interface SetupOptions {
   categories?: ItemCategory[];
@@ -54,7 +48,6 @@ function setupStatistics({
     currentStreak: 0,
     maxStreak: 0,
     averageItemsPerDay: 0,
-    lastFind: undefined,
     categoryStats: categories.map((category) => ({
       category,
       total: 4,
@@ -75,6 +68,20 @@ function getTile(label: string): HTMLElement {
   const tile = screen.getByText(label).closest<HTMLElement>('[data-slot="card"]');
   expect(tile).not.toBeNull();
   return tile as HTMLElement;
+}
+
+/** Returns the row that holds the two progress charts. */
+function getChartsRow(): HTMLElement {
+  return screen.getByTestId('stats-charts');
+}
+
+/** Returns the card of the chart with the given heading. */
+function getChartCard(name: string): HTMLElement {
+  const card = screen
+    .getByRole('heading', { level: 2, name })
+    .closest<HTMLElement>('[data-slot="card"]');
+  expect(card).not.toBeNull();
+  return card as HTMLElement;
 }
 
 function buildCharacter(id: string, name: string, characterClass: CharacterClass) {
@@ -179,6 +186,40 @@ describe('When StatsDashboard shows the headline statistics', () => {
     expect(runesMissing.getByText('0')).toBeInTheDocument();
     expect(runesMissing.getByText('All runes found')).toBeInTheDocument();
     expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
+  });
+
+  it('If the startup scan found an item after the last tracked find, Then the page shows one last find, the tracked one', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new().withId('tracked').withName('Vampire Gaze').build(),
+      HolyGrailItemBuilder.new().withId('scanned').withName("Mara's Kaleidoscope").build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withItemId('tracked')
+        .withFoundDate(new Date(2026, 9, 5, 12))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('p2')
+        .withItemId('scanned')
+        .withFoundDate(new Date(2026, 9, 8, 12))
+        .asFromInitialScan()
+        .build(),
+    ];
+    setupStatistics({ items, progress });
+
+    // Act
+    const { container } = render(<StatsDashboard />);
+
+    // Assert
+    expect(screen.getAllByText(/last find/i)).toHaveLength(1);
+    expect(screen.queryByText('Last Find')).not.toBeInTheDocument();
+    expect(
+      within(getTile('Last Find While Tracking')).getByText('Vampire Gaze'),
+    ).toBeInTheDocument();
+    expect(container).not.toHaveTextContent("Mara's Kaleidoscope");
+    expect(container).not.toHaveTextContent('Recent Activity');
   });
 
   it('If no sets or runes are tracked, Then their tiles are hidden', () => {
@@ -372,6 +413,105 @@ describe('When StatsDashboard shows the progress charts', () => {
     expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
   });
 
+  it('If both charts have finds, Then they share the row and neither is compact', () => {
+    // Arrange
+    const items = [HolyGrailItemBuilder.new().withId('a').build()];
+    setupStatistics({
+      items,
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('a')
+          .withFoundDate(new Date(2026, 9, 9, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
+    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
+    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+  });
+
+  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is compact', () => {
+    // Arrange
+    const items = [HolyGrailItemBuilder.new().withId('a').build()];
+    setupStatistics({
+      items,
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('a')
+          .withFoundDate(new Date(2026, 0, 15, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(screen.getByRole('img', { name: /^Grail progress over time/ })).toBeInTheDocument();
+    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
+    const weekly = getChartCard('Finds per Week');
+    expect(weekly).toHaveAttribute('data-chart-state', 'empty');
+    expect(within(weekly).getByText('No finds in the last 12 weeks')).toBeInTheDocument();
+    expect(within(weekly).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(weekly).queryByText(/the latest week ending today/)).not.toBeInTheDocument();
+  });
+
+  it('If finds were made but no tracked grail entry was found, Then the weekly chart takes the whole row and the progress chart is compact', () => {
+    // Arrange
+    setupStatistics({
+      items: [],
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('untracked')
+          .withFoundDate(new Date(2026, 9, 9, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(screen.getByRole('img', { name: /^Finds per week/ })).toBeInTheDocument();
+    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
+    const progress = getChartCard('Grail Progress Over Time');
+    expect(progress).toHaveAttribute('data-chart-state', 'empty');
+    expect(within(progress).getByText('No items found yet')).toBeInTheDocument();
+    expect(within(progress).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(progress).queryByText(/counted on the day each was first found/)).toBeNull();
+  });
+
+  it('If neither chart has finds, Then both are compact and stacked', () => {
+    // Arrange
+    setupStatistics();
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(getChartCard('Grail Progress Over Time')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChartCard('Finds per Week')).toHaveAttribute('data-chart-state', 'empty');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('If items were found, Then the charts summarize the finds and list them in a table', () => {
     // Arrange
     const items = ['a', 'b'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
@@ -407,6 +547,7 @@ describe('When StatsDashboard shows the progress charts', () => {
     ).toBeInTheDocument();
     const progressTable = screen.getByRole('table', { name: 'Grail Progress Over Time' });
     expect(within(progressTable).getAllByRole('row')).toHaveLength(3);
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
   });
 
   it('If the user moves through a chart with the keyboard, Then the tooltip shows the focused value', () => {

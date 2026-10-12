@@ -4,8 +4,11 @@ import {
   buildCumulativeFinds,
   buildSessionDurations,
   buildWeeklyFinds,
+  type CumulativeFindsPoint,
   durationTicks,
   formatDayIndex,
+  hasProgressFinds,
+  hasWeeklyFinds,
   niceTicks,
   toLocalDayIndex,
 } from './chartData';
@@ -235,6 +238,59 @@ describe('When counting finds per week', () => {
 
     // Assert
     expect(weeks.map((week) => week.count)).toEqual([0, 0]);
+  });
+});
+
+describe('When deciding whether the finds charts have anything to show', () => {
+  it('If there are no progress points, Then the progress chart has no finds', () => {
+    // Arrange
+    const points: CumulativeFindsPoint[] = [];
+
+    // Act
+    const result = hasProgressFinds(points);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If there is a progress point, Then the progress chart has finds', () => {
+    // Arrange
+    const points: CumulativeFindsPoint[] = [{ day: 20000, total: 1 }];
+
+    // Act
+    const result = hasProgressFinds(points);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If every week has zero finds, Then the weekly chart has no finds', () => {
+    // Arrange
+    const weeks = buildWeeklyFinds([], new Date(2026, 9, 10, 12), 3);
+
+    // Act
+    const result = hasWeeklyFinds(weeks);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If any week has a find, Then the weekly chart has finds', () => {
+    // Arrange
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withItemId('a')
+        .withFoundDate(new Date(2026, 9, 9, 9))
+        .build(),
+    ];
+    const weeks = buildWeeklyFinds(progress, new Date(2026, 9, 10, 12), 3);
+
+    // Act
+    const result = hasWeeklyFinds(weeks);
+
+    // Assert
+    expect(result).toBe(true);
   });
 });
 

@@ -622,8 +622,6 @@
       "runesMissing": "Runes Missing",
       "highestMissingRune": "Highest missing: {{rune}}",
       "allRunesFound": "All runes found",
-      "recentActivity": "Recent Activity",
-      "lastFind": "Last Find:",
       "noItemsFoundYet": "No items found yet",
       "progressByCategory": "Progress by Category",
       "recentBadge": "+{{count}} recent",

@@ -119,6 +119,16 @@ export function buildCumulativeFinds(
   };
 }
 
+/**
+ * Whether the grail progress chart has anything to draw. The one place that decides it, so the
+ * chart and the layout around it agree.
+ * @param points - Points from {@link buildCumulativeFinds}
+ * @returns True if at least one entry was found
+ */
+export function hasProgressFinds(points: CumulativeFindsPoint[]): boolean {
+  return points.length > 0;
+}
+
 /** Number of finds in a week (seven calendar days). */
 export interface WeeklyFinds {
   /** Day index of the first day of the week. */
@@ -158,6 +168,16 @@ export function buildWeeklyFinds(
   }
 
   return result;
+}
+
+/**
+ * Whether the finds per week chart has anything to draw. The one place that decides it, so the
+ * chart and the layout around it agree.
+ * @param weeks - Weeks from {@link buildWeeklyFinds}
+ * @returns True if at least one week has a find
+ */
+export function hasWeeklyFinds(weeks: WeeklyFinds[]): boolean {
+  return weeks.some((week) => week.count > 0);
 }
 
 /** Distribution of the completed run durations of a session, in milliseconds. */

@@ -26,6 +26,18 @@ interface ChartCardProps {
 }
 
 /**
+ * Heading of a chart card, rendered as an `h2`.
+ * @returns {JSX.Element} The card title
+ */
+function ChartCardTitle({ children }: { children: string }) {
+  return (
+    <CardTitle>
+      <h2>{children}</h2>
+    </CardTitle>
+  );
+}
+
+/**
  * Card that frames a chart with a section heading and a description.
  * @returns {JSX.Element} The chart card
  */
@@ -33,12 +45,37 @@ export function ChartCard({ title, description, children, className }: ChartCard
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>
-          <h2>{title}</h2>
-        </CardTitle>
+        <ChartCardTitle>{title}</ChartCardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Props for the EmptyChartCard component.
+ */
+interface EmptyChartCardProps {
+  /** Section heading, rendered as an `h2` */
+  title: string;
+  /** Why the chart has nothing to show */
+  message: string;
+}
+
+/**
+ * Compact card shown in place of a chart without data: the heading and the message side by side,
+ * so an empty chart takes little room on the page. The message wraps below the heading when the
+ * card is too narrow for both, rather than being truncated.
+ * @returns {JSX.Element} The empty chart card
+ */
+export function EmptyChartCard({ title, message }: EmptyChartCardProps) {
+  return (
+    <Card className="py-4" data-chart-state="empty">
+      <CardContent className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <ChartCardTitle>{title}</ChartCardTitle>
+        <p className="text-muted-foreground text-sm">{message}</p>
+      </CardContent>
     </Card>
   );
 }

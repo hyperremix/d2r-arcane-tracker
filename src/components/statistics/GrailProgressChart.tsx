@@ -5,8 +5,8 @@ import {
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
-  ChartEmptyState,
   ChartGrid,
+  EmptyChartCard,
   getPlotArea,
   InteractiveChart,
   linearScale,
@@ -15,6 +15,7 @@ import {
 import {
   type CumulativeFindsPoint,
   formatDayIndex,
+  hasProgressFinds,
   niceTicks,
   type TrackingBaseline,
 } from '@/components/statistics/chartData';
@@ -59,11 +60,12 @@ export function GrailProgressChart({
   const title = t(chartT.grailProgressTitle);
   const description = t(chartT.grailProgressDescription);
 
-  if (points.length === 0) {
+  if (!hasProgressFinds(points)) {
     return (
-      <ChartCard title={title} description={description}>
-        <ChartEmptyState>{t(translations.statistics.dashboard.noItemsFoundYet)}</ChartEmptyState>
-      </ChartCard>
+      <EmptyChartCard
+        title={title}
+        message={t(translations.statistics.dashboard.noItemsFoundYet)}
+      />
     );
   }
 

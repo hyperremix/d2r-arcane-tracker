@@ -1,11 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Clock, Gem, History, Layers, Trophy, Users } from 'lucide-react';
+import { BarChart3, Gem, History, Layers, Trophy, Users } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ItemCard } from '@/components/grail/ItemCard';
 import {
   buildCumulativeFinds,
   buildWeeklyFinds,
+  hasProgressFinds,
+  hasWeeklyFinds,
   toLocalDayIndex,
 } from '@/components/statistics/chartData';
 import {
@@ -20,10 +21,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressLabel } from '@/components/ui/progress';
 import { useCurrentDay } from '@/hooks/useCurrentDay';
-import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import { formatTimeAgo } from '@/lib/date';
 import { itemCategoryLabelKeys, itemSubCategoryLabelKeys } from '@/lib/labelKeys';
+import { cn } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -52,8 +53,8 @@ function SectionTitle({ icon: Icon, children }: SectionTitleProps) {
 /**
  * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.
  * Shows headline statistics that stay meaningful when nothing was found recently (total progress,
- * last find, closest set and missing runes), progress over time, finds per week, category
- * breakdowns, a character comparison and recent activity.
+ * last find while tracking, closest set and missing runes), progress over time, finds per week,
+ * category breakdowns and a character comparison.
  * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
  */
@@ -62,20 +63,11 @@ export const StatsDashboard = memo(function StatsDashboard() {
   const stats = useGrailStatistics();
   const items = useGrailStore((state) => state.items);
   const progress = useGrailStore((state) => state.progress);
-  const characters = useGrailStore((state) => state.characters);
   const settings = useGrailStore((state) => state.settings);
   const grailNormal = settings.grailNormal;
   const grailEthereal = settings.grailEthereal;
   // The charts end today, so recalculate them when the day rolls over
   const currentDay = useCurrentDay();
-
-  const lastFindItem = useMemo(
-    () => items.find((i) => i.id === stats.lastFind?.itemId),
-    [items, stats.lastFind?.itemId],
-  );
-  // Only the last found item is shown with its progress
-  const lastFindItems = useMemo(() => (lastFindItem ? [lastFindItem] : []), [lastFindItem]);
-  const progressLookup = useProgressLookup(lastFindItems, progress, settings);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: currentDay only triggers a recalculation with a fresh current time
   const chartData = useMemo(() => {
@@ -97,6 +89,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
     };
   }, [items, progress, grailNormal, grailEthereal]);
   const { lastTrackedFind, sets, runes } = highlights;
+  // An empty chart shrinks to a compact card, so the other one gets the whole row
+  const chartsSideBySide =
+    hasProgressFinds(chartData.cumulativeFinds.points) && hasWeeklyFinds(chartData.weeklyFinds);
 
   // Shared stashes are not characters, so they are not compared
   const characterStats = stats.characterStats.filter(
@@ -162,7 +157,11 @@ export const StatsDashboard = memo(function StatsDashboard() {
       </div>
 
       {/* Progress over time */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div
+        data-testid="stats-charts"
+        data-layout={chartsSideBySide ? 'side-by-side' : 'stacked'}
+        className={cn('grid grid-cols-1 gap-4', chartsSideBySide && 'lg:grid-cols-2')}
+      >
         <GrailProgressChart
           points={chartData.cumulativeFinds.points}
           baseline={chartData.cumulativeFinds.baseline}
@@ -171,42 +170,6 @@ export const StatsDashboard = memo(function StatsDashboard() {
         />
         <WeeklyFindsChart weeks={chartData.weeklyFinds} />
       </div>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <SectionTitle icon={Clock}>
-            {t(translations.statistics.dashboard.recentActivity)}
-          </SectionTitle>
-        </CardHeader>
-        <CardContent>
-          {stats.lastFind && lastFindItem ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">
-                  {t(translations.statistics.dashboard.lastFind)}
-                </span>
-                <span className="font-medium text-sm">
-                  {stats.lastFind.foundDate
-                    ? formatTimeAgo(new Date(stats.lastFind.foundDate), t, i18n.language)
-                    : t(translations.common.unknown)}
-                </span>
-              </div>
-              <ItemCard
-                item={lastFindItem}
-                normalProgress={progressLookup.get(lastFindItem?.id)?.normalProgress}
-                etherealProgress={progressLookup.get(lastFindItem?.id)?.etherealProgress}
-                characters={characters}
-                viewMode="list"
-              />
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              {t(translations.statistics.dashboard.noItemsFoundYet)}
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-2">
         {/* Category Breakdown */}
