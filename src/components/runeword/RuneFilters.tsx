@@ -29,7 +29,7 @@ interface RuneFiltersProps {
 
 /**
  * RuneFilters component that displays checkboxes for filtering by runes.
- * Shows all 33 runes with their images, available counts, and highlights runes with 0 count.
+ * Shows all 33 runes with their images and available counts; runes you don't own are muted.
  * Runewords must contain all selected runes to match; a button clears the selection.
  */
 export function RuneFilters({
@@ -135,10 +135,13 @@ export function RuneFilters({
                 <span className="min-w-0 truncate font-medium" title={rune.name}>
                   {rune.name}
                 </span>
+                {/* Not owning a rune is normal, not an error: zero is plain muted text, while
+                    owned counts sit in a filled pill, so the two differ in shape, not only color. The zero
+                    takes its muted color from the label. */}
                 <span
                   className={cn(
                     'shrink-0 rounded-full px-1.5 py-0.5 font-mono text-xs',
-                    hasNone ? 'bg-missing/15 text-missing' : 'bg-info/15 text-info',
+                    !hasNone && 'bg-info/15 text-info',
                   )}
                 >
                   {count}

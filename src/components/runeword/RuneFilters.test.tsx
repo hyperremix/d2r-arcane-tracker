@@ -110,3 +110,42 @@ describe('When RuneFilters shows long rune names or counts', () => {
     expect(screen.getByLabelText(/^Cham\s*123$/)).toBeInTheDocument();
   });
 });
+
+/** Finds the count shown in the row of the rune whose label matches. */
+function getCountOf(runeLabel: RegExp, count: string): HTMLElement {
+  const row = screen.getByLabelText(runeLabel).closest('div') as HTMLElement;
+  return within(row).getByText(count);
+}
+
+describe('When RuneFilters shows owned counts', () => {
+  beforeEach(() => {
+    setElectronAPI({ icon: { getByFilename: vi.fn().mockResolvedValue(undefined) } });
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If a rune is not owned, Then its zero count is muted text rather than a red pill', () => {
+    // Arrange & Act
+    render(
+      <RuneFilters selectedRunes={[]} onRuneSelectionChange={vi.fn()} availableRunes={{ el: 2 }} />,
+    );
+
+    // Assert
+    const zodCount = getCountOf(/^Zod/, '0');
+    expect(zodCount.closest('label')).toHaveClass('text-muted-foreground');
+    expect(zodCount).not.toHaveClass('text-missing', 'bg-missing/15', 'bg-info/15');
+  });
+
+  it('If a rune is owned, Then its count is shown in a filled pill', () => {
+    // Arrange & Act
+    render(
+      <RuneFilters selectedRunes={[]} onRuneSelectionChange={vi.fn()} availableRunes={{ el: 2 }} />,
+    );
+
+    // Assert
+    const elCount = getCountOf(/^El\s*2$/, '2');
+    expect(elCount).toHaveClass('bg-info/15', 'text-info');
+  });
+});

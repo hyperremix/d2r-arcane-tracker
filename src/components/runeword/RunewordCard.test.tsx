@@ -29,9 +29,9 @@ function stubElectronApi() {
   };
 }
 
-function renderCard(runes: string[] | undefined) {
+function renderCard(runes: string[] | undefined, link = '') {
   stubElectronApi();
-  render(<RunewordCard runeword={createRuneword(runes)} availableRunes={{}} />);
+  render(<RunewordCard runeword={createRuneword(runes, link)} availableRunes={{}} />);
 }
 
 describe('RunewordCard', () => {
@@ -83,5 +83,60 @@ describe('RunewordCard', () => {
     // contained by the page and stretch the document's scrollable height.
     const card = screen.getByRole('heading', { name: 'Steel' }).closest('[data-slot="card"]');
     expect(card).toHaveClass('relative');
+  });
+
+  it('When the card is rendered, Then the completion badge sits on its own line below the name', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el']);
+
+    // Assert
+    const heading = screen.getByRole('heading', { name: 'Steel' });
+    const header = heading.parentElement;
+    expect(header).toHaveClass('flex-col');
+    expect(heading.nextElementSibling).toHaveTextContent('0 of 2 runes available');
+  });
+
+  it.each([
+    [
+      'd2runewizard',
+      'https://d2runewizard.com/runewords/Steel',
+      'View on d2runewizard',
+      'd2runewizard',
+    ],
+    [
+      'diablo2.io',
+      'https://diablo2.io/runewords/steel-t1.html',
+      'View on diablo2.io',
+      'diablo2.io',
+    ],
+  ])('If the runeword links to %s, Then the link shows the site name and its accessible name says where it goes', (_site, link, accessibleName, visibleText) => {
+    // Arrange & Act
+    renderCard(['tir', 'el'], link);
+
+    // Assert
+    const anchor = screen.getByRole('link', { name: accessibleName });
+    expect(anchor).toHaveAttribute('href', link);
+    expect(anchor).toHaveTextContent(visibleText);
+    expect(anchor).not.toHaveTextContent('View on');
+  });
+
+  it('When the footer is narrow, Then the socket count and link stay unbroken and the link wraps below', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el'], 'https://d2runewizard.com/runewords/Steel');
+
+    // Assert
+    const sockets = screen.getByText('2 sockets');
+    const link = screen.getByRole('link', { name: 'View on d2runewizard' });
+    expect(sockets).toHaveClass('whitespace-nowrap');
+    expect(link).toHaveClass('whitespace-nowrap');
+    expect(sockets.parentElement).toHaveClass('flex-wrap');
+  });
+
+  it('If the runeword has no link, Then no external link is shown', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el']);
+
+    // Assert
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

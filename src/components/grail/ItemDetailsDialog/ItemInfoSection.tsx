@@ -10,6 +10,7 @@ import {
   itemTreasureClassLabelKeys,
   itemTypeLabelKeys,
 } from '@/lib/labelKeys';
+import { getExternalLinkLabelKey } from '@/lib/links';
 import { cn } from '@/lib/utils';
 
 /**
@@ -79,9 +80,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-primary underline underline-offset-4 hover:text-primary/80"
           >
-            {item.link.includes('diablo2.io')
-              ? t(keys.viewOnDiablo2io)
-              : t(keys.viewOnD2runewizard)}
+            {t(getExternalLinkLabelKey(item.link))}
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           </a>
         </p>

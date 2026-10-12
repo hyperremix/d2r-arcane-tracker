@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { getExternalLinkLabelKey, getExternalLinkSiteKey } from '@/lib/links';
 import { getRunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import { RuneImages } from '../grail/RuneImages';
@@ -46,15 +47,15 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         className,
       )}
     >
-      {/* Header with name and completion badge */}
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="min-w-0 flex-1 break-words font-semibold text-lg leading-tight">
-          {runeword.name}
-        </h3>
+      {/* Header: the name gets the full card width and the completion badge sits on its own line
+          below it, so long names never collide with the badge. Most names fit on one line; a
+          long one wraps instead of being cut off. */}
+      <div className="flex min-w-0 flex-col items-start gap-1.5">
+        <h3 className="w-full break-words font-semibold text-lg leading-tight">{runeword.name}</h3>
         <Badge
           variant={completionStatus.complete ? 'default' : 'outline'}
           className={cn(
-            'shrink-0 font-mono',
+            'font-mono',
             completionStatus.complete && 'bg-success text-success-foreground',
           )}
         >
@@ -85,10 +86,11 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         )}
       </div>
 
-      {/* Footer: one socket per rune, and a link to the full runeword details */}
-      <div className="flex items-end justify-between gap-2 border-border border-t pt-3 text-xs">
+      {/* Footer: one socket per rune, and a link to the runeword's page on an external site. Both
+          stay on one line each; on a card too narrow for both, the link wraps to its own line. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1 border-border border-t pt-3 text-xs">
         {socketCount > 0 && (
-          <span className="text-muted-foreground">
+          <span className="whitespace-nowrap text-muted-foreground">
             {t(translations.runeword.card.sockets, { count: socketCount })}
           </span>
         )}
@@ -97,13 +99,16 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
             href={runeword.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
+            aria-label={t(getExternalLinkLabelKey(runeword.link))}
+            className="ml-auto inline-flex items-center gap-1 whitespace-nowrap text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI?.shell.openExternal(runeword.link);
             }}
           >
-            {t(translations.runeword.card.viewDetails)}
+            {/* The footer shows just the site name so it fits on one row; the accessible name is
+                the full "View on ..." label the item details dialog uses and contains the text */}
+            {t(getExternalLinkSiteKey(runeword.link))}
             <ExternalLink aria-hidden="true" className="size-3" />
           </a>
         )}

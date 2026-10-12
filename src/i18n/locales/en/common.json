@@ -65,6 +65,8 @@
       "etherealType": "Ethereal type:",
       "viewOnDiablo2io": "View on diablo2.io",
       "viewOnD2runewizard": "View on d2runewizard",
+      "siteDiablo2io": "diablo2.io",
+      "siteD2runewizard": "d2runewizard",
       "normalStatus": "Normal:",
       "etherealStatus": "Ethereal:",
       "characterProgress": "Character progress",
@@ -1098,7 +1100,6 @@
       "showAll": "Show all runewords"
     },
     "card": {
-      "viewDetails": "View details",
       "sockets_one": "{{count}} socket",
       "sockets_other": "{{count}} sockets",
       "runesOwned": "{{available}}/{{total}} runes",
