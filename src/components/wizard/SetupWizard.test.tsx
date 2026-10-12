@@ -79,8 +79,8 @@ describe('SetupWizard', () => {
         'Choose the folder that contains your .d2s character files to continue, or skip setup to configure it later.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip Setup' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip setup' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Skip optional steps' })).not.toBeInTheDocument();
   });
 
   it('If the save directory step reports a directory, Then Next is enabled and advances', () => {
@@ -139,7 +139,7 @@ describe('SetupWizard', () => {
     expect(screen.getByText('Optional')).toBeInTheDocument();
     expect(screen.getByText('Step 5 of 6')).toBeInTheDocument();
     // Only the summary is left, so there is nothing optional to skip
-    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip optional steps' })).not.toBeInTheDocument();
 
     // Act
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -147,7 +147,7 @@ describe('SetupWizard', () => {
     // Assert
     expect(screen.getByText('CompletionContent')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip Setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip setup' })).not.toBeInTheDocument();
   });
 
   it('When the user skips optional steps from What to Track, Then the wizard jumps straight to the summary', () => {
@@ -156,7 +156,7 @@ describe('SetupWizard', () => {
     render(<SetupWizard />);
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Skip Optional Steps' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip optional steps' }));
 
     // Assert
     expect(screen.getByText('CompletionContent')).toBeInTheDocument();
@@ -174,19 +174,19 @@ describe('SetupWizard', () => {
 
     // Assert
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip optional steps' })).not.toBeInTheDocument();
   });
 
   it('When Skip Setup is confirmed on an invalid step, Then the wizard closes', async () => {
     // Arrange
     openWizardAt(1);
     render(<SetupWizard />);
-    fireEvent.click(screen.getByRole('button', { name: 'Skip Setup' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip setup' }));
     const confirm = await screen.findByRole('alertdialog');
 
     // Act
     await act(async () => {
-      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip setup' }));
     });
 
     // Assert
@@ -271,7 +271,7 @@ describe('When SetupWizard is open', () => {
       const wizard = await screen.findByRole('dialog');
 
       // Act
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
 
       // Assert
       const confirm = await screen.findByRole('alertdialog');
@@ -283,11 +283,11 @@ describe('When SetupWizard is open', () => {
       // Arrange
       render(<SetupWizard />);
       const wizard = await screen.findByRole('dialog');
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       const confirm = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip setup' }));
 
       // Assert
       await waitFor(() =>
@@ -303,11 +303,11 @@ describe('When SetupWizard is open', () => {
       // Arrange
       render(<SetupWizard />);
       const wizard = await screen.findByRole('dialog');
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       const confirm = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(confirm).getByRole('button', { name: 'Continue Setup' }));
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Continue setup' }));
 
       // Assert
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
@@ -401,7 +401,7 @@ describe('When SetupWizard is open', () => {
       getMonitoringStatus: ReturnType<typeof vi.fn>,
     ): Promise<HTMLElement> {
       const wizard = await screen.findByRole('dialog');
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       const confirm = await screen.findByRole('alertdialog');
       await waitFor(() => expect(getMonitoringStatus).toHaveBeenCalledTimes(1));
       await act(async () => {
@@ -520,7 +520,7 @@ describe('When SetupWizard is open', () => {
       const wizard = await screen.findByRole('dialog');
 
       // Act
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       const confirm = await screen.findByRole('alertdialog');
 
       // Assert
@@ -559,7 +559,7 @@ describe('When SetupWizard is open', () => {
       installMonitoringStatus(getMonitoringStatus);
       const { unmount } = render(<SetupWizard />);
       const wizard = await screen.findByRole('dialog');
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       await screen.findByRole('alertdialog');
       await waitFor(() => expect(getMonitoringStatus).toHaveBeenCalledTimes(1));
 
@@ -602,12 +602,12 @@ describe('When SetupWizard is open', () => {
       setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
       render(<SetupWizard />);
       const wizard = await screen.findByRole('dialog');
-      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip setup' }));
       const confirm = await screen.findByRole('alertdialog');
 
       // Act
       await act(async () => {
-        fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+        fireEvent.click(within(confirm).getByRole('button', { name: 'Skip setup' }));
       });
 
       // Assert

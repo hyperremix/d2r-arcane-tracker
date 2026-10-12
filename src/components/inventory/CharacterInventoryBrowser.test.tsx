@@ -505,7 +505,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+        expect(screen.getByText('Selected item')).toBeInTheDocument();
       });
 
       const stashBoard = await screen.findByTestId('stash-board-stash-snap-0');
@@ -998,11 +998,11 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      expect(await screen.findByText('Shared Tab 1')).toBeInTheDocument();
-      expect(screen.getByText('Shared Tab 2')).toBeInTheDocument();
-      expect(screen.getByText('Shared Tab 3')).toBeInTheDocument();
-      expect(screen.getByText('Shared Tab 4')).toBeInTheDocument();
-      expect(screen.getByText('Shared Tab 5')).toBeInTheDocument();
+      expect(await screen.findByText('Shared tab 1')).toBeInTheDocument();
+      expect(screen.getByText('Shared tab 2')).toBeInTheDocument();
+      expect(screen.getByText('Shared tab 3')).toBeInTheDocument();
+      expect(screen.getByText('Shared tab 4')).toBeInTheDocument();
+      expect(screen.getByText('Shared tab 5')).toBeInTheDocument();
       expect(screen.getByText('Gems')).toBeInTheDocument();
       expect(screen.getByText('Materials')).toBeInTheDocument();
       expect(screen.getByText('Runes')).toBeInTheDocument();
@@ -2251,7 +2251,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('Quality/Type:')).toBeInTheDocument();
+        expect(screen.getByText('Quality/type:')).toBeInTheDocument();
       });
     });
   });
@@ -2327,7 +2327,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
+        expect(screen.getByText('Vaulted items')).toBeInTheDocument();
       });
       await waitFor(() => {
         expect(iconByFilenameMock).toHaveBeenCalledWith('flail.png');
@@ -2435,7 +2435,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         );
       });
       await waitFor(() => {
-        expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
+        expect(screen.getByText('Vaulted items')).toBeInTheDocument();
       });
     });
 

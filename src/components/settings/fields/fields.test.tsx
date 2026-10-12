@@ -17,7 +17,7 @@ describe('When a shared settings select is rendered', () => {
       render(<GameModeSelect id="mode" value={GameMode.Hardcore} onValueChange={onValueChange} />);
 
       // Assert
-      expect(document.getElementById('mode')).toHaveTextContent('Hardcore Only');
+      expect(document.getElementById('mode')).toHaveTextContent('Hardcore only');
     });
 
     it('Then the game version trigger shows the translated label instead of the raw value', () => {
@@ -64,7 +64,7 @@ describe('When a shared settings select is rendered', () => {
 
       // Assert
       const trigger = document.getElementById('mode');
-      expect(trigger).toHaveTextContent('Softcore Only');
+      expect(trigger).toHaveTextContent('Softcore only');
       expect(trigger).not.toHaveTextContent('softcore');
     });
 
@@ -130,7 +130,7 @@ describe('When GrailTrackingFields is rendered', () => {
       );
 
       // Act
-      fireEvent.click(screen.getByLabelText('Include Ethereal Items'));
+      fireEvent.click(screen.getByLabelText('Include ethereal items'));
 
       // Assert
       expect(onChange).toHaveBeenCalledWith({ grailEthereal: true });
@@ -152,7 +152,7 @@ describe('When NotificationFields is rendered', () => {
       // Arrange
       const onChange = vi.fn();
       render(<NotificationFields values={values} onChange={onChange} />);
-      const nativeSwitch = screen.getByRole('switch', { name: 'Native Notifications' });
+      const nativeSwitch = screen.getByRole('switch', { name: 'Native notifications' });
 
       // Act
       fireEvent.click(nativeSwitch);

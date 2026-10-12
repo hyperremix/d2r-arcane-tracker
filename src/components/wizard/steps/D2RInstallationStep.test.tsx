@@ -71,7 +71,7 @@ describe('D2RInstallationStep', () => {
 
     // Assert
     expect(await screen.findByRole('button', { name: 'Use this' })).toBeInTheDocument();
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     expect(input).toHaveValue('');
     expect(input).toHaveAttribute('placeholder', SUGGESTED_PATH);
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe('D2RInstallationStep', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use this' })).not.toBeInTheDocument();
     expect(screen.queryByText(SUGGESTED_PATH, { selector: 'p' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Installation Path')).toHaveAttribute(
+    expect(screen.getByLabelText('Installation path')).toHaveAttribute(
       'placeholder',
       SUGGESTED_PATH,
     );
@@ -146,7 +146,7 @@ describe('D2RInstallationStep', () => {
     expect(useGrailStore.getState().settings.d2rInstallPath).toBe(SUGGESTED_PATH);
     expect(api.grail.updateSettings).not.toHaveBeenCalled();
     expect(api.icon.validatePath).toHaveBeenCalled();
-    expect(screen.getByLabelText('Installation Path')).toHaveValue(SUGGESTED_PATH);
+    expect(screen.getByLabelText('Installation path')).toHaveValue(SUGGESTED_PATH);
     expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
 
     // Act
     fireEvent.change(input, { target: { value: 'D:\\D2' } });
@@ -182,7 +182,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
 
     // Act
     fireEvent.change(input, { target: { value: 'D:\\Nowhere' } });
@@ -288,7 +288,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     fireEvent.change(input, { target: { value: 'D:\\D2R' } });
 
     // Act
@@ -315,7 +315,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     fireEvent.change(input, { target: { value: 'D:\\D2R' } });
 
     // Act
@@ -346,7 +346,7 @@ describe('D2RInstallationStep', () => {
 
     // Assert
     expect(api.icon.setD2RPath).toHaveBeenCalledWith('F:\\Games\\D2R');
-    expect(screen.getByLabelText('Installation Path')).toHaveValue('F:\\Games\\D2R');
+    expect(screen.getByLabelText('Installation path')).toHaveValue('F:\\Games\\D2R');
     expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
   });
 
@@ -375,7 +375,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     fireEvent.change(input, { target: { value: 'D:\\D2R' } });
 
     // Act
@@ -402,7 +402,7 @@ describe('D2RInstallationStep', () => {
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     fireEvent.change(input, { target: { value: 'D:\\D2R' } });
 
     // Act

@@ -69,8 +69,8 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Assert
-      expect(screen.queryByRole('button', { name: 'End Session' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Archive Session' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'End session' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Archive session' })).toBeInTheDocument();
     });
   });
 
@@ -80,7 +80,7 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
 
       // Assert
       const dialog = await screen.findByRole('alertdialog');
@@ -91,7 +91,7 @@ describe('SessionCard', () => {
     it('Then confirming archives the session', async () => {
       // Arrange
       render(<SessionCard session={mockSession} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -106,7 +106,7 @@ describe('SessionCard', () => {
     it('If a run starts while the confirmation is open, Then confirming does not archive the session', async () => {
       // Arrange
       const { rerender } = render(<SessionCard session={mockSession} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
       const activeRun: Run = {
         id: 'run-1',
@@ -132,7 +132,7 @@ describe('SessionCard', () => {
     it('If the confirmation is cancelled, Then the session is not archived', async () => {
       // Arrange
       render(<SessionCard session={mockSession} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -158,7 +158,7 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Archive Session' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Archive session' })).toBeDisabled();
     });
   });
 
@@ -179,7 +179,7 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Assert
-      const archiveButton = screen.getByRole('button', { name: 'Archive Session' });
+      const archiveButton = screen.getByRole('button', { name: 'Archive session' });
       expect(archiveButton).toBeDisabled();
       expect(archiveButton).toHaveAttribute(
         'title',
@@ -316,7 +316,7 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Assert
-      const list = screen.getByRole('region', { name: 'Recent Runs' });
+      const list = screen.getByRole('region', { name: 'Recent runs' });
       const rows = within(list).getAllByRole('listitem');
       expect(rows.map((row) => within(row).getByText(/^Run #/).textContent)).toEqual([
         'Run #7',
@@ -357,7 +357,7 @@ describe('SessionCard', () => {
       render(<SessionCard session={mockSession} />);
 
       // Assert
-      expect(screen.getByText('Harlequin Crest, Unknown Item')).toBeInTheDocument();
+      expect(screen.getByText('Harlequin Crest, Unknown item')).toBeInTheDocument();
     });
 
     it('If no View all runs handler is given, Then the action is not shown', () => {
@@ -412,8 +412,8 @@ describe('SessionCard', () => {
 
       // Assert
       expect(useSessionStats).toHaveBeenCalledWith(mockSession);
-      expect(screen.getByText('Items Found').nextElementSibling).toHaveTextContent('2');
-      expect(screen.getByText('New Grail Items').nextElementSibling).toHaveTextContent('1');
+      expect(screen.getByText('Items found').nextElementSibling).toHaveTextContent('2');
+      expect(screen.getByText('New grail items').nextElementSibling).toHaveTextContent('1');
     });
   });
 
@@ -433,23 +433,23 @@ describe('SessionCard', () => {
     it('Then they start collapsed and expand from the Session Notes toggle', async () => {
       // Arrange
       render(<SessionCard session={mockSession} />);
-      const toggle = screen.getByRole('button', { name: 'Session Notes' });
+      const toggle = screen.getByRole('button', { name: 'Session notes' });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.queryByRole('textbox', { name: 'Session Notes' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('textbox', { name: 'Session notes' })).not.toBeInTheDocument();
 
       // Act
       fireEvent.click(toggle);
 
       // Assert
-      expect(await screen.findByRole('textbox', { name: 'Session Notes' })).toBeInTheDocument();
+      expect(await screen.findByRole('textbox', { name: 'Session notes' })).toBeInTheDocument();
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
   });
 
   describe('When edited session notes lose focus', () => {
     const openNotes = async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Session Notes' }));
-      return screen.findByRole('textbox', { name: 'Session Notes' });
+      fireEvent.click(screen.getByRole('button', { name: 'Session notes' }));
+      return screen.findByRole('textbox', { name: 'Session notes' });
     };
 
     it('Then the notes are saved for the session', async () => {

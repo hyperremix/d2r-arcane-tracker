@@ -92,7 +92,7 @@ describe('When the run duration card loads its sessions', () => {
     render(<RunDurationCard />);
 
     // Assert
-    const table = await screen.findByRole('table', { name: 'Run Durations by Session' });
+    const table = await screen.findByRole('table', { name: 'Run durations by session' });
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(13);
     expect(rows[1]).toHaveTextContent('Sep 4, 2026');
@@ -114,7 +114,7 @@ describe('When the run duration card loads its sessions', () => {
     render(<RunDurationCard />);
 
     // Assert
-    const table = await screen.findByRole('table', { name: 'Run Durations by Session' });
+    const table = await screen.findByRole('table', { name: 'Run durations by session' });
     expect(within(table).getAllByRole('row')).toHaveLength(13);
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Sep 1, 2026');
   });
@@ -175,7 +175,7 @@ describe('When the run duration card loads its sessions', () => {
     render(<RunDurationCard />);
 
     // Assert
-    const table = await screen.findByRole('table', { name: 'Run Durations by Session' });
+    const table = await screen.findByRole('table', { name: 'Run durations by session' });
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(13);
     expect(rows[1]).toHaveTextContent('Sep 9, 2026');
@@ -222,7 +222,7 @@ describe('When the run duration card loads its sessions', () => {
         <RunDurationCard />
       </StrictMode>,
     );
-    await screen.findByRole('table', { name: 'Run Durations by Session' });
+    await screen.findByRole('table', { name: 'Run durations by session' });
 
     // Act
     resolveFirst([buildSession('old', new Date(2026, 9, 1, 12), 1)]);
@@ -232,7 +232,7 @@ describe('When the run duration card loads its sessions', () => {
 
     // Assert
     const rows = within(
-      screen.getByRole('table', { name: 'Run Durations by Session' }),
+      screen.getByRole('table', { name: 'Run durations by session' }),
     ).getAllByRole('row');
     expect(rows).toHaveLength(2);
     expect(rows[1]).toHaveTextContent('Oct 2, 2026');
@@ -245,7 +245,7 @@ describe('When the run duration chart is rendered', () => {
     render(<RunDurationChart summaries={[{ ...buildSummary(0, 60_000), runCount: 1_234 }]} />);
 
     // Assert
-    const table = screen.getByRole('table', { name: 'Run Durations by Session' });
+    const table = screen.getByRole('table', { name: 'Run durations by session' });
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('1,234');
   });
 

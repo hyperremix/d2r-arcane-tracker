@@ -185,7 +185,7 @@ describe('When ItemCard is rendered', () => {
       );
 
       // Assert
-      const label = await screen.findByText('Weapons • Two-Handed Swords');
+      const label = await screen.findByText('Weapons • Two-handed swords');
       expect(label).toBeInTheDocument();
       expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
@@ -308,7 +308,7 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If an ethereal-only item is tracked', () => {
-    it('Then shows a single missing "Ethereal Only" pill until it is found', () => {
+    it('Then shows a single missing "Ethereal only" pill until it is found', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('only').build();
       setupStoreMock({ grailNormal: true, grailEthereal: true });
@@ -321,7 +321,7 @@ describe('When ItemCard is rendered', () => {
       expect(pills).toHaveLength(1);
       expect(pills[0]).toHaveAttribute('data-version', 'ethereal');
       expect(pills[0]).toHaveAttribute('data-found', 'false');
-      expect(screen.getByText('Ethereal Only')).toBeInTheDocument();
+      expect(screen.getByText('Ethereal only')).toBeInTheDocument();
     });
   });
 
@@ -636,7 +636,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={onClick} />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Clickable, Not Found' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clickable, Not found' }));
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -680,7 +680,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Pressable, Not found' });
 
       // Act
       fireEvent.keyDown(card, { key: 'Enter' });
@@ -697,7 +697,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Pressable, Not found' });
 
       // Act
       fireEvent.keyDown(card, { key: ' ' });
@@ -715,7 +715,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Pressable, Not found' });
 
       // Act
       const notPrevented = fireEvent.keyDown(card, { key: ' ' });
@@ -733,7 +733,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Nested Key').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Nested Key, Not Found' });
+      const card = screen.getByRole('button', { name: 'Nested Key, Not found' });
       const nested = screen.getByText('Nested Key');
       expect(card).not.toBe(nested);
       expect(card).toContainElement(nested);
@@ -755,7 +755,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Stray Key').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Stray Key, Not Found' });
+      const card = screen.getByRole('button', { name: 'Stray Key, Not found' });
 
       // Act
       fireEvent.keyUp(card, { key: ' ' });
@@ -772,7 +772,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Once Key').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Once Key, Not Found' });
+      const card = screen.getByRole('button', { name: 'Once Key, Not found' });
 
       // Act
       fireEvent.keyDown(card, { key: ' ' });
@@ -791,7 +791,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Blur Key').build();
       render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-      const card = screen.getByRole('button', { name: 'Blur Key, Not Found' });
+      const card = screen.getByRole('button', { name: 'Blur Key, Not found' });
       fireEvent.keyDown(card, { key: ' ' });
 
       // Act
@@ -807,7 +807,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
       render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Pressable, Not found' });
 
       // Act
       fireEvent.keyUp(card, { key: 'Enter' });
@@ -821,7 +821,7 @@ describe('When ItemCard is rendered', () => {
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Ignorable').build();
       render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByRole('button', { name: 'Ignorable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Ignorable, Not found' });
 
       // Act
       fireEvent.keyDown(card, { key });
@@ -903,7 +903,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} />);
 
       // Assert
-      expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Static, Not found' })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -920,7 +920,7 @@ describe('When ItemCard is rendered', () => {
 
       // Act
       const missing = render(<ItemCard item={item} viewMode={viewMode} />);
-      const missingText = screen.getByText('Not Found');
+      const missingText = screen.getByText('Not found');
       missing.unmount();
       render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />);
 
@@ -941,7 +941,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} viewMode={viewMode} />);
 
       // Assert
-      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
+      expect(screen.queryByText('Not found')).not.toBeInTheDocument();
       expect(screen.getByText('Normal missing')).toHaveClass('sr-only');
     });
 
@@ -953,8 +953,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={vi.fn()} />);
 
       // Assert
-      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Named, Not Found' })).toBeInTheDocument();
+      expect(screen.queryByText('Not found')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Named, Not found' })).toBeInTheDocument();
     });
 
     it.each([
@@ -1054,7 +1054,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={vi.fn()} viewMode={viewMode} />);
 
       // Assert
-      const card = screen.getByRole('button', { name: 'Neutral, Not Found' });
+      const card = screen.getByRole('button', { name: 'Neutral, Not found' });
       const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
       expect(surface).toHaveAttribute('data-found', 'false');
       expect(surface).toHaveClass('border-border', 'bg-muted/40');
@@ -1157,7 +1157,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={vi.fn()} />);
 
       // Assert
-      const card = screen.getByRole('button', { name: 'Steady, Not Found' });
+      const card = screen.getByRole('button', { name: 'Steady, Not found' });
       const surface = card.querySelector('[data-found]');
       expect(card.className).not.toMatch(/scale-/);
       expect(surface?.className).not.toMatch(/scale-/);
@@ -1179,7 +1179,7 @@ describe('When ItemCard is rendered', () => {
       expect(surface).toBeInTheDocument();
       expect(surface?.className).not.toMatch(/hover:/);
       expect(surface?.className).not.toMatch(/transition/);
-      expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Static, Not found' })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -1381,7 +1381,7 @@ describe('When ItemCard is rendered', () => {
       );
       expect(
         screen.getByRole('button', {
-          name: 'Fresh, Normal found, Ethereal missing, Recently Found!',
+          name: 'Fresh, Normal found, Ethereal missing, Recently found!',
         }),
       ).toBeInTheDocument();
     });

@@ -68,7 +68,7 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     renderRuneFilters([]);
 
     // Assert
-    const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
+    const runeList = screen.getByRole('group', { name: 'Filter by runes' });
     expect(runeList).toHaveClass('grid-cols-2', 'overflow-y-auto');
   });
 
@@ -77,7 +77,7 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     renderRuneFilters([]);
 
     // Assert
-    const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
+    const runeList = screen.getByRole('group', { name: 'Filter by runes' });
     expect(within(runeList).getAllByRole('checkbox')).toHaveLength(runes.length);
     expect(within(runeList).getByLabelText(/^Zod/)).toBeInTheDocument();
     expect(within(runeList).getByLabelText(/^Cham/)).toBeInTheDocument();

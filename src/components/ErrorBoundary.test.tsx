@@ -70,10 +70,10 @@ describe('When a component outside the router throws', () => {
     // Assert
     expect(screen.getByRole('heading', { name: 'Something went wrong' })).toHaveFocus();
     expect(screen.getByText('Error: Child exploded')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try to Recover' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reload Application' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy Error Details' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Report Issue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try to recover' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload application' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy error details' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
   });
 
   it('If the user copies the error details, Then the component stack is included', async () => {
@@ -81,14 +81,14 @@ describe('When a component outside the router throws', () => {
     renderBoundary();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Error Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
 
     // Assert
     expect(await screen.findByText('Error details copied to clipboard')).toBeInTheDocument();
     const report = mockClipboard.writeText.mock.calls[0][0] as string;
-    expect(report).toContain('App Version: 4.5.6');
-    expect(report).toContain('Error Message: Error: Child exploded');
-    expect(report).toContain('Component Stack:');
+    expect(report).toContain('App version: 4.5.6');
+    expect(report).toContain('Error message: Error: Child exploded');
+    expect(report).toContain('Component stack:');
     expect(report).toContain('BrokenChild');
   });
 
@@ -97,7 +97,7 @@ describe('When a component outside the router throws', () => {
     renderBoundary();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
     // Assert
     await waitFor(() =>
@@ -111,7 +111,7 @@ describe('When a component outside the router throws', () => {
     renderBoundary();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
     // Assert
     expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('When a component outside the router throws', () => {
     renderBoundary();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
     // Assert
     expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('When a component outside the router throws', () => {
     renderBoundary();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
     // Assert
     expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
@@ -147,7 +147,7 @@ describe('When a component outside the router throws', () => {
     shouldThrow = false;
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Try to Recover' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try to recover' }));
 
     // Assert
     expect(screen.getByText('Child recovered')).toBeInTheDocument();

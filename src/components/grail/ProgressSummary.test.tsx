@@ -83,8 +83,8 @@ describe('When ProgressSummary is rendered', () => {
       expect(screen.getByRole('region', { name: 'Grail progress' })).toBeInTheDocument();
       expect(screen.getByText('19.5%')).toBeInTheDocument();
       expect(screen.getByText('190 of 975 found')).toBeInTheDocument();
-      expect(screen.queryByText('Normal Items')).not.toBeInTheDocument();
-      expect(screen.queryByText('Ethereal Items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Normal items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Ethereal items')).not.toBeInTheDocument();
     });
   });
 
@@ -223,8 +223,8 @@ describe('When ProgressSummary is rendered', () => {
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown />);
 
       // Assert
-      expect(screen.getByText('Normal Items')).toBeInTheDocument();
-      expect(screen.getByText('Ethereal Items')).toBeInTheDocument();
+      expect(screen.getByText('Normal items')).toBeInTheDocument();
+      expect(screen.getByText('Ethereal items')).toBeInTheDocument();
       expect(screen.getByText('184/628')).toBeInTheDocument();
       expect(screen.getByText('6/347')).toBeInTheDocument();
       expect(screen.getByText('19.5%')).toBeInTheDocument();
@@ -256,8 +256,8 @@ describe('When ProgressSummary is rendered', () => {
       render(<ProgressSummary statistics={noEtherealStatistics} showEtherealBreakdown />);
 
       // Assert
-      expect(screen.queryByText('Normal Items')).not.toBeInTheDocument();
-      expect(screen.queryByText('Ethereal Items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Normal items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Ethereal items')).not.toBeInTheDocument();
     });
   });
 

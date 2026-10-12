@@ -24,13 +24,13 @@ function setupGrailStore(settings: Partial<Settings>) {
 
 /** Opens the conversion warning dialog and confirms it, then waits for the conversion to end. */
 async function startConversion() {
-  const convertButton = await screen.findByRole('button', { name: 'Convert Sprite Files to PNG' });
+  const convertButton = await screen.findByRole('button', { name: 'Convert sprite files to PNG' });
   await waitFor(() => expect(convertButton).toBeEnabled());
   fireEvent.click(convertButton);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start Conversion' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Start conversion' }));
   await waitFor(() => expect(convertSprites).toHaveBeenCalledTimes(1));
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Convert Sprite Files to PNG' })).toBeEnabled(),
+    expect(screen.getByRole('button', { name: 'Convert sprite files to PNG' })).toBeEnabled(),
   );
 }
 

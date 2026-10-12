@@ -160,7 +160,7 @@ export function SetupWizard() {
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
   // Steps that require validation stay blocked until they report themselves valid.
-  // Skipping the whole setup remains available through the Skip Setup button.
+  // Skipping the whole setup remains available through the Skip setup button.
   const canProceed = useMemo(() => {
     if (!step?.requiresValidation) {
       return true;

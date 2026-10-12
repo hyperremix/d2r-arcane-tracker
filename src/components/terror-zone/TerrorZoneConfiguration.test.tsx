@@ -90,9 +90,9 @@ function expectZoneControlsHidden() {
   expect(screen.queryByText(/modifies game files/)).not.toBeInTheDocument();
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   expect(screen.queryByText(/zones enabled/)).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Enable All' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Disable All' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Restore Original' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Enable all' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Disable all' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Restore original' })).not.toBeInTheDocument();
 }
 
 describe('When TerrorZoneConfiguration validates the game installation', () => {
@@ -116,12 +116,12 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(
         await screen.findByText('desecratedzones.json file not found in D2R installation'),
       ).toBeInTheDocument();
-      expect(screen.getByText('Game Files Must Be Extracted')).toBeInTheDocument();
+      expect(screen.getByText('Game files must be extracted')).toBeInTheDocument();
       expect(screen.getByText("Ladik's CASC Viewer")).toBeInTheDocument();
       expect(screen.getByText('Always launch D2R using this shortcut')).toBeInTheDocument();
       expect(screen.queryByText('Spieldatei fehlt')).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Open D2R Installation settings' }),
+        screen.queryByRole('button', { name: 'Open D2R installation settings' }),
       ).not.toBeInTheDocument();
     });
   });
@@ -142,9 +142,9 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(
         await screen.findByText('D2R installation directory does not exist'),
       ).toBeInTheDocument();
-      expect(screen.queryByText('Game Files Must Be Extracted')).not.toBeInTheDocument();
+      expect(screen.queryByText('Game files must be extracted')).not.toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: 'Open D2R Installation settings' }),
+        screen.getByRole('button', { name: 'Open D2R installation settings' }),
       ).toBeInTheDocument();
     });
   });
@@ -203,12 +203,12 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(within(emptyState).getAllByRole('button')).toHaveLength(1);
     });
 
-    it('Then the empty state button opens the D2R Installation settings', async () => {
+    it('Then the empty state button opens the D2R installation settings', async () => {
       // Arrange
       setupTerrorZoneApi({ valid: false, errorCode: 'pathNotConfigured' });
       renderTerrorZoneConfiguration();
       const openSettings = await screen.findByRole('button', {
-        name: 'Open D2R Installation settings',
+        name: 'Open D2R installation settings',
       });
 
       // Act
@@ -229,7 +229,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       await screen.findByTestId('terror-zone-not-configured');
       expectZoneControlsHidden();
       expect(screen.queryByText('Error')).not.toBeInTheDocument();
-      expect(screen.queryByText('Game Files Must Be Extracted')).not.toBeInTheDocument();
+      expect(screen.queryByText('Game files must be extracted')).not.toBeInTheDocument();
     });
   });
 
@@ -419,7 +419,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Enable All' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Enable all' }));
 
       // Assert
       expect(await screen.findByText('Failed to enable all zones')).toBeInTheDocument();
@@ -432,11 +432,11 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockRejectedValue(new Error('boom')) });
       renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
-      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Disable all' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all' }));
 
       // Assert
       expect(await screen.findByText('Failed to disable all zones')).toBeInTheDocument();
@@ -450,11 +450,11 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       setupValidTerrorZoneApi({ restoreOriginal: vi.fn().mockResolvedValue({ success: false }) });
       renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore original' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore original' }));
 
       // Assert
       await waitFor(() =>
@@ -474,11 +474,11 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       const terrorZone = setupValidTerrorZoneApi({ getZones });
       renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore original' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore original' }));
 
       // Assert
       expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
@@ -497,11 +497,11 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       renderTerrorZoneConfiguration();
       fireEvent.click(await screen.findByRole('switch', { name: 'Cold Plains' }));
       await screen.findByText('Failed to update terror zone configuration');
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore original' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore original' }));
 
       // Assert
       await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
@@ -712,15 +712,15 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       expect(updateConfig).toHaveBeenCalledTimes(2);
     });
 
-    it('Then Enable All, Disable All and Restore Original are disabled until the write finishes', async () => {
+    it('Then Enable all, Disable all and Restore original are disabled until the write finishes', async () => {
       // Arrange
       const write = createDeferred<typeof saveSuccess>();
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
       renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
-      const enableAll = screen.getByRole('button', { name: 'Enable All' });
-      const disableAll = screen.getByRole('button', { name: 'Disable All' });
-      const restoreOriginal = screen.getByRole('button', { name: 'Restore Original' });
+      const enableAll = screen.getByRole('button', { name: 'Enable all' });
+      const disableAll = screen.getByRole('button', { name: 'Disable all' });
+      const restoreOriginal = screen.getByRole('button', { name: 'Restore original' });
       expect(enableAll).toBeEnabled();
 
       // Act
@@ -743,9 +743,9 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
       renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
-      const enableAll = screen.getByRole('button', { name: 'Enable All' });
-      const disableAll = screen.getByRole('button', { name: 'Disable All' });
-      const restoreOriginal = screen.getByRole('button', { name: 'Restore Original' });
+      const enableAll = screen.getByRole('button', { name: 'Enable all' });
+      const disableAll = screen.getByRole('button', { name: 'Disable all' });
+      const restoreOriginal = screen.getByRole('button', { name: 'Restore original' });
 
       // Act
       fireEvent.click(enableAll);
@@ -841,7 +841,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
     vi.restoreAllMocks();
   });
 
-  describe('If Disable All is clicked', () => {
+  describe('If Disable all is clicked', () => {
     it('Then a confirmation dialog is shown and nothing is written yet', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi();
@@ -849,7 +849,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Disable all' }));
 
       // Assert
       const dialog = await screen.findByRole('alertdialog');
@@ -864,7 +864,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
       const terrorZone = setupValidTerrorZoneApi();
       renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
-      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Disable all' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -883,11 +883,11 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
       const terrorZone = setupValidTerrorZoneApi();
       renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
-      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Disable all' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all' }));
 
       // Assert
       await waitFor(() =>
@@ -1180,14 +1180,14 @@ describe('When TerrorZoneConfiguration shows the restart reminder', () => {
     expect(screen.queryByText(restartReminder)).not.toBeInTheDocument();
   });
 
-  it('If Enable All is saved, Then the reminder is shown', async () => {
+  it('If Enable all is saved, Then the reminder is shown', async () => {
     // Arrange
     setupValidTerrorZoneApi();
     renderTerrorZoneConfiguration();
     await screen.findByRole('switch', { name: 'Blood Moor' });
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Enable All' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enable all' }));
 
     // Assert
     expect(await screen.findByText(restartReminder)).toBeInTheDocument();
@@ -1198,11 +1198,11 @@ describe('When TerrorZoneConfiguration shows the restart reminder', () => {
     setupValidTerrorZoneApi();
     renderTerrorZoneConfiguration();
     await screen.findByRole('switch', { name: 'Blood Moor' });
-    fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore original' }));
     const dialog = await screen.findByRole('alertdialog');
 
     // Act
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore original' }));
 
     // Assert
     expect(await screen.findByText(restartReminder)).toBeInTheDocument();

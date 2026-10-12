@@ -99,7 +99,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     const notice = await screen.findByRole('status');
     expect(notice).toHaveTextContent(NOT_SAVED_NOTICE);
     expect(notice).toHaveTextContent('Select Browse to choose your Diablo II: Resurrected folder');
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     expect(input).toHaveValue('');
     expect(input).not.toHaveAttribute('placeholder');
     expect(screen.queryByText(MAC_DEFAULT_PATH)).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     expect(notice).toHaveTextContent(WINDOWS_DEFAULT_PATH);
     expect(notice).toHaveTextContent('Or select Browse to choose a different folder.');
     expect(screen.getByRole('button', { name: 'Use this folder' })).toBeInTheDocument();
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     expect(input).toHaveValue('');
     expect(input).not.toHaveAttribute('placeholder');
   });
@@ -138,7 +138,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     expect(await screen.findByRole('button', { name: 'Use this folder' })).toBeInTheDocument();
     expect(screen.getByText(MAC_DEFAULT_PATH)).toBeInTheDocument();
     expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
-    expect(screen.getByLabelText('Installation Path')).toHaveValue('');
+    expect(screen.getByLabelText('Installation path')).toHaveValue('');
     expect(api.icon.getD2RPath).not.toHaveBeenCalled();
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
   });
@@ -155,7 +155,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     // Assert
     await waitFor(() => expect(api.icon.setD2RPath).toHaveBeenCalledWith(MAC_DEFAULT_PATH));
     await waitFor(() => expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument());
-    expect(screen.getByLabelText('Installation Path')).toHaveValue(MAC_DEFAULT_PATH);
+    expect(screen.getByLabelText('Installation path')).toHaveValue(MAC_DEFAULT_PATH);
   });
 
   it('If the user is typing, Then nothing is saved and the notice does not flash', async () => {
@@ -267,7 +267,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
     // Assert
     expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
-    expect(screen.getByLabelText('Installation Path')).toHaveValue('');
+    expect(screen.getByLabelText('Installation path')).toHaveValue('');
     expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
   });
 
@@ -275,7 +275,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     // Arrange
     arrangeElectronAPI({ setD2RPath: vi.fn().mockRejectedValue(new Error('disk full')) });
     render(<D2RInstallationSettings />);
-    const input = await screen.findByLabelText('Installation Path');
+    const input = await screen.findByLabelText('Installation path');
     await screen.findByText(NOT_SAVED_NOTICE);
     fireEvent.change(input, { target: { value: '/games/other' } });
 
@@ -396,7 +396,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     const firstSave = createDeferred();
     arrangeElectronAPI({ setD2RPath: vi.fn().mockReturnValueOnce(firstSave.promise) });
     render(<D2RInstallationSettings />);
-    const input = await screen.findByLabelText('Installation Path');
+    const input = await screen.findByLabelText('Installation path');
     await screen.findByText(NOT_SAVED_NOTICE);
     fireEvent.change(input, { target: { value: '/games/first' } });
     fireEvent.blur(input);
@@ -478,7 +478,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     await waitFor(() =>
       expect(console.error).toHaveBeenCalledWith('Failed to load D2R path:', expect.any(Error)),
     );
-    const input = screen.getByLabelText('Installation Path');
+    const input = screen.getByLabelText('Installation path');
     expect(input).toHaveValue('');
     expect(input).not.toHaveAttribute('placeholder');
     expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument();
@@ -515,7 +515,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
       // Assert
       await waitFor(() => expect(api.icon.setD2RPath).toHaveBeenCalledWith('/games/new'));
-      expect(screen.getByLabelText('Installation Path')).toHaveValue('/games/new');
+      expect(screen.getByLabelText('Installation path')).toHaveValue('/games/new');
     });
 
     it('If the dialog is cancelled, Then nothing is saved', async () => {
@@ -547,7 +547,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
-      expect(screen.getByLabelText('Installation Path')).toHaveValue('/games/d2r');
+      expect(screen.getByLabelText('Installation path')).toHaveValue('/games/d2r');
     });
 
     it('If a path is saved, Then the dialog starts in the saved path', async () => {
@@ -615,7 +615,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
-      expect(screen.getByLabelText('Installation Path')).toHaveValue('');
+      expect(screen.getByLabelText('Installation path')).toHaveValue('');
       expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
     });
 

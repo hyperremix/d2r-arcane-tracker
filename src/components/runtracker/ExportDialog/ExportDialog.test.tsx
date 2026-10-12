@@ -98,10 +98,10 @@ describe('When using the session export dialog', () => {
     renderDialog();
 
     // Act
-    const formatSelect = await screen.findByRole('combobox', { name: 'Export Format' });
+    const formatSelect = await screen.findByRole('combobox', { name: 'Export format' });
 
     // Assert
-    expect(formatSelect).toHaveTextContent('CSV (Spreadsheet)');
+    expect(formatSelect).toHaveTextContent('CSV (spreadsheet)');
     expect(formatSelect).not.toHaveTextContent(/^csv$/);
   });
 
@@ -113,7 +113,7 @@ describe('When using the session export dialog', () => {
     });
     mockElectronAPI.dialog.writeFile.mockResolvedValue({ success: true });
     const { onOpenChange } = renderDialog();
-    const saveButton = await waitForExportReady(/Save to File/i);
+    const saveButton = await waitForExportReady(/Save to file/i);
 
     // Act
     fireEvent.click(saveButton);
@@ -137,7 +137,7 @@ describe('When using the session export dialog', () => {
     });
     mockElectronAPI.dialog.writeFile.mockRejectedValue(new Error('EACCES: permission denied'));
     const { onOpenChange } = renderDialog();
-    const saveButton = await waitForExportReady(/Save to File/i);
+    const saveButton = await waitForExportReady(/Save to file/i);
 
     // Act
     fireEvent.click(saveButton);
@@ -147,9 +147,9 @@ describe('When using the session export dialog', () => {
     expect(alert).toHaveTextContent('Failed to save file');
     expect(alert).toHaveTextContent('EACCES: permission denied');
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
-    expect(screen.getByText('Export Format')).toBeInTheDocument();
+    expect(screen.getByText('Export format')).toBeInTheDocument();
     expect(screen.getByText('Include items found during runs')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Save to File/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Save to file/i })).toBeEnabled();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
@@ -157,7 +157,7 @@ describe('When using the session export dialog', () => {
     // Arrange
     mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({ canceled: true });
     const { onOpenChange } = renderDialog();
-    const saveButton = await waitForExportReady(/Save to File/i);
+    const saveButton = await waitForExportReady(/Save to file/i);
 
     // Act
     fireEvent.click(saveButton);
@@ -173,7 +173,7 @@ describe('When using the session export dialog', () => {
     // Arrange
     mockClipboard.writeText.mockResolvedValue(undefined);
     renderDialog();
-    const copyButton = await waitForExportReady(/Copy to Clipboard/i);
+    const copyButton = await waitForExportReady(/Copy to clipboard/i);
 
     // Act
     fireEvent.click(copyButton);
@@ -187,7 +187,7 @@ describe('When using the session export dialog', () => {
     // Arrange
     mockClipboard.writeText.mockRejectedValue(new Error('Clipboard unavailable'));
     renderDialog();
-    const copyButton = await waitForExportReady(/Copy to Clipboard/i);
+    const copyButton = await waitForExportReady(/Copy to clipboard/i);
 
     // Act
     fireEvent.click(copyButton);
@@ -195,7 +195,7 @@ describe('When using the session export dialog', () => {
     // Assert
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Failed to copy to clipboard');
-    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copy to clipboard/i })).toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
@@ -210,13 +210,13 @@ describe('When using the session export dialog', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Failed to load session data');
     expect(alert).toHaveTextContent('DB locked');
-    expect(screen.getByText('Export Format')).toBeInTheDocument();
+    expect(screen.getByText('Export format')).toBeInTheDocument();
   });
 
   it('If a reload fails after a successful load, Then export actions are disabled and the error is shown', async () => {
     // Arrange
     renderDialog();
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
     mockElectronAPI.runTracker.getSessionById.mockRejectedValue(new Error('DB locked'));
 
     // Act
@@ -225,15 +225,15 @@ describe('When using the session export dialog', () => {
     // Assert
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Failed to load session data');
-    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Save to file/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to clipboard/i })).toBeDisabled();
     expect(mockElectronAPI.dialog.showSaveDialog).not.toHaveBeenCalled();
   });
 
   it('If loading the items fails after the session and runs loaded, Then export actions stay disabled and the form is kept', async () => {
     // Arrange
     renderDialog();
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
     mockElectronAPI.runTracker.getSessionItems.mockRejectedValue(new Error('Items unavailable'));
 
     // Act
@@ -243,22 +243,22 @@ describe('When using the session export dialog', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Failed to load session data');
     expect(alert).toHaveTextContent('Items unavailable');
-    expect(screen.getByText('Export Format')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+    expect(screen.getByText('Export format')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save to file/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to clipboard/i })).toBeDisabled();
   });
 
   it('If the include items option is toggled, Then the session data is reloaded exactly once', async () => {
     // Arrange
     renderDialog();
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
     expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalledTimes(1);
 
     // Act
     fireEvent.click(screen.getByLabelText(/Include items found during runs/i));
 
     // Assert
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
     expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalledTimes(2);
     expect(mockElectronAPI.runTracker.getSessionItems).toHaveBeenCalledTimes(1);
   });
@@ -269,16 +269,16 @@ describe('When using the session export dialog', () => {
     const { rerender } = render(
       <ExportDialog sessionId="session-12345678" open onOpenChange={onOpenChange} />,
     );
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
 
     // Act
     rerender(<ExportDialog sessionId="" open onOpenChange={onOpenChange} />);
 
     // Assert
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /Save to file/i })).toBeDisabled(),
     );
-    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to clipboard/i })).toBeDisabled();
   });
 
   it('If the session id becomes empty while a load is in flight, Then the late result is ignored', async () => {
@@ -301,8 +301,8 @@ describe('When using the session export dialog', () => {
 
     // Assert
     await waitFor(() => expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Save to file/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to clipboard/i })).toBeDisabled();
   });
 
   it('If generating the export fails and the format is then changed successfully, Then the generation error is cleared', async () => {
@@ -316,14 +316,14 @@ describe('When using the session export dialog', () => {
     expect(alert).toHaveTextContent('Formatter exploded');
 
     // Act
-    fireEvent.click(screen.getByRole('combobox', { name: /Export Format/i }));
+    fireEvent.click(screen.getByRole('combobox', { name: /Export format/i }));
     const option = await screen.findByRole('option', { name: /JSON/i });
     fireEvent.mouseMove(option);
     fireEvent.click(option);
 
     // Assert
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Save to File/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Save to file/i })).toBeEnabled();
   });
 
   it.each([
@@ -340,7 +340,7 @@ describe('When using the session export dialog', () => {
 
     // Act
     renderDialog();
-    await waitForExportReady(/Save to File/i);
+    await waitForExportReady(/Save to file/i);
 
     // Assert
     expect(screen.getByText(new RegExp(expected.replace('.', '\\.')))).toBeInTheDocument();

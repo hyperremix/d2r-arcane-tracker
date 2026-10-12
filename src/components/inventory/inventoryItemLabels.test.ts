@@ -28,7 +28,7 @@ describe('When an inventory tile label is built', () => {
     const label = formatInventoryTileLabel(item, t);
 
     // Assert
-    expect(label).toBe('Shako, Unique, Stash Tab 2');
+    expect(label).toBe('Shako, Unique, Stash tab 2');
   });
 
   it('If the item is equipped, Then the label names the equipped location', () => {

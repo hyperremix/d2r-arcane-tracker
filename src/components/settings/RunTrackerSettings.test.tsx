@@ -47,7 +47,7 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
     // Assert (the thumb input stays visibility:hidden in jsdom until measured, which blanks its
     // computed role name, so verify the label association via getAllByLabelText instead)
     const slider = screen.getByRole('slider', { hidden: true });
-    expect(screen.getAllByLabelText('Memory Polling Interval')).toContain(slider);
+    expect(screen.getAllByLabelText('Memory polling interval')).toContain(slider);
   });
 
   it('Then the shortcut fields show the stored shortcuts with Ctrl', () => {
@@ -55,8 +55,8 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
     render(<RunTrackerSettings />);
 
     // Assert
-    expect(screen.getByLabelText('Start Run:')).toHaveValue('Ctrl+R');
-    expect(screen.getByLabelText('End Session:')).toHaveValue('Ctrl+Shift+E');
+    expect(screen.getByLabelText('Start run:')).toHaveValue('Ctrl+R');
+    expect(screen.getByLabelText('End session:')).toHaveValue('Ctrl+Shift+E');
   });
 
   it('Then the shortcut edit buttons use translated text', () => {
@@ -122,10 +122,10 @@ describe('When RunTrackerSettings renders the global hotkeys option', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'End Run: \u2318E is already used by another app or action. Choose a different shortcut.',
+        'End run: \u2318E is already used by another app or action. Choose a different shortcut.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/End Session: E can't be used globally/)).toBeInTheDocument();
+    expect(screen.getByText(/End session: E can't be used globally/)).toBeInTheDocument();
     expect(screen.queryByText(/Start Run: \u2318R/)).not.toBeInTheDocument();
   });
 
@@ -138,9 +138,9 @@ describe('When RunTrackerSettings renders the global hotkeys option', () => {
     render(<RunTrackerSettings />);
 
     // Assert
-    expect(screen.getByLabelText('Start Run:')).toHaveValue('\u2318R');
-    expect(screen.getByLabelText('Pause/Resume Run:')).toHaveValue('\u2318Space');
-    expect(screen.getByLabelText('End Session:')).toHaveValue('\u21E7\u2318E');
+    expect(screen.getByLabelText('Start run:')).toHaveValue('\u2318R');
+    expect(screen.getByLabelText('Pause/resume run:')).toHaveValue('\u2318Space');
+    expect(screen.getByLabelText('End session:')).toHaveValue('\u21E7\u2318E');
   });
 
   it('If an unsupported shortcut is reported on macOS, Then the hint names the Command and Option keys', async () => {

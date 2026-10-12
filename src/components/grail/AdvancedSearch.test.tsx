@@ -72,9 +72,9 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(screen.getByRole('group', { name: 'Status' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'View' })).toBeInTheDocument();
-      expect(screen.queryByLabelText('Sort By')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Group By')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Fuzzy Search' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Group by')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Fuzzy search' })).not.toBeInTheDocument();
     });
 
     it('Then does not show the clear all button, filter count or active filter chips', () => {
@@ -149,7 +149,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
         'true',
       );
       const chips = screen.getByRole('list', { name: 'Active filters' });
-      expect(within(chips).getByText('Fuzzy Search')).toBeInTheDocument();
+      expect(within(chips).getByText('Fuzzy search')).toBeInTheDocument();
     });
   });
 
@@ -206,10 +206,10 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       render(<AdvancedSearch />);
       openFiltersPopover();
-      const fuzzySwitch = await screen.findByRole('switch', { name: 'Fuzzy Search' });
+      const fuzzySwitch = await screen.findByRole('switch', { name: 'Fuzzy search' });
 
       // Act
-      fireEvent.click(screen.getByText('Fuzzy Search', { selector: 'label' }));
+      fireEvent.click(screen.getByText('Fuzzy search', { selector: 'label' }));
 
       // Assert
       expect(useGrailStore.getState().advancedFilter.fuzzySearch).toBe(true);
@@ -222,7 +222,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       render(<AdvancedSearch />);
       openFiltersPopover();
-      const fuzzySwitch = await screen.findByRole('switch', { name: 'Fuzzy Search' });
+      const fuzzySwitch = await screen.findByRole('switch', { name: 'Fuzzy search' });
 
       // Act
       fireEvent.click(fuzzySwitch);
@@ -234,7 +234,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
         'Also match abbreviations and small typos, such as "windfroce".',
       );
       const chips = screen.getByRole('list', { name: 'Active filters' });
-      expect(within(chips).getByText('Fuzzy Search')).toBeInTheDocument();
+      expect(within(chips).getByText('Fuzzy search')).toBeInTheDocument();
     });
   });
 
@@ -245,7 +245,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       render(<AdvancedSearch />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fuzzy Search' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fuzzy search' }));
 
       // Assert
       expect(useGrailStore.getState().advancedFilter.fuzzySearch).toBe(false);
@@ -284,7 +284,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       const weaponGroup = within(subCategories).getByRole('group', { name: 'Weapons' });
       expect(within(armorGroup).getByLabelText('Helms')).toBeInTheDocument();
       expect(within(armorGroup).getByLabelText('Barbarian')).toBeInTheDocument();
-      expect(within(weaponGroup).getByLabelText('1H Swords')).toBeInTheDocument();
+      expect(within(weaponGroup).getByLabelText('1H swords')).toBeInTheDocument();
       expect(within(subCategories).queryByRole('group', { name: 'Jewelry' })).toBeNull();
       expect(within(subCategories).queryByLabelText('Runewords')).toBeNull();
     });
@@ -303,7 +303,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       const labels = within(armorGroup)
         .getAllByRole('checkbox')
         .map((checkbox) => checkbox.parentElement?.textContent);
-      expect(labels).toEqual(['Body Armor', 'Helms', 'Barbarian']);
+      expect(labels).toEqual(['Body armor', 'Helms', 'Barbarian']);
     });
 
     it('Then toggling a category updates the store categories', async () => {
@@ -457,7 +457,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       const viewOptions = await openViewPopover();
 
       // Assert
-      const viewMode = within(viewOptions).getByRole('group', { name: 'View Mode' });
+      const viewMode = within(viewOptions).getByRole('group', { name: 'View mode' });
       expect(within(viewMode).getByRole('button', { name: 'Grid' })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -466,11 +466,11 @@ describe('When AdvancedSearch toolbar is rendered', () => {
         'aria-pressed',
         'false',
       );
-      expect(within(viewOptions).getByRole('combobox', { name: 'Sort By' })).toHaveTextContent(
-        'Found Date',
+      expect(within(viewOptions).getByRole('combobox', { name: 'Sort by' })).toHaveTextContent(
+        'Found date',
       );
-      expect(within(viewOptions).getByRole('combobox', { name: 'Group By' })).toHaveTextContent(
-        'No Grouping',
+      expect(within(viewOptions).getByRole('combobox', { name: 'Group by' })).toHaveTextContent(
+        'No grouping',
       );
       const sortOrder = within(viewOptions).getByRole('group', { name: 'Sort order' });
       expect(within(sortOrder).getByRole('button', { name: 'Descending' })).toHaveAttribute(
@@ -485,11 +485,11 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       const viewOptions = await openViewPopover();
 
       // Act
-      fireEvent.click(within(viewOptions).getByRole('combobox', { name: 'Group By' }));
+      fireEvent.click(within(viewOptions).getByRole('combobox', { name: 'Group by' }));
 
       // Assert
-      expect(await screen.findByRole('option', { name: 'By Type' })).toBeInTheDocument();
-      expect(screen.queryByRole('option', { name: 'By Ethereal' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('option', { name: 'By type' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'By ethereal' })).not.toBeInTheDocument();
     });
 
     it('Then shows grouping by category if the grouping was not changed in this session', async () => {
@@ -501,8 +501,8 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       const viewOptions = await openViewPopover();
 
       // Assert
-      expect(within(viewOptions).getByRole('combobox', { name: 'Group By' })).toHaveTextContent(
-        'By Category',
+      expect(within(viewOptions).getByRole('combobox', { name: 'Group by' })).toHaveTextContent(
+        'By category',
       );
     });
   });
@@ -512,7 +512,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       render(<AdvancedSearch />);
       const viewOptions = await openViewPopover();
-      const sortSelect = within(viewOptions).getByRole('combobox', { name: 'Sort By' });
+      const sortSelect = within(viewOptions).getByRole('combobox', { name: 'Sort by' });
 
       // Act
       fireEvent.click(sortSelect);
@@ -533,17 +533,17 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       resetStore({ grailEthereal: true });
       render(<AdvancedSearch />);
       const viewOptions = await openViewPopover();
-      const groupSelect = within(viewOptions).getByRole('combobox', { name: 'Group By' });
+      const groupSelect = within(viewOptions).getByRole('combobox', { name: 'Group by' });
 
       // Act
       fireEvent.click(groupSelect);
-      const option = await screen.findByRole('option', { name: 'By Ethereal' });
+      const option = await screen.findByRole('option', { name: 'By ethereal' });
       fireEvent.mouseMove(option);
       fireEvent.click(option);
 
       // Assert
       await waitFor(() => expect(useGrailStore.getState().groupMode).toBe('ethereal'));
-      await waitFor(() => expect(groupSelect).toHaveTextContent('By Ethereal'));
+      await waitFor(() => expect(groupSelect).toHaveTextContent('By ethereal'));
     });
   });
 

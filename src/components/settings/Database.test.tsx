@@ -77,7 +77,7 @@ describe('When managing database backups', () => {
     render(<DatabaseCard />);
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Backup database' }));
 
     // Assert
     expect(await screen.findByText('Last backup: holy-grail-backup.db')).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe('When managing database backups', () => {
     render(<DatabaseCard />);
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Backup database' }));
 
     // Assert
     await waitFor(() =>
@@ -122,7 +122,7 @@ describe('When managing database backups', () => {
     render(<DatabaseCard />);
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Backup database' }));
 
     // Assert
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to back up database'));
@@ -151,7 +151,7 @@ describe('When managing database backups', () => {
     expect(mockElectronAPI.grail.restore).not.toHaveBeenCalled();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Restore Database' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore database' }));
 
     // Assert
     await waitFor(() =>
@@ -197,9 +197,9 @@ describe('When managing database backups', () => {
 
     // Assert
     await waitFor(() => expect(mockElectronAPI.grail.backup).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('button', { name: 'Restore Database' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Restore database' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    const inFlightButtons = screen.getAllByRole('button', { name: 'Creating Backup...' });
+    const inFlightButtons = screen.getAllByRole('button', { name: 'Creating backup...' });
     expect(inFlightButtons.length).toBeGreaterThan(0);
     for (const button of inFlightButtons) {
       expect(button).toBeDisabled();
@@ -209,7 +209,7 @@ describe('When managing database backups', () => {
     finishBackup({ success: true });
 
     // Assert
-    expect(await screen.findByRole('button', { name: 'Restore Database' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Restore database' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Back up first' })).toBeEnabled();
   });
@@ -259,7 +259,7 @@ describe('When managing database backups', () => {
     await openRestoreConfirmation();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Restore Database' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore database' }));
 
     // Assert
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to restore database');

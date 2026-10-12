@@ -116,8 +116,8 @@ describe('When RunList is rendered', () => {
 
       // Assert
       expect(screen.getByText('Run #')).toBeInTheDocument();
-      expect(screen.getByText('Start Time')).toBeInTheDocument();
-      expect(screen.getByText('End Time')).toBeInTheDocument();
+      expect(screen.getByText('Start time')).toBeInTheDocument();
+      expect(screen.getByText('End time')).toBeInTheDocument();
       expect(screen.getByText('Duration')).toBeInTheDocument();
       expect(screen.getByText('Items')).toBeInTheDocument();
     });
@@ -151,7 +151,7 @@ describe('When RunList is rendered', () => {
       render(<RunList runs={runs} />);
 
       // Assert
-      expect(screen.getByText('Run History')).toBeInTheDocument();
+      expect(screen.getByText('Run history')).toBeInTheDocument();
     });
 
     it('Then renders runs count badge', () => {
@@ -240,8 +240,8 @@ describe('When RunList is rendered', () => {
       const runs = createRuns(3);
       render(<RunList runs={runs} />);
 
-      // Act — click Start Time header (default sort is desc on startTime)
-      fireEvent.click(screen.getByText('Start Time'));
+      // Act — click Start time header (default sort is desc on startTime)
+      fireEvent.click(screen.getByText('Start time'));
 
       // Assert — first run should be at the top (ascending order)
       const rows = screen.getAllByText(/#\d+/);
@@ -256,8 +256,8 @@ describe('When RunList is rendered', () => {
       render(<RunList runs={runs} />);
 
       // Act — click twice to go asc then desc
-      fireEvent.click(screen.getByText('Start Time'));
-      fireEvent.click(screen.getByText('Start Time'));
+      fireEvent.click(screen.getByText('Start time'));
+      fireEvent.click(screen.getByText('Start time'));
 
       // Assert — should be back to descending
       const rows = screen.getAllByText(/#\d+/);
@@ -289,7 +289,7 @@ describe('When RunList is rendered', () => {
       render(<RunList runs={runs} />);
 
       // Assert
-      expect(screen.getByRole('columnheader', { name: 'Start Time' })).toHaveAttribute(
+      expect(screen.getByRole('columnheader', { name: 'Start time' })).toHaveAttribute(
         'aria-sort',
         'descending',
       );
@@ -297,7 +297,7 @@ describe('When RunList is rendered', () => {
         'aria-sort',
         'none',
       );
-      expect(screen.getByRole('columnheader', { name: 'End Time' })).not.toHaveAttribute(
+      expect(screen.getByRole('columnheader', { name: 'End time' })).not.toHaveAttribute(
         'aria-sort',
       );
     });
@@ -313,7 +313,7 @@ describe('When RunList is rendered', () => {
 
       // Assert
       expect(durationHeader).toHaveAttribute('aria-sort', 'ascending');
-      expect(screen.getByRole('columnheader', { name: 'Start Time' })).toHaveAttribute(
+      expect(screen.getByRole('columnheader', { name: 'Start time' })).toHaveAttribute(
         'aria-sort',
         'none',
       );

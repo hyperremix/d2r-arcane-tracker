@@ -24,10 +24,10 @@ describe('When the finds per week chart is rendered', () => {
     render(<WeeklyFindsChart weeks={buildWeeks([0, 0, 0])} />);
 
     // Assert
-    expect(screen.getByRole('heading', { level: 2, name: 'Finds per Week' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Finds per week' })).toBeInTheDocument();
     expect(
       screen
-        .getByRole('heading', { level: 2, name: 'Finds per Week' })
+        .getByRole('heading', { level: 2, name: 'Finds per week' })
         .closest('[data-slot="card"]'),
     ).toHaveAttribute('data-chart-state', 'empty');
     expect(screen.getByText('No finds in the last 3 weeks')).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('When the finds per week chart is rendered', () => {
     renderChart([2, 0, 1_500]);
 
     // Assert
-    const table = screen.getByRole('table', { name: 'Finds per Week' });
+    const table = screen.getByRole('table', { name: 'Finds per week' });
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(4);
     expect(rows[1]).toHaveTextContent('Oct 4, 2026 – Oct 10, 2026');

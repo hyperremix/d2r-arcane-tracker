@@ -29,7 +29,7 @@ function getStatusClasses(kind: StatusKind): string {
 }
 
 /**
- * "Found" / "Found (not tracked)" / "Not Found" text with a matching icon. Color, icon and text
+ * "Found" / "Found (not tracked)" / "Not found" text with a matching icon. Color, icon and text
  * all carry the state, so it doesn't rely on hue alone.
  */
 function StatusText({ kind }: { kind: StatusKind }) {
@@ -52,7 +52,7 @@ function StatusText({ kind }: { kind: StatusKind }) {
 /**
  * The item's found status under its name. Each tracked version shows whether it was found; a
  * version that isn't tracked only shows up when it was found anyway, labelled as not tracked, so
- * a find never reads as "Not Found" and never counts as found. With one version to show, a single
+ * a find never reads as "Not found" and never counts as found. With one version to show, a single
  * status line is shown; with both, the normal and the ethereal status sit side by side.
  */
 export function ProgressStatusSection({

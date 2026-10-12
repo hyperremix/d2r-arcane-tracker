@@ -80,7 +80,7 @@ describe('WidgetStep', () => {
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Show Run Item List'));
+      fireEvent.click(screen.getByLabelText('Show run item list'));
     });
 
     // Assert
@@ -100,7 +100,7 @@ describe('WidgetStep', () => {
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Show Run Item List'));
+      fireEvent.click(screen.getByLabelText('Show run item list'));
     });
 
     // Assert
@@ -118,7 +118,7 @@ describe('WidgetStep', () => {
     render(<WidgetStep />);
 
     // Assert
-    expect(screen.getByLabelText('Show Run Item List')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByLabelText('Show run item list')).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('When the enable switch is turned off, Then the setting is saved and the widget is closed', async () => {
@@ -127,7 +127,7 @@ describe('WidgetStep', () => {
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Enable Widget'));
+      fireEvent.click(screen.getByLabelText('Enable widget'));
     });
 
     // Assert

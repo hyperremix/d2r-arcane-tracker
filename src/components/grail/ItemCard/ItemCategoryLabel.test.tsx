@@ -4,9 +4,9 @@ import { ItemCategoryLabel } from './ItemCategoryLabel';
 
 describe('When ItemCategoryLabel is rendered', () => {
   it.each([
-    { category: 'weapons', subCategory: '2h_swords', expected: 'Weapons • Two-Handed Swords' },
-    { category: 'armor', subCategory: 'body_armor', expected: 'Armor • Body Armor' },
-    { category: 'charms', subCategory: 'small_charms', expected: 'Charms • Small Charms' },
+    { category: 'weapons', subCategory: '2h_swords', expected: 'Weapons • Two-handed swords' },
+    { category: 'armor', subCategory: 'body_armor', expected: 'Armor • Body armor' },
+    { category: 'charms', subCategory: 'small_charms', expected: 'Charms • Small charms' },
     { category: 'armor', subCategory: 'necromancer', expected: 'Armor • Necromancer' },
   ] as const)('If the item is $category / $subCategory, then it shows $expected', ({
     category,

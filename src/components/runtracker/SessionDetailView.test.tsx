@@ -68,7 +68,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Assert
@@ -88,7 +88,7 @@ describe('SessionDetailView', () => {
       // Arrange
       const onBack = vi.fn();
       render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -109,7 +109,7 @@ describe('SessionDetailView', () => {
       mockArchiveSession.mockResolvedValueOnce(false);
       const onBack = vi.fn();
       render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -146,7 +146,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
 
       // Assert
-      const button = screen.getByRole('button', { name: 'Archive Session' });
+      const button = screen.getByRole('button', { name: 'Archive session' });
       expect(button).toBeDisabled();
       expect(button).toHaveAttribute('title', 'End the current run before archiving the session');
     });
@@ -155,7 +155,7 @@ describe('SessionDetailView', () => {
       // Arrange
       const onBack = vi.fn();
       const { rerender } = render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Archive session' }));
       const dialog = await screen.findByRole('alertdialog');
       mockStoreState(
         mockUseRunTrackerStore,
@@ -188,7 +188,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Archive Session' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Archive session' })).toBeEnabled();
     });
   });
 
@@ -204,7 +204,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Archive Session' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Archive session' })).toBeDisabled();
     });
   });
 
@@ -240,11 +240,11 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Session Details')).toBeInTheDocument();
-      expect(screen.getByText('Session Information')).toBeInTheDocument();
+      expect(screen.getByText('Session details')).toBeInTheDocument();
+      expect(screen.getByText('Session information')).toBeInTheDocument();
       expect(screen.getByText('Archived')).toBeInTheDocument();
-      expect(screen.getByText('Session Duration')).toBeInTheDocument();
-      expect(screen.getByLabelText('Session Notes')).toHaveAttribute(
+      expect(screen.getByText('Session duration')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session notes')).toHaveAttribute(
         'placeholder',
         'Add notes about this session...',
       );
@@ -285,8 +285,8 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="missing" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Session Not Found')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Go Back' })).toBeInTheDocument();
+      expect(screen.getByText('Session not found')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
     });
   });
 
@@ -300,8 +300,8 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Session Information')).toBeInTheDocument();
-      expect(screen.queryByText('Session Not Found')).not.toBeInTheDocument();
+      expect(screen.getByText('Session information')).toBeInTheDocument();
+      expect(screen.queryByText('Session not found')).not.toBeInTheDocument();
     });
   });
 
@@ -311,7 +311,7 @@ describe('SessionDetailView', () => {
       const updateSessionNotes = vi.fn().mockResolvedValue(true);
       mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
-      const textarea = screen.getByLabelText('Session Notes');
+      const textarea = screen.getByLabelText('Session notes');
 
       // Act
       fireEvent.change(textarea, { target: { value: 'Cow runs' } });
@@ -329,7 +329,7 @@ describe('SessionDetailView', () => {
       const updateSessionNotes = vi.fn().mockResolvedValue(false);
       mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
-      const textarea = screen.getByLabelText('Session Notes');
+      const textarea = screen.getByLabelText('Session notes');
 
       // Act
       fireEvent.change(textarea, { target: { value: 'Cow runs' } });
@@ -352,7 +352,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByLabelText('Session Notes')).toHaveAttribute(
+      expect(screen.getByLabelText('Session notes')).toHaveAttribute(
         'maxlength',
         String(MAX_SESSION_NOTES_LENGTH),
       );
@@ -389,11 +389,11 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
 
       // Assert
-      const runCountStat = screen.getByText('Run Count').parentElement as HTMLElement;
+      const runCountStat = screen.getByText('Run count').parentElement as HTMLElement;
       expect(within(runCountStat).getByText('7')).toBeInTheDocument();
       expect(within(runCountStat).queryByText('3')).not.toBeInTheDocument();
       expect(screen.getByText('90.0%')).toBeInTheDocument();
-      expect(screen.getByLabelText('Session Notes')).toHaveValue('live notes');
+      expect(screen.getByLabelText('Session notes')).toHaveValue('live notes');
     });
   });
 
@@ -474,7 +474,7 @@ describe('SessionDetailView', () => {
       // Assert
       const efficiencyStat = screen.getByText('Efficiency').parentElement as HTMLElement;
       expect(within(efficiencyStat).getByText('12.5%')).toBeInTheDocument();
-      const durationStat = screen.getByText('Session Duration').parentElement as HTMLElement;
+      const durationStat = screen.getByText('Session duration').parentElement as HTMLElement;
       expect(within(durationStat).getByText('3m 20s')).toBeInTheDocument();
     });
   });
@@ -500,15 +500,15 @@ describe('SessionDetailView', () => {
       // Assert
       const labels = screen.getAllByRole('term').map((term) => term.textContent);
       expect(labels).toEqual([
-        'Items Found',
-        'New Grail Items',
-        'Run Count',
-        'Average Run Time',
-        'Fastest Run',
+        'Items found',
+        'New grail items',
+        'Run count',
+        'Average run time',
+        'Fastest run',
         'Efficiency',
-        'Start Time',
-        'End Time',
-        'Session Duration',
+        'Start time',
+        'End time',
+        'Session duration',
       ]);
     });
 
@@ -547,7 +547,7 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
 
       // Assert
-      const endTimeStat = screen.getByText('End Time').parentElement as HTMLElement;
+      const endTimeStat = screen.getByText('End time').parentElement as HTMLElement;
       expect(within(endTimeStat).getByText('In progress')).toBeInTheDocument();
     });
   });

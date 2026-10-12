@@ -40,4 +40,4 @@ On a clean Windows machine with D2R installed:
 - [ ] Run Tracker auto mode starts and ends runs on entering and leaving a game ([memory reading](MEMORY_READING.md)), and manual shortcuts work with auto mode off.
 - [ ] Session export saves CSV, JSON and text files, and copies to the clipboard.
 - [ ] Database backup and restore work.
-- [ ] Updating from the previous release works through **Settings → Application Updates**.
+- [ ] Updating from the previous release works through **Settings → Application updates**.

@@ -13,7 +13,7 @@ const filterSubCategoryKeys = translations.grail.advancedSearch.subCategory;
 
 /**
  * Translation keys for the short item sub-category labels used in the search filters
- * (e.g. "Helms", "1H Swords", "Amazon").
+ * (e.g. "Helms", "1H swords", "Amazon").
  */
 export const subCategoryLabelKeys: Record<ItemSubCategory, string> = {
   '1h_swords': filterSubCategoryKeys['1h_swords'],

@@ -34,9 +34,9 @@ describe('When NotificationSettings is rendered', () => {
     render(<NotificationSettings />);
 
     // Assert
-    expect(screen.getByLabelText('Sound Notifications')).toHaveAttribute('role', 'switch');
-    expect(screen.getByLabelText('In-App Notifications')).toHaveAttribute('role', 'switch');
-    expect(screen.getByLabelText('Native Notifications')).toHaveAttribute('role', 'switch');
+    expect(screen.getByLabelText('Sound notifications')).toHaveAttribute('role', 'switch');
+    expect(screen.getByLabelText('In-app notifications')).toHaveAttribute('role', 'switch');
+    expect(screen.getByLabelText('Native notifications')).toHaveAttribute('role', 'switch');
   });
 
   it('Then each switch is described by its description text', () => {
@@ -44,11 +44,11 @@ describe('When NotificationSettings is rendered', () => {
     render(<NotificationSettings />);
 
     // Assert
-    expect(screen.getByRole('switch', { name: 'Sound Notifications' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('switch', { name: 'Sound notifications' })).toHaveAccessibleDescription(
       'Play sound when items are found',
     );
     expect(
-      screen.getByRole('switch', { name: 'Native Notifications' }),
+      screen.getByRole('switch', { name: 'Native notifications' }),
     ).toHaveAccessibleDescription('Show browser/OS notifications');
   });
 

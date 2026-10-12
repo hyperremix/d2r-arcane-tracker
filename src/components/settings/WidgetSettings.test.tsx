@@ -108,7 +108,7 @@ describe('WidgetSettings', () => {
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Reset Size' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Reset size' }));
     });
 
     // Assert
@@ -212,7 +212,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await settle();
-      fireEvent.click(screen.getByRole('radio', { name: 'Run Only' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Run only' }));
       await settle();
       act(() => {
         useGrailStore.getState().hydrateSettings({ widgetDisplay: 'split' });
@@ -276,7 +276,7 @@ describe('WidgetSettings', () => {
       });
       render(<WidgetSettings />);
       await act(async () => {
-        fireEvent.click(screen.getByRole('switch', { name: 'Enable Widget' }));
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable widget' }));
       });
       const options = toastError.mock.calls[0]?.[1] as {
         action?: { onClick: (event: { preventDefault: () => void }) => void };
@@ -309,7 +309,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByRole('switch', { name: 'Enable Widget' }));
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable widget' }));
       });
 
       // Assert
@@ -345,8 +345,8 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Assert
-      expect(screen.getByLabelText('Enable Widget')).toHaveAttribute('role', 'switch');
-      expect(screen.getByLabelText('Show Run Item List')).toHaveAttribute('role', 'switch');
+      expect(screen.getByLabelText('Enable widget')).toHaveAttribute('role', 'switch');
+      expect(screen.getByLabelText('Show run item list')).toHaveAttribute('role', 'switch');
     });
 
     it('Then the opacity slider is labelled', () => {
@@ -364,12 +364,12 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Assert
-      const group = screen.getByRole('group', { name: 'Display Mode' });
+      const group = screen.getByRole('group', { name: 'Display mode' });
       expect(group).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Overall' })).toBeChecked();
       expect(screen.getByRole('radio', { name: 'Split' })).not.toBeChecked();
       expect(screen.getByRole('radio', { name: 'All' })).not.toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Run Only' })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Run only' })).not.toBeChecked();
     });
 
     it('Then the enable and run item list switches are described by their help text', () => {
@@ -377,11 +377,11 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Assert
-      expect(screen.getByLabelText('Enable Widget')).toHaveAccessibleDescription(
+      expect(screen.getByLabelText('Enable widget')).toHaveAccessibleDescription(
         'Show an overlay widget with grail progress',
       );
-      expect(screen.getByLabelText('Show Run Item List')).toHaveAccessibleDescription(
-        'In Run Only mode, show a compact text list of grail-relevant items found each run.',
+      expect(screen.getByLabelText('Show run item list')).toHaveAccessibleDescription(
+        'In "Run only" mode, show a compact text list of grail-relevant items found each run.',
       );
     });
 
@@ -390,7 +390,7 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Assert
-      expect(screen.getByRole('group', { name: 'Display Mode' })).toHaveAccessibleDescription(
+      expect(screen.getByRole('group', { name: 'Display mode' })).toHaveAccessibleDescription(
         /Overall: Total progress only/,
       );
     });
@@ -410,7 +410,7 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Act
-      fireEvent.click(screen.getByRole('radio', { name: 'Run Only' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Run only' }));
 
       // Assert
       expect(mockSetSettings).toHaveBeenCalledWith({ widgetDisplay: 'run-only' });
@@ -475,7 +475,7 @@ describe('WidgetSettings', () => {
       render(<WidgetSettings />);
 
       // Assert
-      const lockSwitch = screen.getByLabelText('Lock Widget (Click-Through)');
+      const lockSwitch = screen.getByLabelText('Lock widget (click-through)');
       expect(lockSwitch).toHaveAttribute('role', 'switch');
       expect(lockSwitch).toHaveAccessibleDescription(/Clicks pass through the widget to the game/);
     });
@@ -486,7 +486,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+        fireEvent.click(screen.getByLabelText('Lock widget (click-through)'));
       });
 
       // Assert
@@ -504,7 +504,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+        fireEvent.click(screen.getByLabelText('Lock widget (click-through)'));
       });
 
       // Assert
@@ -516,7 +516,7 @@ describe('WidgetSettings', () => {
       // Arrange
       render(<WidgetSettings />);
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+        fireEvent.click(screen.getByLabelText('Lock widget (click-through)'));
       });
       const options = mockSetSettings.mock.calls[0]?.[1] as { onSaved: () => Promise<void> };
       setLocked.mockClear();
@@ -538,7 +538,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+        fireEvent.click(screen.getByLabelText('Lock widget (click-through)'));
       });
 
       // Assert
@@ -547,7 +547,7 @@ describe('WidgetSettings', () => {
       expect(toastError).toHaveBeenCalledWith(
         'Could not change the widget lock. Please try again.',
       );
-      expect(screen.getByLabelText('Lock Widget (Click-Through)')).not.toBeChecked();
+      expect(screen.getByLabelText('Lock widget (click-through)')).not.toBeChecked();
       consoleError.mockRestore();
     });
 
@@ -559,7 +559,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+        fireEvent.click(screen.getByLabelText('Lock widget (click-through)'));
       });
 
       // Assert
@@ -576,7 +576,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Reset Size' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Reset size' }));
       });
 
       // Assert
@@ -592,7 +592,7 @@ describe('WidgetSettings', () => {
 
       // Act
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Show Run Item List'));
+        fireEvent.click(screen.getByLabelText('Show run item list'));
       });
 
       // Assert

@@ -243,18 +243,18 @@ describe('When SaveDirectoryStep is rendered', () => {
       await renderStep();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Use Default Directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Use default directory' }));
 
       // Assert
       const dialog = await screen.findByRole('alertdialog');
-      expect(within(dialog).getByText('Restore Default Directory')).toBeInTheDocument();
+      expect(within(dialog).getByText('Restore default directory')).toBeInTheDocument();
       expect(electronAPI.saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
     });
 
     it('Then confirming the restore applies the default and reloads grail data', async () => {
       // Arrange
       await renderStep();
-      fireEvent.click(screen.getByRole('button', { name: 'Use Default Directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Use default directory' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -278,7 +278,7 @@ describe('When SaveDirectoryStep is rendered', () => {
       await renderStep();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Use Default Directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Use default directory' }));
 
       // Assert
       await waitFor(() => expect(electronAPI.saveFile.restoreDefaultDirectory).toHaveBeenCalled());
@@ -352,7 +352,7 @@ describe('When SaveDirectoryStep is rendered', () => {
       electronAPI.saveFile.getDefaultDirectory.mockRejectedValue(new Error('no default'));
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Use Default Directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Use default directory' }));
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -413,7 +413,7 @@ describe('When SaveDirectoryStep is rendered', () => {
       // Assert
       await waitFor(() =>
         expect(electronAPI.dialog.showOpenDialog).toHaveBeenCalledWith({
-          title: 'Select Save File Directory',
+          title: 'Select save file directory',
           properties: ['openDirectory'],
         }),
       );
@@ -455,7 +455,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
 
     // Assert
     expect(await screen.findByText('No save directory detected')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Browse for Folder' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse for folder' })).toBeInTheDocument();
     expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(false);
   });
 
@@ -463,7 +463,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
     // Arrange
     electronAPI.saveFile.getSaveFiles.mockResolvedValueOnce([]).mockResolvedValue([SAVE_FILE]);
     render(<SaveDirectoryStep />);
-    const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
+    const browseButton = await screen.findByRole('button', { name: 'Browse for folder' });
 
     // Act
     await act(async () => {
@@ -490,7 +490,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
         }),
     );
     render(<SaveDirectoryStep />);
-    const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
+    const browseButton = await screen.findByRole('button', { name: 'Browse for folder' });
 
     // Act
     await act(async () => {
@@ -515,7 +515,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
     // Arrange
     electronAPI.saveFile.updateSaveDirectory.mockRejectedValue(new Error('monitor failed'));
     render(<SaveDirectoryStep />);
-    const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
+    const browseButton = await screen.findByRole('button', { name: 'Browse for folder' });
 
     // Act
     await act(async () => {
@@ -574,7 +574,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
   };
 
   const typePath = (value: string) => {
-    fireEvent.change(screen.getByLabelText('Save Directory Path'), { target: { value } });
+    fireEvent.change(screen.getByLabelText('Save directory path'), { target: { value } });
   };
 
   beforeEach(() => {
@@ -704,7 +704,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       });
       await renderStep();
       typePath(TYPED_DIR);
-      const useButton = screen.getByRole('button', { name: 'Use This Folder' });
+      const useButton = screen.getByRole('button', { name: 'Use this folder' });
       await waitFor(() => expect(useButton).toBeEnabled(), { timeout: INSPECTION_TIMEOUT_MS });
 
       // Act
@@ -716,7 +716,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       );
       await waitFor(() => expect(getStepValidity()).toBe(true));
       expect(reloadData).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole('button', { name: 'Use This Folder' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Use this folder' })).not.toBeInTheDocument();
     });
 
     it('Then pressing Enter applies the typed path once it has been validated', async () => {
@@ -724,12 +724,12 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       await renderStep();
       typePath(TYPED_DIR);
       await waitFor(
-        () => expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeEnabled(),
+        () => expect(screen.getByRole('button', { name: 'Use this folder' })).toBeEnabled(),
         { timeout: INSPECTION_TIMEOUT_MS },
       );
 
       // Act
-      fireEvent.keyDown(screen.getByLabelText('Save Directory Path'), { key: 'Enter' });
+      fireEvent.keyDown(screen.getByLabelText('Save directory path'), { key: 'Enter' });
 
       // Assert
       await waitFor(() =>
@@ -754,9 +754,9 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
           timeout: INSPECTION_TIMEOUT_MS,
         }),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
-      expect(screen.getByLabelText('Save Directory Path')).toHaveAttribute('aria-invalid', 'true');
-      fireEvent.keyDown(screen.getByLabelText('Save Directory Path'), { key: 'Enter' });
+      expect(screen.getByRole('button', { name: 'Use this folder' })).toBeDisabled();
+      expect(screen.getByLabelText('Save directory path')).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.keyDown(screen.getByLabelText('Save directory path'), { key: 'Enter' });
       expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
@@ -777,7 +777,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
           timeout: INSPECTION_TIMEOUT_MS,
         }),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Use this folder' })).toBeDisabled();
     });
 
     it('Then progress is still protected by the destructive confirmation', async () => {
@@ -790,7 +790,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       installElectronAPI(electronAPI);
       await renderStep();
       typePath(TYPED_DIR);
-      const useButton = screen.getByRole('button', { name: 'Use This Folder' });
+      const useButton = screen.getByRole('button', { name: 'Use this folder' });
       await waitFor(() => expect(useButton).toBeEnabled(), { timeout: INSPECTION_TIMEOUT_MS });
 
       // Act
@@ -819,7 +819,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       await renderStep();
       const useSuggestion = await screen.findByRole(
         'button',
-        { name: 'Use Suggested Folder' },
+        { name: 'Use suggested folder' },
         { timeout: INSPECTION_TIMEOUT_MS },
       );
       expect(screen.getByText('Did you mean this folder?')).toBeInTheDocument();
@@ -835,7 +835,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       await waitFor(() => expect(screen.getByDisplayValue(SUGGESTED_DIR)).toBeInTheDocument());
       await waitFor(() => expect(getStepValidity()).toBe(true));
       expect(
-        screen.queryByRole('button', { name: 'Use Suggested Folder' }),
+        screen.queryByRole('button', { name: 'Use suggested folder' }),
       ).not.toBeInTheDocument();
     });
 
@@ -856,7 +856,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       expect(
         await screen.findByRole(
           'button',
-          { name: 'Use Suggested Folder' },
+          { name: 'Use suggested folder' },
           { timeout: INSPECTION_TIMEOUT_MS },
         ),
       ).toBeInTheDocument();
@@ -882,9 +882,9 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
         },
       );
       expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledWith(TYPED_DIR);
-      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Use this folder' })).toBeDisabled();
       expect(
-        screen.queryByRole('button', { name: 'Use Suggested Folder' }),
+        screen.queryByRole('button', { name: 'Use suggested folder' }),
       ).not.toBeInTheDocument();
       expect(getStepValidity()).toBe(false);
     });

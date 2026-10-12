@@ -130,7 +130,7 @@ describe('When NotificationButton is rendered', () => {
 
     // Assert - open
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Recent Notifications');
+    expect(dialog).toHaveTextContent('Recent notifications');
     expect(dialog).toHaveTextContent('No recent item detections');
     expect(bell).toHaveAttribute('aria-expanded', 'true');
 

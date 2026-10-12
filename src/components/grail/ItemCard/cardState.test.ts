@@ -140,7 +140,7 @@ describe('When getCardStatusLabel is called', () => {
 
     // Assert
     expect(found).toBe('Found');
-    expect(missing).toBe('Not Found');
+    expect(missing).toBe('Not found');
   });
 
   it('If versions are tracked, Then it reports each version and a recent find', () => {
@@ -154,7 +154,7 @@ describe('When getCardStatusLabel is called', () => {
     const label = getCardStatusLabel(true, [...versionStatuses], true, t);
 
     // Assert
-    expect(label).toBe('Normal found, Ethereal missing, Recently Found!');
+    expect(label).toBe('Normal found, Ethereal missing, Recently found!');
   });
 });
 

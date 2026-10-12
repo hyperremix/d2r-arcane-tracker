@@ -49,7 +49,7 @@ describe('When SessionsList is rendered with previous sessions', () => {
     render(<SessionsList onSessionSelect={vi.fn()} />);
 
     // Assert
-    expect(screen.getByText('Previous Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Previous sessions')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Show archived' })).toBeInTheDocument();
   });
 
@@ -76,7 +76,7 @@ describe('When SessionsList is rendered with previous sessions', () => {
 
     // Assert
     const dateHeader = screen.getByRole('columnheader', { name: 'Date' });
-    const startTimeHeader = screen.getByRole('columnheader', { name: 'Start Time' });
+    const startTimeHeader = screen.getByRole('columnheader', { name: 'Start time' });
     expect(dateHeader).toHaveAttribute('aria-sort', 'descending');
     expect(within(dateHeader).getByRole('button', { name: 'Date' })).toBeInTheDocument();
     expect(startTimeHeader).not.toHaveAttribute('aria-sort');

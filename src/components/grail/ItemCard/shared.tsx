@@ -64,7 +64,7 @@ interface CardStatusTextProps {
 
 /**
  * CardStatusText component that gives a non-clickable card without version pills a "Found" /
- * "Not Found" text for assistive technology. Clickable cards carry their status in the accessible
+ * "Not found" text for assistive technology. Clickable cards carry their status in the accessible
  * name, and version pills carry theirs as screen reader text, so neither needs this.
  */
 export function CardStatusText({ isFound }: CardStatusTextProps) {

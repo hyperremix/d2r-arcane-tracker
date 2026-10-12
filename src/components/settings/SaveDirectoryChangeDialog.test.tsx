@@ -73,7 +73,7 @@ describe('SaveDirectoryChangeDialog', () => {
     renderDialog({ onBackup: vi.fn(), isBackingUp: true });
 
     // Assert
-    expect(screen.getByRole('button', { name: 'Creating Backup...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Creating backup...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Delete progress and switch folder' }),

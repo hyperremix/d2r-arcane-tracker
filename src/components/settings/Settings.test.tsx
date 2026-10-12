@@ -99,7 +99,7 @@ describe('Settings', () => {
     const general = screen.getByRole('region', { name: 'General' });
     expect(within(general).getByText('SaveFileMonitorCard')).toBeInTheDocument();
     expect(within(general).getByText('D2RInstallationCard')).toBeInTheDocument();
-    expect(within(general).getByRole('button', { name: 'Run Setup Wizard' })).toBeInTheDocument();
+    expect(within(general).getByRole('button', { name: 'Run setup wizard' })).toBeInTheDocument();
 
     const tracking = screen.getByRole('region', { name: 'Tracking' });
     expect(within(tracking).getByText('GameModeCard')).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('Settings', () => {
     const data = screen.getByRole('region', { name: 'Data' });
     expect(within(data).getByText('DatabaseCard')).toBeInTheDocument();
     expect(
-      within(data).queryByRole('button', { name: 'Run Setup Wizard' }),
+      within(data).queryByRole('button', { name: 'Run setup wizard' }),
     ).not.toBeInTheDocument();
 
     const about = screen.getByRole('region', { name: 'About' });
@@ -138,9 +138,9 @@ describe('Settings', () => {
     ).toBeVisible();
     expect(
       within(general)
-        .getAllByText(/Card$|Run Setup Wizard/)
+        .getAllByText(/Card$|Run setup wizard/)
         .map((element) => element.textContent),
-    ).toEqual(['SaveFileMonitorCard', 'D2RInstallationCard', 'Run Setup Wizard']);
+    ).toEqual(['SaveFileMonitorCard', 'D2RInstallationCard', 'Run setup wizard']);
 
     const tracking = screen.getByRole('region', { name: 'Tracking' });
     expect(

@@ -26,10 +26,10 @@ describe('PreferencesStep', () => {
     // Assert
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Appearance' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Notification Settings' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Widget Settings' })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Sound Notifications' })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Enable Widget' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Notification settings' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Widget settings' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Sound notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Enable widget' })).toBeInTheDocument();
   });
 
   it('If a stored widget opacity is below the minimum, Then the slider is clamped to 30%', () => {
@@ -56,7 +56,7 @@ describe('PreferencesStep', () => {
     render(ui);
 
     // Assert
-    const widgetRegion = screen.getByRole('region', { name: 'Widget Settings' });
+    const widgetRegion = screen.getByRole('region', { name: 'Widget settings' });
     expect(widgetRegion).toHaveTextContent('"Windowed (Fullscreen)"');
     expect(widgetRegion).toHaveTextContent('exclusive "Fullscreen"');
   });
