@@ -4,9 +4,9 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
-  MapPinned,
   PackageSearch,
   Settings,
+  Skull,
   Timer,
   Trophy,
 } from 'lucide-react';
@@ -49,11 +49,11 @@ const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
 /**
  * Secondary destinations (Terror zones and Settings) shown as icon-only links after the
  * primary navigation.
- * Terror Zones uses `MapPinned` (a marked area on a map) rather than a warning
- * icon so it does not read as an error state.
+ * Terror Zones uses `Skull`, which reads as the dangerous, empowered zones of D2R. A map pin
+ * reads as a profile avatar at icon size, and a warning icon would read as an error state.
  */
 const SECONDARY_NAVIGATION_ITEMS: NavigationItem[] = [
-  { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: MapPinned },
+  { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: Skull },
   { to: '/settings', labelKey: translations.titleBar.settings, icon: Settings },
 ];
 
