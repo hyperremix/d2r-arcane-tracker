@@ -223,7 +223,7 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Assert
       expect(
-        await screen.findByRole('heading', { level: 1, name: 'Inventory Browser' }),
+        await screen.findByRole('heading', { level: 1, name: 'Inventory browser' }),
       ).toBeInTheDocument();
       const notice = screen.getByTestId('save-write-notice');
       expect(notice).toHaveTextContent(
@@ -244,8 +244,8 @@ describe('When InventoryBrowserMain is rendered', () => {
       render(<InventoryBrowserMain />);
 
       // Assert
-      const listTitle = await screen.findByText('Characters & Stashes');
-      const vaultTitle = await screen.findByText('Vaulted Items');
+      const listTitle = await screen.findByText('Characters & stashes');
+      const vaultTitle = await screen.findByText('Vaulted items');
       const filters = screen.getByRole('group', { name: 'Filter items' });
       expect(
         listTitle.compareDocumentPosition(vaultTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -266,10 +266,10 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Assert
       expect(await screen.findByRole('combobox', { name: 'Character' })).toHaveTextContent(
-        'All Characters',
+        'All characters',
       );
-      expect(screen.getByRole('combobox', { name: 'Location' })).toHaveTextContent('All Locations');
-      expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All Types');
+      expect(screen.getByRole('combobox', { name: 'Location' })).toHaveTextContent('All locations');
+      expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All types');
     });
 
     it('Then the vault drop area is hidden while nothing is dragged', async () => {
@@ -279,7 +279,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       render(<InventoryBrowserMain />);
 
       // Assert
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
       expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
     });
   });
@@ -409,7 +409,7 @@ describe('When InventoryBrowserMain is rendered', () => {
     it('Then the vault drop area is shown even without a drag state from another window', async () => {
       // Arrange
       render(<InventoryBrowserMain />);
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
 
       // Act
       enterWindowWithInventoryDrag();
@@ -421,7 +421,7 @@ describe('When InventoryBrowserMain is rendered', () => {
     it('Then the vault drop area goes away when the drag ends', async () => {
       // Arrange
       render(<InventoryBrowserMain />);
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
       enterWindowWithInventoryDrag();
 
       // Act
@@ -434,7 +434,7 @@ describe('When InventoryBrowserMain is rendered', () => {
     it('Then the vault drop area goes away when the drag leaves the window', async () => {
       // Arrange
       render(<InventoryBrowserMain />);
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
       enterWindowWithInventoryDrag();
 
       // Act
@@ -505,7 +505,7 @@ describe('When InventoryBrowserMain is rendered', () => {
     it('Then it can be dropped on the vault drop area, which then goes away', async () => {
       // Arrange
       render(<InventoryBrowserMain />);
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
       enterWindowWithInventoryDrag();
       const payload = {
         fingerprint: 'fp-local',
@@ -541,7 +541,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       const addSpy = vi.spyOn(window, 'addEventListener');
       const removeSpy = vi.spyOn(window, 'removeEventListener');
       const { unmount } = render(<InventoryBrowserMain />);
-      await screen.findByText('Characters & Stashes');
+      await screen.findByText('Characters & stashes');
       await waitFor(() => expect(mainEvents.listenerCount(INVENTORY_DRAG_STATE_CHANNEL)).toBe(1));
 
       // Act
@@ -675,7 +675,7 @@ describe('When InventoryBrowserMain is rendered', () => {
           screen.queryByRole('button', { name: 'Vaulted item Shako' }),
         ).not.toBeInTheDocument();
       });
-      const vaultCard = screen.getByText('Vaulted Items').closest('[data-slot="card"]');
+      const vaultCard = screen.getByText('Vaulted items').closest('[data-slot="card"]');
       expect(vaultCard).not.toBeNull();
       expect(
         within(vaultCard as HTMLElement).getByText(
@@ -705,7 +705,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(
         await screen.findByText('Showing only vaulted items that match your filters.'),
       ).toBeInTheDocument();
-      expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
+      expect(screen.getByText('Vaulted items')).toBeInTheDocument();
       expect(screen.getByText('No inventory items match your filters.')).toBeInTheDocument();
     });
   });
@@ -720,7 +720,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
         target: { value: 'nothing like this' },
       });
-      const vaultTitle = await screen.findByText('Vaulted Items');
+      const vaultTitle = await screen.findByText('Vaulted items');
       const vaultCard = vaultTitle.closest('[data-slot="card"]');
       await waitFor(() => expect(searchAllMock).toHaveBeenCalledTimes(2));
       searchAllMock.mockReturnValue(new Promise(() => undefined));
@@ -732,7 +732,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       await waitFor(() => expect(searchAllMock).toHaveBeenCalledTimes(3));
 
       // Assert
-      const cardDuringReload = screen.getByText('Vaulted Items').closest('[data-slot="card"]');
+      const cardDuringReload = screen.getByText('Vaulted items').closest('[data-slot="card"]');
       expect(cardDuringReload).not.toBeNull();
       expect(cardDuringReload).toBe(vaultCard);
     });
@@ -756,7 +756,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       });
 
       // Assert
-      expect(screen.queryByText('Vaulted Items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Vaulted items')).not.toBeInTheDocument();
     });
   });
 
@@ -769,7 +769,7 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Assert
       await screen.findByRole('button', { name: /^Sorc Character/ });
-      expect(screen.queryByText('Vaulted Items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Vaulted items')).not.toBeInTheDocument();
       expect(
         screen.queryByText('Showing only vaulted items that match your filters.'),
       ).not.toBeInTheDocument();
@@ -912,7 +912,7 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(screen.getByText('Characters & Stashes')).toBeInTheDocument();
+        expect(screen.getByText('Characters & stashes')).toBeInTheDocument();
       });
       expect(screen.getByRole('button', { name: 'Sorc Character 1 item' })).toBeInTheDocument();
       expect(screen.queryByTestId('inventory-board-snap-1')).not.toBeInTheDocument();

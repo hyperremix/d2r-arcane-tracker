@@ -94,7 +94,7 @@ function pickFolder(directory: string) {
     canceled: false,
     filePaths: [directory],
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Change Directory' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Change directory' }));
 }
 
 describe('SaveFileMonitor', () => {
@@ -152,7 +152,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
-      const notice = screen.getByText(/Manual Mode Active:/).closest('[data-slot="alert"]');
+      const notice = screen.getByText(/Manual mode active:/).closest('[data-slot="alert"]');
       expect(notice).toHaveAttribute('role', 'status');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
@@ -166,7 +166,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
-      expect(screen.queryByText(/Manual Mode Active:/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Manual mode active:/)).not.toBeInTheDocument();
     });
   });
 
@@ -230,7 +230,7 @@ describe('SaveFileMonitor', () => {
       render(<SaveFileMonitor />);
 
       // Assert
-      expect(await screen.findByText('Detected Characters (3):')).toBeInTheDocument();
+      expect(await screen.findByText('Detected characters (3):')).toBeInTheDocument();
       expect(screen.getByText('Active (3 files)')).toBeInTheDocument();
     });
 
@@ -341,7 +341,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       expect(screen.getByText('Active (1 file)')).toBeInTheDocument();
-      expect(screen.getByText('Detected Characters (1):')).toBeInTheDocument();
+      expect(screen.getByText('Detected characters (1):')).toBeInTheDocument();
     });
 
     it('If loading the save files fails, Then the error is logged and the badge shows the empty list', async () => {
@@ -381,7 +381,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
-      expect(screen.getByText('Detected Characters (2):')).toBeInTheDocument();
+      expect(screen.getByText('Detected characters (2):')).toBeInTheDocument();
       expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(2);
     });
   });
@@ -556,7 +556,7 @@ describe('SaveFileMonitor', () => {
       await renderWithLoadedDirectory();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
 
       // Assert
       await waitFor(() => expect(toast.info).toHaveBeenCalled());
@@ -592,11 +592,11 @@ describe('SaveFileMonitor', () => {
       await renderWithLoadedDirectory();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
 
       // Assert
       const dialog = await screen.findByRole('alertdialog');
-      expect(within(dialog).getByText('Restore Default Directory')).toBeInTheDocument();
+      expect(within(dialog).getByText('Restore default directory')).toBeInTheDocument();
       expect(within(dialog).getByText(DEFAULT_DIRECTORY)).toBeInTheDocument();
       expect(getElectronAPI().saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
     });
@@ -628,7 +628,7 @@ describe('SaveFileMonitor', () => {
       // Arrange
       arrangeMonitoredDirectory(true);
       await renderWithLoadedDirectory();
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -727,7 +727,7 @@ describe('SaveFileMonitor', () => {
       await renderWithLoadedDirectory();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
 
       // Assert
       await waitFor(() =>
@@ -749,7 +749,7 @@ describe('SaveFileMonitor', () => {
       await renderWithLoadedDirectory();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
 
       // Assert
       await waitFor(() =>
@@ -902,12 +902,12 @@ describe('SaveFileMonitor', () => {
       await renderWithLoadedDirectory();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Change Directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Change directory' }));
 
       // Assert
       await waitFor(() => expect(getElectronAPI().dialog.showOpenDialog).toHaveBeenCalled());
       await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'Change Directory' })).toBeEnabled(),
+        expect(screen.getByRole('button', { name: 'Change directory' })).toBeEnabled(),
       );
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       expect(getElectronAPI().saveFile.updateSaveDirectory).not.toHaveBeenCalled();

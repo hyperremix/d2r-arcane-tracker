@@ -94,8 +94,8 @@ function ActionButton({
 }
 
 /**
- * Live session actions: one primary, state-dependent action (Start New Session, Start Run or End Run)
- * plus secondary Pause/Resume and End Session. Each run action shows its keyboard shortcut as a key
+ * Live session actions: one primary, state-dependent action (Start new session, Start run or End run)
+ * plus secondary Pause/Resume and End session. Each run action shows its keyboard shortcut as a key
  * chip. In auto mode the manual run actions are replaced by a notice explaining that runs are
  * tracked automatically.
  */

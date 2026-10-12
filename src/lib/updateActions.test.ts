@@ -44,7 +44,7 @@ describe('When the shared update actions are used', () => {
 
     // Assert
     expect(downloadUpdateMock).toHaveBeenCalledTimes(1);
-    expect(toastInfo).toHaveBeenCalledWith('Downloading Update', {
+    expect(toastInfo).toHaveBeenCalledWith('Downloading update', {
       description: 'Download started in the background',
     });
     expect(toastError).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('When the shared update actions are used', () => {
     await downloadUpdate(i18n.t);
 
     // Assert
-    expect(toastError).toHaveBeenCalledWith('Download Failed', {
+    expect(toastError).toHaveBeenCalledWith('Download failed', {
       description: 'Failed to download update',
     });
     expect(toastInfo).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ describe('When the shared update actions are used', () => {
 
     // Assert
     expect(quitAndInstallMock).toHaveBeenCalledTimes(1);
-    expect(toastError).toHaveBeenCalledWith('Install Failed', {
+    expect(toastError).toHaveBeenCalledWith('Install failed', {
       description: 'Failed to install update',
     });
   });

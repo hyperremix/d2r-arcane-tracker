@@ -298,7 +298,7 @@ export class GlobalHotkeyService {
 
     try {
       if (action === 'endSession') {
-        // Ending the session stays available in auto mode, matching the End Session button
+        // Ending the session stays available in auto mode, matching the End session button
         if (runTracker.getActiveSession()) {
           runTracker.endSession();
         }

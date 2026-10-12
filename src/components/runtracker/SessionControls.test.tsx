@@ -126,10 +126,10 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      expect(screen.getByText('Live Session')).toBeDefined();
+      expect(screen.getByText('Live session')).toBeDefined();
     });
 
-    it('When a run is active, Then End Run is the primary action next to Pause and End Session', () => {
+    it('When a run is active, Then End run is the primary action next to Pause and End session', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
@@ -141,13 +141,13 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'End Run' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'End run' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'End Session' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'End session' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument();
     });
 
-    it('When a session has no active run, Then Start Run is the primary action and Pause is hidden', () => {
+    it('When a session has no active run, Then Start run is the primary action and Pause is hidden', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
@@ -158,9 +158,9 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
       expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'End Run' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'End run' })).not.toBeInTheDocument();
     });
 
     it('When a run is active, Then the state badge politely reports Running', () => {
@@ -224,15 +224,15 @@ describe('SessionControls', () => {
 
       // Assert
       expect(screen.queryByText('0:00')).not.toBeInTheDocument();
-      expect(screen.queryByText('Current Run')).not.toBeInTheDocument();
+      expect(screen.queryByText('Current run')).not.toBeInTheDocument();
       expect(screen.queryByText('No run in progress')).not.toBeInTheDocument();
       expect(
         screen.getByText('Start a session to track your runs and the items you find.'),
       ).toBeInTheDocument();
       const prompt = screen.getByText('Start a session to track your runs and the items you find.');
-      const startButton = screen.getByRole('button', { name: 'Start New Session' });
+      const startButton = screen.getByRole('button', { name: 'Start new session' });
       expect(prompt.parentElement).toContainElement(startButton);
-      expect(screen.queryByText('Keyboard Shortcuts:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Keyboard shortcuts:')).not.toBeInTheDocument();
     });
 
     it('When the run is paused, Then the timer stays frozen at the time it was paused', () => {
@@ -365,7 +365,7 @@ describe('SessionControls', () => {
   });
 
   describe('Button States', () => {
-    it('If no session is active, Then only Start New Session is offered and the badge reports No Session', () => {
+    it('If no session is active, Then only Start new session is offered and the badge reports No session', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
@@ -373,25 +373,25 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeEnabled();
-      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'End Session' })).not.toBeInTheDocument();
-      expect(screen.getByRole('status')).toHaveTextContent('No Session');
+      expect(screen.getByRole('button', { name: 'Start new session' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'End session' })).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('No session');
     });
 
-    it('If no session is active, When Start New Session is clicked, Then a session is started', () => {
+    it('If no session is active, When Start new session is clicked, Then a session is started', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, defaultStoreState);
       render(<SessionControls />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Start New Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Start new session' }));
 
       // Assert
       expect(mockStoreActions.startSession).toHaveBeenCalledTimes(1);
     });
 
-    it('If starting a session is in flight, Then the Start New Session button is disabled', () => {
+    it('If starting a session is in flight, Then the Start new session button is disabled', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
@@ -402,7 +402,7 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Start new session' })).toBeDisabled();
     });
 
     it('enables start run button when session exists but no active run', () => {
@@ -414,7 +414,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const startButton = screen.getByText('Start Run');
+      const startButton = screen.getByText('Start run');
       expect(startButton).not.toBeDisabled();
     });
 
@@ -440,7 +440,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const endRunButton = screen.getByText('End Run');
+      const endRunButton = screen.getByText('End run');
       expect(endRunButton).not.toBeDisabled();
     });
 
@@ -452,7 +452,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const endSessionButton = screen.getByText('End Session');
+      const endSessionButton = screen.getByText('End session');
       expect(endSessionButton).not.toBeDisabled();
     });
 
@@ -468,8 +468,8 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       const pauseButton = screen.getByText('Pause');
-      const endRunButton = screen.getByText('End Run');
-      const endSessionButton = screen.getByText('End Session');
+      const endRunButton = screen.getByText('End run');
+      const endSessionButton = screen.getByText('End session');
 
       expect(pauseButton).toBeDisabled();
       expect(endRunButton).toBeDisabled();
@@ -487,7 +487,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const startButton = screen.getByText('Start Run');
+      const startButton = screen.getByText('Start run');
       fireEvent.click(startButton);
 
       expect(mockStoreActions.startRun).toHaveBeenCalledWith();
@@ -525,7 +525,7 @@ describe('SessionControls', () => {
       expect(mockStoreActions.resumeRun).toHaveBeenCalled();
     });
 
-    it('When End Run is clicked, Then the run ends right away and a success toast is shown', async () => {
+    it('When End run is clicked, Then the run ends right away and a success toast is shown', async () => {
       // Arrange
       mockStoreActions.endRun.mockResolvedValue(true);
       mockStoreState(mockUseRunTrackerStore, {
@@ -536,7 +536,7 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'End Run' }));
+      fireEvent.click(screen.getByRole('button', { name: 'End run' }));
 
       // Assert
       expect(mockStoreActions.endRun).toHaveBeenCalledTimes(1);
@@ -555,7 +555,7 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'End Run' }));
+      fireEvent.click(screen.getByRole('button', { name: 'End run' }));
 
       // Assert
       await waitFor(() => expect(mockStoreActions.endRun).toHaveBeenCalledTimes(1));
@@ -570,7 +570,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const endSessionButton = screen.getByText('End Session');
+      const endSessionButton = screen.getByText('End session');
       fireEvent.click(endSessionButton);
 
       // Dialog might not render in test environment, so just verify button click works
@@ -588,15 +588,15 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'End session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Assert
-      expect(within(dialog).getByText('End Current Session')).toBeInTheDocument();
+      expect(within(dialog).getByText('End current session')).toBeInTheDocument();
       expect(mockStoreActions.endSession).not.toHaveBeenCalled();
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'End Session' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'End session' }));
 
       // Assert
       await waitFor(() => {
@@ -611,7 +611,7 @@ describe('SessionControls', () => {
         activeSession: mockSession,
       });
       render(<SessionControls />);
-      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'End session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -631,7 +631,7 @@ describe('SessionControls', () => {
         activeSession: mockSession,
       });
       const { rerender } = render(<SessionControls />);
-      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      fireEvent.click(screen.getByRole('button', { name: 'End session' }));
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
@@ -675,9 +675,9 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument();
       expect(screen.getByText('Runs are tracked automatically')).toBeInTheDocument();
-      const endSessionButton = screen.getByRole('button', { name: 'End Session' });
+      const endSessionButton = screen.getByRole('button', { name: 'End session' });
       expect(endSessionButton).toBeEnabled();
       fireEvent.click(endSessionButton);
       expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
@@ -690,7 +690,7 @@ describe('SessionControls', () => {
     });
   });
 
-  describe('Keyboard Shortcuts', () => {
+  describe('Keyboard shortcuts', () => {
     it('sets up keyboard event listeners on mount', () => {
       mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
@@ -1029,7 +1029,7 @@ describe('SessionControls', () => {
 
       // Assert
       const dialog = await screen.findByRole('alertdialog');
-      expect(within(dialog).getByText('End Current Session')).toBeInTheDocument();
+      expect(within(dialog).getByText('End current session')).toBeInTheDocument();
     });
 
     it('If auto mode is enabled but memory reading is unavailable, Then the start run shortcut works like the restored button', async () => {
@@ -1085,7 +1085,7 @@ describe('SessionControls', () => {
       });
     });
 
-    it('If a session has no active run on macOS, Then Start Run shows its Command shortcut as a key chip', () => {
+    it('If a session has no active run on macOS, Then Start run shows its Command shortcut as a key chip', () => {
       // Arrange
       setPlatform('darwin');
       mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
@@ -1094,11 +1094,11 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(getShortcutKey('Start Run')).toHaveTextContent('\u2318R');
-      expect(getShortcutKey('End Session')).toHaveTextContent('\u21E7\u2318E');
+      expect(getShortcutKey('Start run')).toHaveTextContent('\u2318R');
+      expect(getShortcutKey('End session')).toHaveTextContent('\u21E7\u2318E');
     });
 
-    it('If a run is active on macOS, Then End Run, Pause and End Session show their Command shortcuts as key chips', () => {
+    it('If a run is active on macOS, Then End run, Pause and End session show their Command shortcuts as key chips', () => {
       // Arrange
       setPlatform('darwin');
       mockStoreState(mockUseRunTrackerStore, {
@@ -1111,9 +1111,9 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(getShortcutKey('End Run')).toHaveTextContent('\u2318E');
+      expect(getShortcutKey('End run')).toHaveTextContent('\u2318E');
       expect(getShortcutKey('Pause')).toHaveTextContent('\u2318Space');
-      expect(getShortcutKey('End Session')).toHaveTextContent('\u21E7\u2318E');
+      expect(getShortcutKey('End session')).toHaveTextContent('\u21E7\u2318E');
     });
 
     it('If the run is paused on macOS, Then Resume shows the Command shortcut as a key chip', () => {
@@ -1146,10 +1146,10 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(getShortcutKey('End Run')).toHaveTextContent('Ctrl+E');
+      expect(getShortcutKey('End run')).toHaveTextContent('Ctrl+E');
       expect(getShortcutKey('Pause')).toHaveTextContent('Ctrl+Space');
-      expect(getShortcutKey('End Session')).toHaveTextContent('Ctrl+Shift+E');
-      expect(screen.getByRole('button', { name: 'End Run' })).toHaveAttribute(
+      expect(getShortcutKey('End session')).toHaveTextContent('Ctrl+Shift+E');
+      expect(screen.getByRole('button', { name: 'End run' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Control+E',
       );
@@ -1157,13 +1157,13 @@ describe('SessionControls', () => {
         'aria-keyshortcuts',
         'Control+Space',
       );
-      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'End session' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Control+Shift+E',
       );
     });
 
-    it('If a session has no active run on Windows, Then Start Run announces Control+R', () => {
+    it('If a session has no active run on Windows, Then Start run announces Control+R', () => {
       // Arrange
       setPlatform('win32');
       mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
@@ -1172,7 +1172,7 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start Run' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Start run' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Control+R',
       );
@@ -1191,24 +1191,24 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      const endRunButton = screen.getByRole('button', { name: 'End Run' });
+      const endRunButton = screen.getByRole('button', { name: 'End run' });
       expect(endRunButton.querySelector('kbd')?.closest('[aria-hidden="true"]')).not.toBeNull();
       expect(endRunButton).toHaveAttribute('aria-keyshortcuts', 'Meta+E');
       expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Meta+Space',
       );
-      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'End session' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Meta+Shift+E',
       );
       // The accessible name is unchanged; the shortcut is the accessible description
-      expect(endRunButton).toHaveAccessibleName('End Run');
+      expect(endRunButton).toHaveAccessibleName('End run');
       expect(endRunButton).toHaveAccessibleDescription('\u2318E');
       expect(screen.getByRole('button', { name: 'Pause' })).toHaveAccessibleDescription(
         '\u2318Space',
       );
-      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAccessibleDescription(
+      expect(screen.getByRole('button', { name: 'End session' })).toHaveAccessibleDescription(
         '\u21E7\u2318E',
       );
     });
@@ -1222,7 +1222,7 @@ describe('SessionControls', () => {
 
       // Assert
       expect(
-        screen.getByRole('button', { name: 'Start New Session' }).querySelector('kbd'),
+        screen.getByRole('button', { name: 'Start new session' }).querySelector('kbd'),
       ).toBeNull();
       expect(screen.queryByText('\u2318R')).not.toBeInTheDocument();
     });
@@ -1302,7 +1302,7 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const startButton = screen.getByText('Start Run');
+      const startButton = screen.getByText('Start run');
       fireEvent.click(startButton);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to start run:', expect.any(Error));
@@ -1389,7 +1389,7 @@ describe('SessionControls', () => {
 
       // Assert
       expect(screen.queryByText('Runs are tracked automatically')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
       expect(screen.getByRole('switch')).toBeInTheDocument();
     });
 
@@ -1405,13 +1405,13 @@ describe('SessionControls', () => {
       });
 
       // Assert
-      const autoModeSwitch = screen.getByRole('switch', { name: 'Auto Mode' });
-      expect(autoModeSwitch).toHaveAccessibleDescription('(Memory Reading)');
+      const autoModeSwitch = screen.getByRole('switch', { name: 'Auto mode' });
+      expect(autoModeSwitch).toHaveAccessibleDescription('(memory reading)');
     });
   });
 
   describe('Run actions', () => {
-    it('When a run is active, Then End Run, Pause, End Session and Add Item are offered', () => {
+    it('When a run is active, Then End run, Pause, End session and Add Item are offered', () => {
       // Arrange
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
@@ -1423,7 +1423,7 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getAllByRole('button')).toHaveLength(4); // End Run, Pause/Resume, End Session, Add Item
+      expect(screen.getAllByRole('button')).toHaveLength(4); // End run, Pause/Resume, End session, Add Item
     });
   });
 });

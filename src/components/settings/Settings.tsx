@@ -172,7 +172,7 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
         </>
       );
     case 'tracking':
-      // Same grouping as the setup wizard's "What to Track" step
+      // Same grouping as the setup wizard's "What to track" step
       return (
         <>
           <GameModeSettings />

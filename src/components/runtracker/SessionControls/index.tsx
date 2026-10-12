@@ -278,7 +278,7 @@ export function SessionControls() {
     [activeSession, activeRun, runs],
   );
 
-  // Keyboard shortcut handlers (gated on auto mode like the buttons; End Session stays allowed)
+  // Keyboard shortcut handlers (gated on auto mode like the buttons; End session stays allowed)
   const handleStartRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
@@ -371,7 +371,7 @@ export function SessionControls() {
   const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoTrackingActive);
   const canPauseResume = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
   const canEndRun = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
-  // End Session stays available in auto mode so tracked sessions can still be stopped by mouse
+  // End session stays available in auto mode so tracked sessions can still be stopped by mouse
   const canEndSession = Boolean(activeSession && !controlsBusy);
   const canStartSession = Boolean(!activeSession && !controlsBusy);
 

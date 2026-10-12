@@ -59,7 +59,7 @@ describe('When the Statistics page is rendered', () => {
     renderStatistics();
 
     // Assert
-    expect(screen.getByRole('tab', { name: 'Grail Statistics' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Grail statistics' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -71,7 +71,7 @@ describe('When the Statistics page is rendered', () => {
     renderStatistics('/statistics?tab=runs');
 
     // Assert
-    expect(screen.getByRole('tab', { name: 'Run Statistics' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Run statistics' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -83,7 +83,7 @@ describe('When the Statistics page is rendered', () => {
     renderStatistics('/statistics?tab=unknown');
 
     // Assert
-    expect(screen.getByRole('tab', { name: 'Grail Statistics' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Grail statistics' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -96,14 +96,14 @@ describe('When the user switches statistics tabs', () => {
     renderStatistics();
 
     // Act
-    fireEvent.click(screen.getByRole('tab', { name: 'Run Statistics' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Run statistics' }));
 
     // Assert
     expect(screen.getByTestId('location')).toHaveTextContent('/statistics?tab=runs');
     expect(screen.getByText('run analytics')).toBeInTheDocument();
 
     // Act
-    fireEvent.click(screen.getByRole('tab', { name: 'Grail Statistics' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Grail statistics' }));
 
     // Assert
     expect(screen.getByTestId('location').textContent).toBe('/statistics');
@@ -112,7 +112,7 @@ describe('When the user switches statistics tabs', () => {
   it('If the user navigates away and back, Then the previously selected tab is restored', async () => {
     // Arrange
     const router = renderStatistics();
-    fireEvent.click(screen.getByRole('tab', { name: 'Run Statistics' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Run statistics' }));
 
     // Act
     await router.navigate('/runs');
@@ -121,7 +121,7 @@ describe('When the user switches statistics tabs', () => {
     // Assert
     expect(await screen.findByText('run analytics')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('/statistics?tab=runs');
-    expect(screen.getByRole('tab', { name: 'Run Statistics' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: 'Run statistics' })).toHaveAttribute(
       'aria-selected',
       'true',
     );

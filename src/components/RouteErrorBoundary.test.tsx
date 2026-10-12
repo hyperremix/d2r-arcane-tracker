@@ -109,10 +109,10 @@ describe('When a routed page throws while rendering', () => {
     expect(screen.getByText(/This page ran into an unexpected error/)).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Test navigation' })).toBeInTheDocument();
     expect(screen.getByText('Error: Page exploded')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try to Recover' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reload Application' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy Error Details' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Report Issue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try to recover' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload application' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy error details' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
     expect(screen.queryByText(/Unexpected Application Error/)).not.toBeInTheDocument();
   });
 
@@ -121,15 +121,15 @@ describe('When a routed page throws while rendering', () => {
     renderRouter();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Error Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
 
     // Assert
     expect(await screen.findByText('Error details copied to clipboard')).toBeInTheDocument();
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     const report = mockClipboard.writeText.mock.calls[0][0] as string;
-    expect(report).toContain('App Version: 1.2.3');
-    expect(report).toContain('Error Message: Error: Page exploded');
-    expect(report).toContain('Stack Trace:');
+    expect(report).toContain('App version: 1.2.3');
+    expect(report).toContain('Error message: Error: Page exploded');
+    expect(report).toContain('Stack trace:');
     expect(report).toContain('BrokenPage');
   });
 
@@ -139,13 +139,13 @@ describe('When a routed page throws while rendering', () => {
     renderRouter();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Error Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
 
     // Assert
     await waitFor(() => expect(mockClipboard.writeText).toHaveBeenCalledTimes(1));
     const report = mockClipboard.writeText.mock.calls[0][0] as string;
-    expect(report).toContain('App Version: Unknown');
-    expect(report).toContain('Error Message: Error: Page exploded');
+    expect(report).toContain('App version: Unknown');
+    expect(report).toContain('Error message: Error: Page exploded');
   });
 
   it('If writing to the clipboard fails, Then a failure message is announced', async () => {
@@ -154,7 +154,7 @@ describe('When a routed page throws while rendering', () => {
     renderRouter();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Error Details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
 
     // Assert
     expect(await screen.findByRole('status')).toHaveTextContent("Couldn't copy the error details");
@@ -165,7 +165,7 @@ describe('When a routed page throws while rendering', () => {
     renderRouter();
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Report issue' }));
 
     // Assert
     await waitFor(() =>
@@ -191,7 +191,7 @@ describe('When a routed page throws while rendering', () => {
     shouldThrow = false;
 
     // Act
-    fireEvent.click(screen.getByRole('button', { name: 'Try to Recover' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try to recover' }));
 
     // Assert
     expect(await screen.findByText('Broken page recovered')).toBeInTheDocument();

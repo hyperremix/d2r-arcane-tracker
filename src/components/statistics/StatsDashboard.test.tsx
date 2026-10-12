@@ -131,14 +131,14 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last Find While Tracking'));
-    expect(within(getTile('Total Progress')).getByText('5/10')).toBeInTheDocument();
+    const lastFind = within(getTile('Last find while tracking'));
+    expect(within(getTile('Total progress')).getByText('5/10')).toBeInTheDocument();
     expect(lastFind.getByText('None yet')).toBeInTheDocument();
     expect(lastFind.getByText('Since tracking began')).toBeInTheDocument();
-    const closestSet = within(getTile('Closest Set'));
+    const closestSet = within(getTile('Closest set'));
     expect(closestSet.getByText('3/4')).toBeInTheDocument();
     expect(closestSet.getByText("Arcanna's Tricks")).toBeInTheDocument();
-    const runesMissing = within(getTile('Runes Missing'));
+    const runesMissing = within(getTile('Runes missing'));
     expect(runesMissing.getByText('1')).toBeInTheDocument();
     expect(runesMissing.getByText('Highest missing: Zod')).toBeInTheDocument();
     expect(screen.queryByText('Current Streak')).not.toBeInTheDocument();
@@ -176,13 +176,13 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last Find While Tracking'));
+    const lastFind = within(getTile('Last find while tracking'));
     expect(lastFind.getByText('3 days ago')).toBeInTheDocument();
     expect(lastFind.getByText('Angelic Halo')).toBeInTheDocument();
-    const closestSet = within(getTile('Closest Set'));
+    const closestSet = within(getTile('Closest set'));
     expect(closestSet.getByText('1/1')).toBeInTheDocument();
     expect(closestSet.getByText('All sets complete')).toBeInTheDocument();
-    const runesMissing = within(getTile('Runes Missing'));
+    const runesMissing = within(getTile('Runes missing'));
     expect(runesMissing.getByText('0')).toBeInTheDocument();
     expect(runesMissing.getByText('All runes found')).toBeInTheDocument();
     expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
@@ -216,7 +216,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     expect(screen.getAllByText(/last find/i)).toHaveLength(1);
     expect(screen.queryByText('Last Find')).not.toBeInTheDocument();
     expect(
-      within(getTile('Last Find While Tracking')).getByText('Vampire Gaze'),
+      within(getTile('Last find while tracking')).getByText('Vampire Gaze'),
     ).toBeInTheDocument();
     expect(container).not.toHaveTextContent("Mara's Kaleidoscope");
     expect(container).not.toHaveTextContent('Recent Activity');
@@ -230,8 +230,8 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(screen.queryByText('Closest Set')).not.toBeInTheDocument();
-    expect(screen.queryByText('Runes Missing')).not.toBeInTheDocument();
+    expect(screen.queryByText('Closest set')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runes missing')).not.toBeInTheDocument();
   });
 
   it('If only ethereal items are tracked, Then the set and rune tiles are hidden because sets and runes cannot be ethereal', () => {
@@ -251,9 +251,9 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(screen.queryByText('Closest Set')).not.toBeInTheDocument();
-    expect(screen.queryByText('Runes Missing')).not.toBeInTheDocument();
-    expect(screen.getByText('Last Find While Tracking')).toBeInTheDocument();
+    expect(screen.queryByText('Closest set')).not.toBeInTheDocument();
+    expect(screen.queryByText('Runes missing')).not.toBeInTheDocument();
+    expect(screen.getByText('Last find while tracking')).toBeInTheDocument();
   });
 
   it('If only ethereal items are tracked, Then a normal find of a set item is not the last find', () => {
@@ -290,7 +290,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last Find While Tracking'));
+    const lastFind = within(getTile('Last find while tracking'));
     expect(lastFind.getByText('5 days ago')).toBeInTheDocument();
     expect(lastFind.getByText('Ethereal Helm')).toBeInTheDocument();
   });
@@ -311,8 +311,8 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(within(getTile('Closest Set')).getByText('0/1')).toBeInTheDocument();
-    expect(within(getTile('Runes Missing')).getByText('Highest missing: El')).toBeInTheDocument();
+    expect(within(getTile('Closest set')).getByText('0/1')).toBeInTheDocument();
+    expect(within(getTile('Runes missing')).getByText('Highest missing: El')).toBeInTheDocument();
   });
 });
 
@@ -335,7 +335,7 @@ describe('When StatsDashboard shows the category breakdown', () => {
         expect(screen.getByRole('progressbar', { name: label })).toBeInTheDocument();
       }
       expect(screen.queryByText('weapons')).not.toBeInTheDocument();
-      expect(screen.queryByText(/progress$/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^(Weapons|Armor|Runewords) progress$/)).not.toBeInTheDocument();
     });
   });
 });
@@ -382,7 +382,7 @@ describe('When StatsDashboard shows the character comparison', () => {
     render(<StatsDashboard />);
 
     // Assert
-    expect(screen.queryByRole('heading', { name: 'Character Comparison' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Character comparison' })).not.toBeInTheDocument();
   });
 });
 
@@ -406,9 +406,9 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Grail Progress Over Time' }),
+      screen.getByRole('heading', { level: 2, name: 'Grail progress over time' }),
     ).toBeVisible();
-    expect(screen.getByRole('heading', { level: 2, name: 'Finds per Week' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 2, name: 'Finds per week' })).toBeVisible();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
   });
@@ -432,11 +432,11 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
-    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+    expect(getChartCard('Grail progress over time')).not.toHaveAttribute(
       'data-chart-state',
       'empty',
     );
-    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
+    expect(getChartCard('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
     expect(screen.getAllByRole('img')).toHaveLength(2);
   });
 
@@ -460,11 +460,11 @@ describe('When StatsDashboard shows the progress charts', () => {
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
     expect(screen.getByRole('img', { name: /^Grail progress over time/ })).toBeInTheDocument();
-    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+    expect(getChartCard('Grail progress over time')).not.toHaveAttribute(
       'data-chart-state',
       'empty',
     );
-    const weekly = getChartCard('Finds per Week');
+    const weekly = getChartCard('Finds per week');
     expect(weekly).toHaveAttribute('data-chart-state', 'empty');
     expect(within(weekly).getByText('No finds in the last 12 weeks')).toBeInTheDocument();
     expect(within(weekly).queryByRole('img')).not.toBeInTheDocument();
@@ -490,8 +490,8 @@ describe('When StatsDashboard shows the progress charts', () => {
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
     expect(screen.getByRole('img', { name: /^Finds per week/ })).toBeInTheDocument();
-    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
-    const progress = getChartCard('Grail Progress Over Time');
+    expect(getChartCard('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
+    const progress = getChartCard('Grail progress over time');
     expect(progress).toHaveAttribute('data-chart-state', 'empty');
     expect(within(progress).getByText('No items found yet')).toBeInTheDocument();
     expect(within(progress).queryByRole('img')).not.toBeInTheDocument();
@@ -507,8 +507,8 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
-    expect(getChartCard('Grail Progress Over Time')).toHaveAttribute('data-chart-state', 'empty');
-    expect(getChartCard('Finds per Week')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChartCard('Grail progress over time')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChartCard('Finds per week')).toHaveAttribute('data-chart-state', 'empty');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
@@ -545,7 +545,7 @@ describe('When StatsDashboard shows the progress charts', () => {
         name: 'Finds per week over the last 12 weeks: 2 in total, 1 in the latest week',
       }),
     ).toBeInTheDocument();
-    const progressTable = screen.getByRole('table', { name: 'Grail Progress Over Time' });
+    const progressTable = screen.getByRole('table', { name: 'Grail progress over time' });
     expect(within(progressTable).getAllByRole('row')).toHaveLength(3);
     expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
   });

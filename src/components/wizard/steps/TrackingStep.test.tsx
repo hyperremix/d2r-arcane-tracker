@@ -11,9 +11,9 @@ describe('TrackingStep', () => {
     // Assert
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
     expect(screen.getAllByRole('region')).toHaveLength(3);
-    expect(screen.getByRole('region', { name: 'Game Mode' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Holy Grail Configuration' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Game Version' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Game mode' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Holy Grail configuration' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Game version' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(3);
   });
 });

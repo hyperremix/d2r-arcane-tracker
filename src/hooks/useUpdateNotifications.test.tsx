@@ -77,7 +77,7 @@ describe('When useUpdateNotifications receives an update status', () => {
     });
 
     // Assert
-    expect(await screen.findByText('Update Available')).toBeInTheDocument();
+    expect(await screen.findByText('Update available')).toBeInTheDocument();
     expect(screen.getByText('Version 1.2.3 is ready to download')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe('When useUpdateNotifications receives an update status', () => {
 
     // Assert
     await waitFor(() => expect(downloadUpdateMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText('Downloading Update')).toBeInTheDocument();
+    expect(await screen.findByText('Downloading update')).toBeInTheDocument();
   });
 
   it('If an update was downloaded, Then a translated toast offers to restart', async () => {
@@ -114,9 +114,9 @@ describe('When useUpdateNotifications receives an update status', () => {
     });
 
     // Assert
-    expect(await screen.findByText('Update Ready')).toBeInTheDocument();
+    expect(await screen.findByText('Update ready')).toBeInTheDocument();
     expect(screen.getByText('Restart to install the update')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Restart Now' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restart now' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Later' })).toBeInTheDocument();
   });
 });

@@ -50,7 +50,7 @@ The app checks for updates on startup and installs them when you confirm.
 
 ## Troubleshooting
 
-- **No characters show up**: check the save folder in **Settings → Save File Monitoring** and make sure you have created at least one character.
+- **No characters show up**: check the save folder in **Settings → Save file monitoring** and make sure you have created at least one character.
 - **Items don't update**: D2R only writes save files when you leave a game, so new items show up after you exit to the menu.
 - **Antivirus blocks the app**: add an exception for the install folder. Unsigned Electron apps sometimes cause false positives.
 - **Run detection stopped after a game patch**: see [Run Tracker troubleshooting](docs/RUN_TRACKER.md#troubleshooting).

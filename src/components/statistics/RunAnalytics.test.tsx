@@ -67,7 +67,7 @@ function buildSession(id: string, startTime: Date, runCount: number): Session {
 
 async function renderAndClickExport() {
   render(<RunAnalytics />);
-  const exportButton = await screen.findByRole('button', { name: /Export Data/i });
+  const exportButton = await screen.findByRole('button', { name: /Export data/i });
   fireEvent.click(exportButton);
 }
 
@@ -107,17 +107,17 @@ describe('When exporting run analytics', () => {
     expect(content).toBe(
       [
         'Metric,Value',
-        'Total Sessions,3',
-        'Total Runs,42',
-        'Total Time,1h 5m',
-        'Average Run Duration,1m 35s',
-        'Items Per Run,1.50',
+        'Total sessions,3',
+        'Total runs,42',
+        'Total time,1h 5m',
+        'Average run duration,1m 35s',
+        'Items per run,1.50',
       ].join('\n'),
     );
     expect(mockElectronAPI.dialog.showSaveDialog).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Export Analytics Data',
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+        title: 'Export analytics data',
+        filters: [{ name: 'CSV files', extensions: ['csv'] }],
       }),
     );
     expect(toast.success).toHaveBeenCalledWith('Analytics data exported', {
@@ -237,12 +237,12 @@ describe('When displaying run analytics', () => {
     render(<RunAnalytics />);
 
     // Assert
-    expect(await screen.findByRole('heading', { name: 'No Data Available' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'No data available' })).toBeInTheDocument();
     expect(
       screen.getByText('Start tracking runs to see analytics and statistics.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Export Data/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Fastest run')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export data/i })).not.toBeInTheDocument();
   });
 
   it('If runs exist but none has been completed, Then the performance highlights are hidden', async () => {
@@ -259,9 +259,9 @@ describe('When displaying run analytics', () => {
     render(<RunAnalytics />);
 
     // Assert
-    expect(await screen.findByText('Total Sessions')).toBeInTheDocument();
-    expect(screen.queryByText('Performance Highlights')).not.toBeInTheDocument();
-    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
+    expect(await screen.findByText('Total sessions')).toBeInTheDocument();
+    expect(screen.queryByText('Performance highlights')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fastest run')).not.toBeInTheDocument();
   });
 
   it('If runs have been completed, Then the fastest and slowest runs are shown without a duplicate efficiency card', async () => {
@@ -272,10 +272,10 @@ describe('When displaying run analytics', () => {
     render(<RunAnalytics />);
 
     // Assert
-    expect(await screen.findByText('Performance Highlights')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Fastest Run' })).toBeInTheDocument();
+    expect(await screen.findByText('Performance highlights')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fastest run' })).toBeInTheDocument();
     expect(screen.getByText('1m')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Slowest Run' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Slowest run' })).toBeInTheDocument();
     expect(screen.getByText('3m')).toBeInTheDocument();
     expect(screen.getByText('1.50')).toBeInTheDocument();
     expect(screen.queryByText('Overall Efficiency')).not.toBeInTheDocument();
@@ -362,7 +362,7 @@ describe('When run analytics show the run durations by session', () => {
     ).toBeInTheDocument();
     expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledWith(false);
     expect(mockElectronAPI.runTracker.getRunsBySession).not.toHaveBeenCalledWith('empty');
-    const table = screen.getByRole('table', { name: 'Run Durations by Session' });
+    const table = screen.getByRole('table', { name: 'Run durations by session' });
     expect(within(table).getAllByRole('row')).toHaveLength(3);
   });
 
@@ -387,7 +387,7 @@ describe('When run analytics show the run durations by session', () => {
 
     // Assert
     expect(await screen.findByText('Could not load the run durations')).toBeInTheDocument();
-    expect(screen.getByText('Total Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Total sessions')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });

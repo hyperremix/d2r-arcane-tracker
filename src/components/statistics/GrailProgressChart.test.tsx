@@ -16,11 +16,11 @@ describe('When the grail progress chart is rendered', () => {
 
     // Assert
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Grail Progress Over Time' }),
+      screen.getByRole('heading', { level: 2, name: 'Grail progress over time' }),
     ).toBeInTheDocument();
     expect(
       screen
-        .getByRole('heading', { level: 2, name: 'Grail Progress Over Time' })
+        .getByRole('heading', { level: 2, name: 'Grail progress over time' })
         .closest('[data-slot="card"]'),
     ).toHaveAttribute('data-chart-state', 'empty');
     expect(screen.getByText('No items found yet')).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('When the grail progress chart is rendered', () => {
     );
 
     // Assert
-    const table = screen.getByRole('table', { name: 'Grail Progress Over Time' });
+    const table = screen.getByRole('table', { name: 'Grail progress over time' });
     const lastRow = within(table).getAllByRole('row')[2];
     expect(
       within(lastRow)

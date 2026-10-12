@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { itemCategoryLabelKeys, itemSubCategoryLabelKeys } from '@/lib/labelKeys';
 
 /**
- * Renders an item's translated category and sub-category (e.g. "Weapons • Two-Handed Swords").
+ * Renders an item's translated category and sub-category (e.g. "Weapons • Two-handed swords").
  */
 export function ItemCategoryLabel({ item }: { item: Pick<Item, 'category' | 'subCategory'> }) {
   const { t } = useTranslation();

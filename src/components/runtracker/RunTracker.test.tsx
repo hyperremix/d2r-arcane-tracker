@@ -149,7 +149,7 @@ describe('RunTracker', () => {
       render(<RunTracker />);
 
       // Assert
-      expect(screen.getByRole('heading', { level: 1, name: 'Run Tracker' })).toBeDefined();
+      expect(screen.getByRole('heading', { level: 1, name: 'Run tracker' })).toBeDefined();
     });
   });
 
@@ -184,7 +184,7 @@ describe('RunTracker', () => {
       render(<RunTracker />);
 
       // Assert
-      expect(screen.getByText('Error Loading Run Tracker')).toBeDefined();
+      expect(screen.getByText('Error loading run tracker')).toBeDefined();
       expect(screen.getByText(errorMessage)).toBeDefined();
       expect(screen.getByText('Retry')).toBeDefined();
       expect(screen.queryByTestId('session-card')).toBeNull();
@@ -229,7 +229,7 @@ describe('RunTracker', () => {
       expect(
         screen.getByText('Failed to end session. Your progress has been saved.', { exact: false }),
       ).toBeDefined();
-      expect(screen.queryByText('Error Loading Run Tracker')).toBeNull();
+      expect(screen.queryByText('Error loading run tracker')).toBeNull();
       expect(screen.getByTestId('session-card')).toBeDefined();
       expect(screen.getByTestId('session-controls')).toBeDefined();
       expect(screen.getByTestId('sessions-list')).toBeDefined();

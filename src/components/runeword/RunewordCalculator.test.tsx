@@ -96,7 +96,7 @@ describe('RunewordCalculator', () => {
         'true',
       );
       expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
     });
 
     it('When Missing ≤ 1 is selected, then runewords missing one rune are added after craftable ones', async () => {
@@ -112,7 +112,7 @@ describe('RunewordCalculator', () => {
         'aria-pressed',
         'true',
       );
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel', 'Enigma']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel', 'Enigma']);
     });
 
     it('When All is selected, then every runeword shows, sorted by fewest missing runes', async () => {
@@ -125,7 +125,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       expect(getCardTitles()).toEqual([
-        'Filter by Runes',
+        'Filter by runes',
         'Stealth',
         'Steel',
         'Enigma',
@@ -152,7 +152,7 @@ describe('RunewordCalculator', () => {
         'aria-pressed',
         'true',
       );
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Enigma']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Enigma']);
     });
 
     it('If nothing is craftable or missing at most 1 rune, then the empty state offers Show all and applies it', async () => {
@@ -247,7 +247,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       expect(screen.getByText('Shows runewords that use all selected runes')).toBeInTheDocument();
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Enigma']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Enigma']);
     });
 
     it('When Clear selection is clicked, then the rune selection is reset', async () => {
@@ -258,7 +258,7 @@ describe('RunewordCalculator', () => {
       const clearButton = screen.getByRole('button', { name: 'Clear selection' });
       expect(clearButton).toBeDisabled();
       fireEvent.click(screen.getByLabelText(/^Ber/));
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Enigma', 'Infinity']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Enigma', 'Infinity']);
 
       // Act
       fireEvent.click(clearButton);
@@ -267,7 +267,7 @@ describe('RunewordCalculator', () => {
       expect(screen.getByLabelText(/^Ber/)).not.toBeChecked();
       expect(clearButton).toBeDisabled();
       expect(getCardTitles()).toEqual([
-        'Filter by Runes',
+        'Filter by runes',
         'Stealth',
         'Steel',
         'Enigma',
@@ -401,7 +401,7 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh runes' }));
 
       // Assert
-      await waitFor(() => expect(getCardTitles()).toEqual(['Filter by Runes', 'Steel']));
+      await waitFor(() => expect(getCardTitles()).toEqual(['Filter by runes', 'Steel']));
       expect(api.saveFile.refreshSaveFiles).toHaveBeenCalledTimes(2);
     });
 
@@ -423,7 +423,7 @@ describe('RunewordCalculator', () => {
       const refreshButton = screen.getByRole('button', { name: 'Refresh runes' });
       expect(refreshButton).toBeDisabled();
       expect(refreshButton).toHaveAttribute('aria-busy', 'true');
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
 
       // Act
       resolveRefresh({ success: true });
@@ -431,7 +431,7 @@ describe('RunewordCalculator', () => {
       // Assert
       await waitFor(() => expect(refreshButton).toBeEnabled());
       expect(refreshButton).toHaveAttribute('aria-busy', 'false');
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
     });
 
     it('If a refresh fails, then an error toast is shown, the button is re-enabled and results remain', async () => {
@@ -449,7 +449,7 @@ describe('RunewordCalculator', () => {
         expect(toast.error).toHaveBeenCalledWith('Failed to refresh runes from save files'),
       );
       expect(screen.getByRole('button', { name: 'Refresh runes' })).toBeEnabled();
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
       consoleError.mockRestore();
     });
   });
@@ -471,7 +471,7 @@ describe('RunewordCalculator', () => {
       expect(within(toolbar).getByRole('group', { name: 'Show runewords' })).toBeInTheDocument();
       expect(within(toolbar).getByRole('button', { name: 'Refresh runes' })).toBeInTheDocument();
       expect(within(sidebar).queryByRole('textbox')).not.toBeInTheDocument();
-      expect(within(sidebar).getByRole('group', { name: 'Filter by Runes' })).toBeInTheDocument();
+      expect(within(sidebar).getByRole('group', { name: 'Filter by runes' })).toBeInTheDocument();
     });
 
     it('When the page loads, Then the runeword grid scrolls in its own container and the sidebar stays outside it', async () => {
@@ -531,7 +531,7 @@ describe('RunewordCalculator', () => {
       });
 
       // Assert
-      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
     });
   });
 
@@ -561,7 +561,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-      expect(screen.getByRole('heading', { level: 1, name: 'Runeword Calculator' })).toBeVisible();
+      expect(screen.getByRole('heading', { level: 1, name: 'Runeword calculator' })).toBeVisible();
     });
 
     it('If the data has loaded, Then exactly one level-1 heading is present', async () => {

@@ -66,7 +66,7 @@ describe('When CompletionStep is rendered', () => {
         'Your settings were saved as you went. Click Finish to close setup and start using D2R Arcane Tracker!',
       ),
     ).toBeInTheDocument();
-    await waitFor(() => expect(getSummaryValue('Character Files:')).toHaveTextContent('1'));
+    await waitFor(() => expect(getSummaryValue('Character files:')).toHaveTextContent('1'));
   });
 
   it('Then the completion heading keeps the display serif as the brand moment', async () => {
@@ -79,7 +79,7 @@ describe('When CompletionStep is rendered', () => {
 
     // Assert
     expect(screen.getByRole('heading', { level: 2 })).toHaveClass('font-display');
-    await waitFor(() => expect(getSummaryValue('Character Files:')).toHaveTextContent('1'));
+    await waitFor(() => expect(getSummaryValue('Character files:')).toHaveTextContent('1'));
   });
 
   it('If a save folder is monitored, Then the summary shows its path and character file count', async () => {
@@ -90,9 +90,9 @@ describe('When CompletionStep is rendered', () => {
     render(<CompletionStep />);
 
     // Assert
-    expect(await screen.findByText('Character Files:')).toBeInTheDocument();
-    expect(getSummaryValue('Save Directory:')).toHaveTextContent(MONITORED_DIR);
-    expect(getSummaryValue('Character Files:')).toHaveTextContent('3');
+    expect(await screen.findByText('Character files:')).toBeInTheDocument();
+    expect(getSummaryValue('Save directory:')).toHaveTextContent(MONITORED_DIR);
+    expect(getSummaryValue('Character files:')).toHaveTextContent('3');
     expect(screen.queryByText('Configured')).not.toBeInTheDocument();
   });
 
@@ -106,8 +106,8 @@ describe('When CompletionStep is rendered', () => {
     render(<CompletionStep />);
 
     // Assert
-    await waitFor(() => expect(getSummaryValue('Save Directory:')).toHaveTextContent(defaultDir));
-    expect(getSummaryValue('Character Files:')).toHaveTextContent('0');
+    await waitFor(() => expect(getSummaryValue('Save directory:')).toHaveTextContent(defaultDir));
+    expect(getSummaryValue('Character files:')).toHaveTextContent('0');
   });
 
   it('If no save folder is known, Then the summary says it is not set and omits the count', async () => {
@@ -121,8 +121,8 @@ describe('When CompletionStep is rendered', () => {
 
     // Assert
     await waitFor(() => expect(api.saveFile.getSaveFiles).toHaveBeenCalled());
-    expect(getSummaryValue('Save Directory:')).toHaveTextContent('Not set');
-    expect(screen.queryByText('Character Files:')).not.toBeInTheDocument();
+    expect(getSummaryValue('Save directory:')).toHaveTextContent('Not set');
+    expect(screen.queryByText('Character files:')).not.toBeInTheDocument();
   });
 
   it('If loading the save files fails, Then the stored path is still shown without a count', async () => {
@@ -136,7 +136,7 @@ describe('When CompletionStep is rendered', () => {
 
     // Assert
     await waitFor(() => expect(api.saveFile.getSaveFiles).toHaveBeenCalled());
-    expect(getSummaryValue('Save Directory:')).toHaveTextContent(MONITORED_DIR);
-    expect(screen.queryByText('Character Files:')).not.toBeInTheDocument();
+    expect(getSummaryValue('Save directory:')).toHaveTextContent(MONITORED_DIR);
+    expect(screen.queryByText('Character files:')).not.toBeInTheDocument();
   });
 });

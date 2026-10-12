@@ -281,9 +281,9 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
 
     it.each([
-      { etherealType: 'none', label: 'Cannot Be Ethereal', isEtherealColored: false },
-      { etherealType: 'optional', label: 'Can Be Ethereal', isEtherealColored: true },
-      { etherealType: 'only', label: 'Ethereal Only', isEtherealColored: true },
+      { etherealType: 'none', label: 'Cannot be ethereal', isEtherealColored: false },
+      { etherealType: 'optional', label: 'Can be ethereal', isEtherealColored: true },
+      { etherealType: 'only', label: 'Ethereal only', isEtherealColored: true },
     ] as const)('Then renders the $etherealType ethereal type as $label without destructive styling', ({
       etherealType,
       label,
@@ -532,13 +532,13 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-missing');
     });
   });
 
   describe('If ethereal tracking is on and an item with optional ethereal type has per-version progress', () => {
     const found = { text: 'Found', present: 'text-found', absent: 'text-missing' };
-    const missing = { text: 'Not Found', present: 'text-missing', absent: 'text-found' };
+    const missing = { text: 'Not found', present: 'text-missing', absent: 'text-found' };
 
     it.each([
       { normalFound: true, etherealFound: false, normal: found, ethereal: missing },
@@ -624,7 +624,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       const normalStatus = screen.getByText('Normal:').nextElementSibling;
       const etherealStatus = screen.getByText('Ethereal:').nextElementSibling;
-      expect(normalStatus).toHaveTextContent('Not Found');
+      expect(normalStatus).toHaveTextContent('Not found');
       expect(etherealStatus).toHaveTextContent('Found (not tracked)');
       expect(etherealStatus).not.toHaveClass('text-found');
       expect(etherealStatus).not.toHaveClass('text-missing');
@@ -641,7 +641,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-missing');
       expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
     });
@@ -894,7 +894,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toBeVisible();
+      expect(screen.getByText('Not found')).toBeVisible();
       const section = screen.getByRole('region', { name: 'Character progress' });
       expect(within(section).getByText('No character has found this item yet.')).toBeVisible();
       expect(within(section).queryByRole('table')).not.toBeInTheDocument();
@@ -923,7 +923,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toBeVisible();
+      expect(screen.getByText('Not found')).toBeVisible();
       const section = screen.getByRole('region', { name: 'Character progress' });
       expect(within(section).getByText('No character has found this item yet.')).toBeVisible();
       expect(within(section).queryByRole('table')).not.toBeInTheDocument();
@@ -958,7 +958,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-missing');
       expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
     });
@@ -1417,7 +1417,7 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByRole('button', { name: 'Mark as found' })).toBeEnabled();
-      expect(screen.queryByRole('button', { name: /Not Found/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Not found/ })).not.toBeInTheDocument();
     });
   });
 });

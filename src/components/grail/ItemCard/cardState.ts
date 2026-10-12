@@ -65,8 +65,8 @@ export function getVersionStatusLabel({ version, isFound }: VersionStatus, t: TF
 
 /**
  * Returns the status part of a card's accessible name. With tracked versions it lists each one
- * ("Normal found, Ethereal missing"), otherwise it is "Found" / "Not Found"; a recent find
- * appends "Recently Found!".
+ * ("Normal found, Ethereal missing"), otherwise it is "Found" / "Not found"; a recent find
+ * appends "Recently found!".
  */
 export function getCardStatusLabel(
   isFound: boolean,

@@ -42,7 +42,7 @@ describe('When a wizard step saves settings', () => {
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Include Ethereal Items'));
+      fireEvent.click(screen.getByLabelText('Include ethereal items'));
     });
 
     // Assert
@@ -59,7 +59,7 @@ describe('When a wizard step saves settings', () => {
       .mockRejectedValueOnce(new Error('database locked'))
       .mockResolvedValue({ success: true });
     render(<NotificationsStep />);
-    const toggle = screen.getByRole('switch', { name: 'In-App Notifications' });
+    const toggle = screen.getByRole('switch', { name: 'In-app notifications' });
 
     // Act
     await act(async () => {
