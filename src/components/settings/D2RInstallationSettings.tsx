@@ -12,7 +12,8 @@ import { getDefaultD2RPath } from '@/lib/d2rInstallPath';
  * D2RInstallationSettings component that provides controls for configuring the D2R installation path.
  * This setting is shared between item icon management and terror zone configuration.
  * The field only ever shows the path stored in the settings, which is also what Terror Zones reads.
- * When none is saved, a notice says so and offers the default location if it exists on disk.
+ * When none is saved, the field stays empty (no example path as placeholder, so it cannot be
+ * mistaken for a saved value) and a notice says so, offering the default location if it exists.
  * The path is persisted on blur, Enter, Browse or when accepting the suggestion - never per keystroke.
  * @returns {JSX.Element} A settings card with D2R installation path configuration
  */
@@ -194,19 +195,13 @@ export function D2RInstallationSettings() {
                   void savePath(e.currentTarget.value);
                 }
               }}
-              placeholder={defaultPath}
               aria-invalid={saveFailed || undefined}
               aria-describedby={describedBy}
               className="flex-1"
             />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleBrowseDirectory}
-              title={t(translations.settings.d2rInstallation.browseForDirectory)}
-              aria-label={t(translations.settings.d2rInstallation.browseForDirectory)}
-            >
+            <Button variant="outline" onClick={handleBrowseDirectory}>
               <FolderOpen className="h-4 w-4" aria-hidden="true" />
+              {t(translations.wizard.saveDirectory.browse)}
             </Button>
           </div>
           <p id={pathDescriptionId} className="text-muted-foreground text-xs">
@@ -244,16 +239,17 @@ export function D2RInstallationSettings() {
                     {t(translations.wizard.d2rInstallation.suggestion)}
                   </p>
                   <p className="break-all font-mono text-xs">{suggestedPath}</p>
+                  <Button size="sm" onClick={() => void savePath(suggestedPath)}>
+                    {t(translations.settings.d2rInstallation.useSuggestion)}
+                  </Button>
+                  <p className="text-muted-foreground text-xs">
+                    {t(translations.settings.d2rInstallation.suggestionHint)}
+                  </p>
                 </>
               ) : (
                 <p className="text-muted-foreground text-xs">
                   {t(translations.settings.d2rInstallation.notConfiguredHint)}
                 </p>
-              )}
-              {suggestedPath && (
-                <Button size="sm" variant="outline" onClick={() => savePath(suggestedPath)}>
-                  {t(translations.wizard.d2rInstallation.useSuggestion)}
-                </Button>
               )}
             </div>
           </output>

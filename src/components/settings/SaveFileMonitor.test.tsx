@@ -72,6 +72,18 @@ function arrangeMonitoredDirectory(hasUserData: boolean) {
   api.grail.getProgress.mockResolvedValue([]);
 }
 
+function createSaveFiles(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `Character ${index + 1}`,
+    path: `${CURRENT_DIRECTORY}/Character${index + 1}.d2s`,
+    lastModified: new Date('2026-01-01T00:00:00Z'),
+    characterClass: 'sorceress',
+    level: 90,
+    hardcore: false,
+    expansion: true,
+  }));
+}
+
 async function renderWithLoadedDirectory() {
   render(<SaveFileMonitor />);
   await screen.findByText(CURRENT_DIRECTORY);
@@ -208,18 +220,6 @@ describe('SaveFileMonitor', () => {
   });
 
   describe('status badge', () => {
-    function createSaveFiles(count: number) {
-      return Array.from({ length: count }, (_, index) => ({
-        name: `Character ${index + 1}`,
-        path: `${CURRENT_DIRECTORY}/Character${index + 1}.d2s`,
-        lastModified: new Date('2026-01-01T00:00:00Z'),
-        characterClass: 'sorceress',
-        level: 90,
-        hardcore: false,
-        expansion: true,
-      }));
-    }
-
     it('When Settings opens while monitoring is already active, Then the badge counts the listed save files', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
@@ -383,6 +383,81 @@ describe('SaveFileMonitor', () => {
       expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
       expect(screen.getByText('Detected Characters (2):')).toBeInTheDocument();
       expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('detected characters', () => {
+    it('If at most five characters are detected, Then all are listed and no toggle is shown', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(5));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      expect(await screen.findByText('Character 5')).toBeInTheDocument();
+      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
+      expect(screen.queryByRole('button', { name: /^Show / })).not.toBeInTheDocument();
+    });
+
+    it('If more than five characters are detected, Then the first five are listed in the page without an inner scroll area', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      const toggle = await screen.findByRole('button', { name: 'Show all 15 characters' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      const list = screen.getByRole('list');
+      expect(toggle).toHaveAttribute('aria-controls', list.id);
+      expect(list).not.toHaveClass('overflow-y-auto');
+      expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+      expect(screen.queryByText('Character 6')).not.toBeInTheDocument();
+    });
+
+    it('When "Show all" is clicked, Then every character is listed and the toggle offers to show fewer', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
+      render(<SaveFileMonitor />);
+      const toggle = await screen.findByRole('button', { name: 'Show all 15 characters' });
+
+      // Act
+      fireEvent.click(toggle);
+
+      // Assert
+      const list = screen.getByRole('list');
+      expect(within(list).getAllByRole('listitem')).toHaveLength(15);
+      expect(within(list).getByText('Character 15')).toBeInTheDocument();
+      const fewerToggle = screen.getByRole('button', { name: 'Show fewer characters' });
+      expect(fewerToggle).toHaveAttribute('aria-expanded', 'true');
+      expect(fewerToggle).toHaveAttribute('aria-controls', list.id);
+    });
+
+    it('When "Show fewer" is clicked, Then only the first five characters are listed again', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
+      render(<SaveFileMonitor />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Show all 15 characters' }));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Show fewer characters' }));
+
+      // Assert
+      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
+      expect(screen.getByRole('button', { name: 'Show all 15 characters' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     });
   });
 
