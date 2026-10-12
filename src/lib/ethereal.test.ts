@@ -1,13 +1,16 @@
 import type { EtherealType, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
-import { HolyGrailItemBuilder } from '@/fixtures';
+import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import {
   canItemBeEthereal,
   canItemBeNormal,
+  canItemHaveVersion,
   filterItemsByTrackedVersions,
   getEtherealTypeDescription,
+  getVersionFindStatuses,
   isEtherealOnly,
+  isTrackedFind,
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from './ethereal';
@@ -389,6 +392,142 @@ describe('When filterItemsByTrackedVersions is called', () => {
 
       // Assert
       expect(result.map((item) => item.id)).toEqual(expectedIds);
+    });
+  });
+});
+
+describe('When isTrackedFind is called', () => {
+  const optional = HolyGrailItemBuilder.new().withId('o').withEtherealType('optional').build();
+  const etherealFind = GrailProgressBuilder.new()
+    .withItemId('o')
+    .withFoundDate(new Date('2026-01-31'))
+    .asEthereal()
+    .build();
+  const normalFind = GrailProgressBuilder.new()
+    .withItemId('o')
+    .withFoundDate(new Date('2026-01-31'))
+    .asNormal()
+    .build();
+
+  describe.each([
+    ['an ethereal find while ethereal tracking is off', etherealFind, true, false, false],
+    ['an ethereal find while ethereal tracking is on', etherealFind, false, true, true],
+    ['a normal find while normal tracking is on', normalFind, true, false, true],
+    ['a normal find while normal tracking is off', normalFind, false, true, false],
+  ])('If it gets %s', (_label, progress, grailNormal, grailEthereal, expected) => {
+    it(`Then returns ${expected}`, () => {
+      // Arrange & Act
+      const result = isTrackedFind(optional, progress, { grailNormal, grailEthereal });
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+  });
+
+  describe('If the record has no found date', () => {
+    it('Then returns false', () => {
+      // Arrange
+      const progress = { ...normalFind, foundDate: undefined };
+
+      // Act
+      const result = isTrackedFind(optional, progress, { grailNormal: true, grailEthereal: true });
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+});
+
+describe('When canItemHaveVersion is called', () => {
+  describe.each([
+    ['none', 'normal', true],
+    ['none', 'ethereal', false],
+    ['optional', 'normal', true],
+    ['optional', 'ethereal', true],
+    ['only', 'normal', false],
+    ['only', 'ethereal', true],
+  ] as const)('If the ethereal type is %s', (etherealType, version, expected) => {
+    it(`Then the ${version} version ${expected ? 'exists' : 'does not exist'}`, () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withEtherealType(etherealType).build();
+
+      // Act
+      const result = canItemHaveVersion(item, version);
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+  });
+});
+
+describe('When getVersionFindStatuses is called', () => {
+  const optional = HolyGrailItemBuilder.new().withId('o').withEtherealType('optional').build();
+  const etherealFind = GrailProgressBuilder.new()
+    .withItemId('o')
+    .withFoundDate(new Date('2026-01-31'))
+    .asEthereal()
+    .build();
+
+  describe('If ethereal tracking is off and only the ethereal version was found', () => {
+    it('Then lists the missing normal version and the untracked ethereal find', () => {
+      // Arrange & Act
+      const result = getVersionFindStatuses(optional, [etherealFind], {
+        grailNormal: true,
+        grailEthereal: false,
+      });
+
+      // Assert
+      expect(result).toEqual([
+        { version: 'normal', tracked: true, found: false },
+        { version: 'ethereal', tracked: false, found: true },
+      ]);
+    });
+  });
+
+  describe('If ethereal tracking is off and nothing was found', () => {
+    it('Then lists only the tracked normal version', () => {
+      // Arrange & Act
+      const result = getVersionFindStatuses(optional, [], {
+        grailNormal: true,
+        grailEthereal: false,
+      });
+
+      // Assert
+      expect(result).toEqual([{ version: 'normal', tracked: true, found: false }]);
+    });
+  });
+
+  describe('If the item cannot be ethereal', () => {
+    it('Then never lists an ethereal version', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('n').withEtherealType('none').build();
+
+      // Act
+      const result = getVersionFindStatuses(item, [], { grailNormal: true, grailEthereal: true });
+
+      // Assert
+      expect(result).toEqual([{ version: 'normal', tracked: true, found: false }]);
+    });
+  });
+
+  describe('If a find is of a version the item cannot have', () => {
+    it('Then the find is not listed', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('n').withEtherealType('none').build();
+      const strayFind = GrailProgressBuilder.new()
+        .withItemId('n')
+        .withFoundDate(new Date('2026-01-31'))
+        .asEthereal()
+        .build();
+
+      // Act
+      const result = getVersionFindStatuses(item, [strayFind], {
+        grailNormal: true,
+        grailEthereal: true,
+      });
+
+      // Assert
+      expect(result).toEqual([{ version: 'normal', tracked: true, found: false }]);
     });
   });
 });

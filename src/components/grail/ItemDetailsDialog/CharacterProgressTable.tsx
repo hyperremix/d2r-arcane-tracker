@@ -22,78 +22,106 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
-import { DetectionMethods, FoundDates } from './ProgressStatusSection';
+import { formatDate } from '@/lib/date';
 
 interface PendingRemoval {
   progress: GrailProgress;
   character: Character;
 }
 
-// Component for character progress table row
-function CharacterProgressRow({
-  character,
-  progress,
-  item,
+/**
+ * A find of the item by one character: a progress record with a found date.
+ */
+interface CharacterFind {
+  progress: GrailProgress;
+  foundDate: Date;
+  character: Character;
+}
+
+/** Runes and other common items can be found by many characters, so long lists are paged. */
+const FINDS_PER_PAGE = 5;
+
+/**
+ * Returns the finds of an item by known characters, most recent first (ties by character name).
+ * Records without a found date and records of characters that no longer exist are left out.
+ */
+function getCharacterFinds(
+  itemProgress: GrailProgress[],
+  characters: Character[],
+): CharacterFind[] {
+  const charactersById = new Map(characters.map((character) => [character.id, character]));
+  const finds: CharacterFind[] = [];
+  for (const progress of itemProgress) {
+    const character = charactersById.get(progress.characterId);
+    if (!progress.foundDate || !character) continue;
+    finds.push({ progress, foundDate: progress.foundDate, character });
+  }
+  return finds.sort(
+    (a, b) =>
+      b.foundDate.getTime() - a.foundDate.getTime() ||
+      a.character.name.localeCompare(b.character.name),
+  );
+}
+
+// One find in the character progress table
+function CharacterFindRow({
+  find: { progress, foundDate, character },
+  showVersion,
   onRequestRemove,
 }: {
-  character: Character;
-  progress: GrailProgress[];
-  item: Item;
+  find: CharacterFind;
+  showVersion: boolean;
   onRequestRemove: (removal: PendingRemoval) => void;
 }) {
   const { t } = useTranslation();
-  const characterProgress = progress.filter(
-    (p) => p.characterId === character.id && p.itemId === item.id,
-  );
-  const normalProgress = characterProgress.find((p) => !p.isEthereal);
-  const etherealProgress = characterProgress.find((p) => p.isEthereal);
-  // Only manually added records can be removed; auto-detected ones mirror the save files
-  const removableProgress = characterProgress.filter((p) => p.manuallyAdded && p.foundDate);
+  const version = progress.isEthereal
+    ? t(translations.grail.itemDetails.ethereal)
+    : t(translations.grail.itemCard.normal);
+  const removeLabel = t(translations.grail.itemDetails.removeRecordLabel, {
+    version,
+    character: character.name,
+  });
 
   return (
     <TableRow>
       <TableCell className="font-medium">{character.name}</TableCell>
+      {showVersion && <TableCell className="text-muted-foreground">{version}</TableCell>}
+      <TableCell className="text-muted-foreground">{formatDate(foundDate)}</TableCell>
       <TableCell className="text-muted-foreground">
-        <FoundDates normalProgress={normalProgress} etherealProgress={etherealProgress} />
-      </TableCell>
-      <TableCell className="text-muted-foreground">
-        <DetectionMethods normalProgress={normalProgress} etherealProgress={etherealProgress} />
+        {progress.manuallyAdded ? t(translations.common.manual) : t(translations.common.auto)}
       </TableCell>
       <TableCell className="text-right">
-        {removableProgress.map((p) => {
-          const label = t(translations.grail.itemDetails.removeRecordLabel, {
-            version: p.isEthereal
-              ? t(translations.grail.itemDetails.ethereal)
-              : t(translations.grail.itemCard.normal),
-            character: character.name,
-          });
-          return (
-            <Button
-              key={p.id}
-              variant="ghost"
-              size="icon"
-              aria-label={label}
-              title={label}
-              onClick={() => onRequestRemove({ progress: p, character })}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          );
-        })}
+        {/* Only manually added records can be removed; auto-detected ones mirror the save files */}
+        {progress.manuallyAdded && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={removeLabel}
+            title={removeLabel}
+            onClick={() => onRequestRemove({ progress, character })}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
 }
 
-// Component for character progress table
+/**
+ * Lists who found the item: one row per find, most recent first, with the version of each find
+ * when the item can be both normal and ethereal. Shows a single line when nobody found it yet.
+ * Manually added finds can be removed after a confirmation.
+ */
 export function CharacterProgressTable({
   characters,
-  progress,
+  itemProgress,
   item,
   onRemoveProgress,
 }: {
   characters: Character[];
-  progress: GrailProgress[];
+  /** Progress records of this item. */
+  itemProgress: GrailProgress[];
   item: Item;
   onRemoveProgress: (progressId: string) => Promise<void>;
 }) {
@@ -123,56 +151,20 @@ export function CharacterProgressTable({
       setRemoving(false);
     }
   };
-  const charactersPerPage = 5;
 
-  // Sort characters by found date (most recent first)
-  const sortedCharacters = useMemo(() => {
-    return [...characters].sort((a, b) => {
-      const aProgress = progress.filter((p) => p.characterId === a.id && p.itemId === item.id);
-      const bProgress = progress.filter((p) => p.characterId === b.id && p.itemId === item.id);
-
-      // Get the most recent found date for each character
-      const aFoundDate = aProgress.reduce(
-        (latest, p) => {
-          if (p.foundDate && (!latest || p.foundDate > latest)) {
-            return p.foundDate;
-          }
-          return latest;
-        },
-        null as Date | null,
-      );
-
-      const bFoundDate = bProgress.reduce(
-        (latest, p) => {
-          if (p.foundDate && (!latest || p.foundDate > latest)) {
-            return p.foundDate;
-          }
-          return latest;
-        },
-        null as Date | null,
-      );
-
-      // Characters with found dates come first, sorted by most recent
-      if (aFoundDate && bFoundDate) {
-        return bFoundDate.getTime() - aFoundDate.getTime();
-      }
-      if (aFoundDate && !bFoundDate) {
-        return -1;
-      }
-      if (!aFoundDate && bFoundDate) {
-        return 1;
-      }
-      // If neither has a found date, sort alphabetically by name
-      return a.name.localeCompare(b.name);
-    });
-  }, [characters, progress, item.id]);
+  const finds = useMemo(
+    () => getCharacterFinds(itemProgress, characters),
+    [itemProgress, characters],
+  );
+  // The version only tells something when the item can be both normal and ethereal
+  const showVersion = item.etherealType === 'optional';
 
   // Calculate pagination, clamping currentPage so it's always in range
-  const totalPages = Math.max(1, Math.ceil(sortedCharacters.length / charactersPerPage));
+  const totalPages = Math.max(1, Math.ceil(finds.length / FINDS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * charactersPerPage;
-  const endIndex = startIndex + charactersPerPage;
-  const paginatedCharacters = sortedCharacters.slice(startIndex, endIndex);
+  const startIndex = (safePage - 1) * FINDS_PER_PAGE;
+  const endIndex = startIndex + FINDS_PER_PAGE;
+  const paginatedFinds = finds.slice(startIndex, endIndex);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(1, prev - 1));
@@ -192,68 +184,72 @@ export function CharacterProgressTable({
           <span className="ml-auto text-muted-foreground text-sm">
             {t(translations.common.paginationRange, {
               start: startIndex + 1,
-              end: Math.min(endIndex, sortedCharacters.length),
-              total: sortedCharacters.length,
+              end: Math.min(endIndex, finds.length),
+              total: finds.length,
             })}
           </span>
         )}
       </div>
-      <div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t(translations.grail.itemDetails.character)}</TableHead>
-              <TableHead>{t(translations.grail.itemDetails.foundDate)}</TableHead>
-              <TableHead>{t(translations.grail.itemDetails.method)}</TableHead>
-              <TableHead className="text-right">
-                {t(translations.grail.itemDetails.actions)}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedCharacters.map((character) => (
-              <CharacterProgressRow
-                key={character.id}
-                character={character}
-                progress={progress}
-                item={item}
-                onRequestRemove={handleRequestRemove}
-              />
-            ))}
-          </TableBody>
-        </Table>
+      {finds.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t(translations.grail.itemDetails.noFinds)}</p>
+      ) : (
+        <div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t(translations.grail.itemDetails.character)}</TableHead>
+                {showVersion && <TableHead>{t(translations.grail.itemDetails.version)}</TableHead>}
+                <TableHead>{t(translations.grail.itemDetails.foundDate)}</TableHead>
+                <TableHead>{t(translations.grail.itemDetails.method)}</TableHead>
+                <TableHead className="text-right">
+                  {t(translations.grail.itemDetails.actions)}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedFinds.map((find) => (
+                <CharacterFindRow
+                  key={find.progress.id}
+                  find={find}
+                  showVersion={showVersion}
+                  onRequestRemove={handleRequestRemove}
+                />
+              ))}
+            </TableBody>
+          </Table>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousPage}
-              disabled={safePage === 1}
-              className="gap-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {t(translations.common.previous)}
-            </Button>
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousPage}
+                disabled={safePage === 1}
+                className="gap-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                {t(translations.common.previous)}
+              </Button>
 
-            <span className="text-muted-foreground text-sm">
-              {t(translations.common.pagination, { current: safePage, total: totalPages })}
-            </span>
+              <span className="text-muted-foreground text-sm">
+                {t(translations.common.pagination, { current: safePage, total: totalPages })}
+              </span>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={safePage === totalPages}
-              className="gap-2"
-            >
-              {t(translations.common.next)}
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={safePage === totalPages}
+                className="gap-2"
+              >
+                {t(translations.common.next)}
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <AlertDialog
         open={pendingRemoval !== undefined}

@@ -11,7 +11,6 @@ const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
 // Mock dependencies
 vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
 vi.mock('@/stores/grailStore');
-vi.mock('@/hooks/useProgressLookup');
 vi.mock('@/hooks/useItemIcon', () => ({
   useItemIcon: () => ({ iconUrl: '/mock-icon.png', isLoading: false, error: null }),
 }));
@@ -30,7 +29,6 @@ vi.mock('../../../electron/items/runes', () => ({
 }));
 
 // Import after mocks
-import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { useGrailStore } from '@/stores/grailStore';
 
 const defaultSettings: Settings = {
@@ -84,21 +82,6 @@ function setupStoreMock(
   });
 }
 
-function setupProgressLookup(
-  entries: Map<
-    string,
-    {
-      normalFound: boolean;
-      etherealFound: boolean;
-      overallFound: boolean;
-      normalProgress: unknown[];
-      etherealProgress: unknown[];
-    }
-  > = new Map(),
-) {
-  vi.mocked(useProgressLookup).mockReturnValue(entries as ReturnType<typeof useProgressLookup>);
-}
-
 describe('When ItemDetailsDialog is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -115,7 +98,6 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
     mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     setupStoreMock();
-    setupProgressLookup();
   });
 
   describe('If itemId is null', () => {
@@ -229,7 +211,13 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
-      setupStoreMock({ items: [item], characters: [character] });
+      const progress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters: [character], progress: [progress] });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -511,25 +499,18 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If progress shows found', () => {
+  describe('If the item was found', () => {
     it('Then shows a Found status line instead of a badge', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item] });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound: true,
-              etherealFound: false,
-              overallFound: true,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const characters = [CharacterBuilder.new().withId('char-1').build()];
+      const progress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters, progress: [progress] });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -541,25 +522,11 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If progress shows not found', () => {
+  describe('If the item was not found', () => {
     it('Then shows a Not Found status line', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
       setupStoreMock({ items: [item] });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound: false,
-              etherealFound: false,
-              overallFound: false,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -569,7 +536,7 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If an item with optional ethereal type has per-version progress', () => {
+  describe('If ethereal tracking is on and an item with optional ethereal type has per-version progress', () => {
     const found = { text: 'Found', present: 'text-found', absent: 'text-missing' };
     const missing = { text: 'Not Found', present: 'text-missing', absent: 'text-found' };
 
@@ -586,21 +553,37 @@ describe('When ItemDetailsDialog is rendered', () => {
     }) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
-      setupStoreMock({ items: [item] });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound,
-              etherealFound,
-              overallFound: normalFound || etherealFound,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
+      const characters = [CharacterBuilder.new().withId('char-1').build()];
+      const progress = [
+        ...(normalFound
+          ? [
+              GrailProgressBuilder.new()
+                .withId('normal')
+                .withCharacterId('char-1')
+                .withItemId('item-1')
+                .withFoundDate(new Date('2024-01-01'))
+                .asNormal()
+                .build(),
+            ]
+          : []),
+        ...(etherealFound
+          ? [
+              GrailProgressBuilder.new()
+                .withId('ethereal')
+                .withCharacterId('char-1')
+                .withItemId('item-1')
+                .withFoundDate(new Date('2024-01-02'))
+                .asEthereal()
+                .build(),
+            ]
+          : []),
+      ];
+      setupStoreMock({
+        items: [item],
+        characters,
+        progress,
+        settings: { grailEthereal: true },
+      });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -617,11 +600,58 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If an item with optional ethereal type is shown', () => {
+  describe('If ethereal tracking is off and only the ethereal version was found', () => {
+    it('Then the normal version reads Not Found and the ethereal find is labelled as not tracked', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const characters = [CharacterBuilder.new().withId('char-1').build()];
+      const progress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2026-01-31'))
+        .asEthereal()
+        .build();
+      setupStoreMock({
+        items: [item],
+        characters,
+        progress: [progress],
+        settings: { grailEthereal: false },
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const normalStatus = screen.getByText('Normal:').nextElementSibling;
+      const etherealStatus = screen.getByText('Ethereal:').nextElementSibling;
+      expect(normalStatus).toHaveTextContent('Not Found');
+      expect(etherealStatus).toHaveTextContent('Found (not tracked)');
+      expect(etherealStatus).not.toHaveClass('text-found');
+      expect(etherealStatus).not.toHaveClass('text-missing');
+    });
+  });
+
+  describe('If ethereal tracking is off and no ethereal version was found', () => {
+    it('Then a single status line is shown for the tracked normal version', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item], settings: { grailEthereal: false } });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
+      expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If an item with optional ethereal type is shown while ethereal tracking is on', () => {
     it('Then the Normal and Ethereal statuses sit side by side in one row', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
-      setupStoreMock({ items: [item] });
+      setupStoreMock({ items: [item], settings: { grailEthereal: true } });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -657,12 +687,18 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If characters exist', () => {
+  describe('If characters exist and one found the item', () => {
     it('Then renders CharacterProgressTable', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
-      setupStoreMock({ items: [item], characters: [character] });
+      const progress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters: [character], progress: [progress] });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -762,8 +798,140 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If character has no foundDate', () => {
-    it('Then shows Never', () => {
+  describe('If several characters exist but only some found the item', () => {
+    it('Then only the finders are listed, most recent find first', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const characters = [
+        CharacterBuilder.new().withId('char-1').withName('Amazon').build(),
+        CharacterBuilder.new().withId('char-2').withName('Barb').build(),
+        CharacterBuilder.new().withId('char-3').withName('Necro').build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('prog-1')
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2024-01-01'))
+          .asNormal()
+          .build(),
+        GrailProgressBuilder.new()
+          .withId('prog-3')
+          .withCharacterId('char-3')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2024-03-01'))
+          .asNormal()
+          .build(),
+      ];
+      setupStoreMock({ items: [item], characters, progress });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      const rows = within(section).getAllByRole('row').slice(1);
+      expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+        'Necro',
+        'Amazon',
+      ]);
+      expect(within(section).queryByText('Barb')).not.toBeInTheDocument();
+      expect(within(section).queryByRole('columnheader', { name: 'Version' })).toBeNull();
+    });
+  });
+
+  describe('If the item can be normal or ethereal and was found as both', () => {
+    it('Then each find shows its version', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('prog-normal')
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2024-01-01'))
+          .asNormal()
+          .build(),
+        GrailProgressBuilder.new()
+          .withId('prog-ethereal')
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2024-02-01'))
+          .asEthereal()
+          .build(),
+      ];
+      setupStoreMock({ items: [item], characters: [character], progress });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      expect(within(section).getByRole('columnheader', { name: 'Version' })).toBeInTheDocument();
+      const rows = within(section).getAllByRole('row').slice(1);
+      expect(rows.map((row) => within(row).getAllByRole('cell')[1].textContent)).toEqual([
+        'Ethereal',
+        'Normal',
+      ]);
+    });
+  });
+
+  describe('If a find belongs to a character that no longer exists', () => {
+    it('Then neither the status line nor the table counts it', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
+      const strayFind = GrailProgressBuilder.new()
+        .withCharacterId('deleted-char')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters: [character], progress: [strayFind] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Not Found')).toBeVisible();
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      expect(within(section).getByText('No character has found this item yet.')).toBeVisible();
+      expect(within(section).queryByRole('table')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a find is of a version the item cannot have', () => {
+    it('Then neither the status line nor the table counts it', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
+      const strayFind = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asEthereal()
+        .build();
+      setupStoreMock({
+        items: [item],
+        characters: [character],
+        progress: [strayFind],
+        settings: { grailEthereal: true },
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Not Found')).toBeVisible();
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      expect(within(section).getByText('No character has found this item yet.')).toBeVisible();
+      expect(within(section).queryByRole('table')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If no character found the item', () => {
+    it('Then one short line is shown instead of an empty table', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
@@ -773,7 +941,10 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Never')).toBeInTheDocument();
+      const section = screen.getByRole('region', { name: 'Character progress' });
+      expect(within(section).getByText('No character has found this item yet.')).toBeVisible();
+      expect(within(section).queryByRole('table')).not.toBeInTheDocument();
+      expect(within(section).queryByText('TestSorc')).not.toBeInTheDocument();
     });
   });
 
@@ -793,11 +964,11 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If etherealType "optional"', () => {
+  describe('If etherealType "optional" and ethereal tracking is on', () => {
     it('Then both the Normal and Ethereal statuses are shown', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
-      setupStoreMock({ items: [item] });
+      setupStoreMock({ items: [item], settings: { grailEthereal: true } });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
@@ -1259,7 +1430,6 @@ function openMarkAsFoundPrompt() {
 describe('When the user marks an item as found', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupProgressLookup();
     mockAddManualProgress.mockResolvedValue(undefined);
   });
 
@@ -1540,7 +1710,6 @@ describe('When the user marks an item as found', () => {
 describe('When the user removes a found record', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupProgressLookup();
     mockRemoveProgress.mockResolvedValue(undefined);
   });
 
