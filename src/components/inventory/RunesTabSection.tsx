@@ -54,7 +54,6 @@ export interface RunesTabSectionProps {
   testId?: string;
   items: ParsedInventoryItem[];
   renderOwnedTile: (item: ParsedInventoryItem) => ReactNode;
-  disableInteractions?: boolean;
   onItemClick?: (item: ParsedInventoryItem) => void;
   onItemContextMenu?: (item: ParsedInventoryItem) => void;
   onDropInventoryItem?: (
@@ -69,7 +68,6 @@ export function RunesTabSection({
   testId,
   items,
   renderOwnedTile,
-  disableInteractions = false,
   onItemClick,
   onItemContextMenu,
   onDropInventoryItem,
@@ -96,7 +94,7 @@ export function RunesTabSection({
         testId={testId}
         showBaseGrid={false}
         onDropOnBoard={
-          !disableInteractions && onDropInventoryItem
+          onDropInventoryItem
             ? (event, targetGridX, targetGridY) => {
                 void onDropInventoryItem(event, targetGridX, targetGridY);
               }

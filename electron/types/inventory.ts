@@ -94,7 +94,6 @@ export interface CharacterInventorySnapshot<
   sourceFileType: VaultSourceFileType;
   sourceFilePath: string;
   sourceFileVersion?: number;
-  readOnly?: boolean;
   capturedAt: Date;
   items: TItem[];
 }

@@ -397,36 +397,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       ).toBeInTheDocument();
     });
 
-    it('Then a read-only character snapshot (Reign of the Warlock) explains why and its items cannot be dragged', async () => {
-      // Arrange
-      const defaultResult = await searchAllMock();
-      searchAllMock.mockReset();
-      searchAllMock.mockResolvedValue({
-        ...defaultResult,
-        inventory: {
-          ...defaultResult.inventory,
-          snapshots: defaultResult.inventory.snapshots.map((snapshot: object) => ({
-            ...snapshot,
-            readOnly: true,
-          })),
-        },
-      });
-
-      // Act
-      render(<CharacterInventoryBrowser />);
-
-      // Assert
-      const inventoryBoard = await waitFor(() => screen.getByTestId('inventory-board-snap-1'));
-      expect(
-        screen.getByText(
-          "Items of this character can't be moved yet: Reign of the Warlock character saves are read-only.",
-        ),
-      ).toBeInTheDocument();
-      for (const tile of within(inventoryBoard).getAllByTestId('inventory-item-tile')) {
-        expect(tile).toHaveAttribute('draggable', 'false');
-      }
-    });
-
     it('Then it renders extended stash cells in the same stash board without a separate overflow board', async () => {
       // Arrange
       searchAllMock.mockResolvedValueOnce({
@@ -753,7 +723,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(screen.queryByTestId('corpse-board-shared-stash-snap')).not.toBeInTheDocument();
     });
 
-    it('Then modern stash snapshots show modern tab labels, stack badges, and disable drag', async () => {
+    it('Then modern stash snapshots show modern tab labels and stack badges', async () => {
       // Arrange
       searchAllMock.mockResolvedValueOnce({
         inventory: {
@@ -765,7 +735,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-shared.d2i',
               sourceFileVersion: 105,
-              readOnly: true,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -910,9 +879,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(screen.getByText('Materials')).toBeInTheDocument();
       expect(screen.getByText('Runes')).toBeInTheDocument();
       expect(screen.getAllByTestId('inventory-item-stack-count')[0]).toHaveTextContent('7');
-
-      const gemsTile = screen.getByLabelText(/^Perfect Ruby, /);
-      expect(gemsTile).toHaveAttribute('draggable', 'false');
     });
 
     it('Then modern stash snapshots render all modern tabs even when some are empty', async () => {
@@ -927,7 +893,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-empty-tabs.d2i',
               sourceFileVersion: 105,
-              readOnly: true,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -1051,7 +1016,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-overlap.d2i',
               sourceFileVersion: 105,
-              readOnly: true,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -1356,7 +1320,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-pickup.d2i',
               sourceFileVersion: 105,
-              readOnly: false,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -1799,7 +1762,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-pickup-full-stack.d2i',
               sourceFileVersion: 105,
-              readOnly: false,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -1894,7 +1856,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-pickup-return-to-source.d2i',
               sourceFileVersion: 105,
-              readOnly: false,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -1998,7 +1959,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-pickup-occupied-anchor.d2i',
               sourceFileVersion: 105,
-              readOnly: false,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {
@@ -3670,7 +3630,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2i',
               sourceFilePath: '/tmp/modern-drop-resource.d2i',
               sourceFileVersion: 105,
-              readOnly: false,
               capturedAt: new Date('2024-01-01T00:00:00.000Z'),
               items: [
                 {

@@ -29,7 +29,7 @@ describe('When showInventoryOperationErrorToast is called', () => {
       messages.stackNeedsSplit,
     ],
     [
-      'a Reign of the Warlock character save would be written',
+      'a character save cannot be written back unchanged',
       new Error('Vault add persisted but source item removal failed: CHARACTER_SAVE_READ_ONLY'),
       messages.characterSaveReadOnly,
     ],

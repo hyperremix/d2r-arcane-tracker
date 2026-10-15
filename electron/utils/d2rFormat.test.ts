@@ -6,12 +6,14 @@ import {
   isModernStashVersion,
   isResourceCodeOfKind,
   isResourceItemCode,
+  isRotwCharacterSave,
   isRuneCode,
   MAX_RESOURCE_STACK_COUNT,
   normalizeItemCode,
   normalizeItemCodeKey,
   RESOURCE_STASH_TAB_BY_KIND,
   type ResourceStashTabKind,
+  readCharacterSaveVersion,
   resolveResourceStashTabKind,
   resolveStackCount,
   SAVE_FILE_EXTENSIONS,
@@ -40,6 +42,55 @@ describe('When saveFileTypeFromExtension is called', () => {
 
     // Assert
     expect(extensions).toEqual(expected);
+  });
+});
+
+function saveWithVersion(version: number, length = 16): Buffer {
+  const buffer = Buffer.alloc(length);
+  buffer.writeUInt32LE(version, 4);
+  return buffer;
+}
+
+describe('When readCharacterSaveVersion is called', () => {
+  it('Then the version at byte 4 is returned, or undefined for a file shorter than the header start', () => {
+    // Arrange
+    const saves = [saveWithVersion(99), saveWithVersion(105, 8), Buffer.alloc(7)];
+
+    // Act
+    const versions = saves.map((save) => readCharacterSaveVersion(save));
+
+    // Assert
+    expect(versions).toEqual([99, 105, undefined]);
+  });
+});
+
+describe('When isRotwCharacterSave is called', () => {
+  it('Then only saves from version 105 on count as Reign of the Warlock layouts', () => {
+    // Arrange
+    const saves = [
+      saveWithVersion(96),
+      saveWithVersion(99),
+      saveWithVersion(104),
+      saveWithVersion(105),
+      saveWithVersion(106),
+    ];
+
+    // Act
+    const result = saves.map((save) => isRotwCharacterSave(save));
+
+    // Assert
+    expect(result).toEqual([false, false, false, true, true]);
+  });
+
+  it('Then a file too short to hold a version is not a Reign of the Warlock save', () => {
+    // Arrange
+    const save = Buffer.alloc(4);
+
+    // Act
+    const result = isRotwCharacterSave(save);
+
+    // Assert
+    expect(result).toBe(false);
   });
 });
 

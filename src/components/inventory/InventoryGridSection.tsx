@@ -41,7 +41,6 @@ export interface InventoryGridSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
-  disableInteractions?: boolean;
   snapshotSourceFilePath?: string;
   snapshotSourceFileType?: VaultSourceFileType;
   sectionLocationContext?: VaultLocationContext;
@@ -92,7 +91,6 @@ export function InventoryGridSection({
   onSelect,
   onDragStart,
   onDragEnd,
-  disableInteractions = false,
   snapshotSourceFilePath,
   snapshotSourceFileType,
   sectionLocationContext,
@@ -150,10 +148,7 @@ export function InventoryGridSection({
     [classified.unplaced, overflowLayout.itemKeys],
   );
   const canDropOnSection =
-    !disableInteractions &&
-    !!snapshotSourceFilePath &&
-    !!snapshotSourceFileType &&
-    !!sectionLocationContext;
+    !!snapshotSourceFilePath && !!snapshotSourceFileType && !!sectionLocationContext;
   const clearDragPreview = useCallback(() => {
     setActiveDragKind(null);
     setActiveVaultDragItem(null);
@@ -429,7 +424,6 @@ export function InventoryGridSection({
                 item={item}
                 iconLookup={iconLookup}
                 selected={item.fingerprint === selectedFingerprint}
-                disableInteractions={disableInteractions}
                 isVaultPresent={isVaultPresent}
                 onSelect={onSelect}
                 onDragStart={onDragStart}
@@ -479,7 +473,6 @@ export function InventoryGridSection({
                     item={item}
                     iconLookup={iconLookup}
                     selected={item.fingerprint === selectedFingerprint}
-                    disableInteractions={disableInteractions}
                     isVaultPresent={isVaultPresent}
                     unplacedReason={reason}
                     onSelect={onSelect}
