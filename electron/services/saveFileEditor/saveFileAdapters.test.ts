@@ -6,7 +6,6 @@ import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as d2sConstants from '../d2s/constants';
-import { registerD2sConstants } from '../d2s/constants';
 import { getClassicStashCodec } from '../saveFormat/saveFormat';
 import {
   assertCharacterSaveWritable,
@@ -224,7 +223,7 @@ describe('When a save file is decoded for in-memory editing', () => {
 
   beforeEach(() => {
     // Registered on the d2s instance imported here, which is the one the adapters decode with.
-    registerD2sConstants(d2s);
+    d2sConstants.registerD2sConstants(d2s);
     directory = mkdtempSync(join(tmpdir(), 'arcane-save-adapters-'));
   });
 
@@ -326,7 +325,7 @@ describe('When a Reign of the Warlock character save is checked before it is wri
   let directory: string;
 
   beforeEach(() => {
-    registerD2sConstants(d2s);
+    d2sConstants.registerD2sConstants(d2s);
     directory = mkdtempSync(join(tmpdir(), 'arcane-save-adapters-'));
   });
 
@@ -381,8 +380,8 @@ describe('When a Reign of the Warlock character save is checked before it is wri
     });
   });
 
-  describe('If the check runs before the d2s constants were registered by the caller', () => {
-    it('Then the check registers them itself', async () => {
+  describe('If a Warlock save is checked', () => {
+    it('Then the check makes sure the d2s constants are registered itself, not only its callers', async () => {
       // Arrange
       const filePath = join(directory, 'Warlock.d2s');
       writeFileSync(filePath, readFileSync(WARLOCK_FIXTURE_PATH));

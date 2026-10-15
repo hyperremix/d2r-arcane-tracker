@@ -1144,18 +1144,70 @@ describe('When the real saveFileEditor edits a Reign of the Warlock character sa
       expect(existsSync(backups)).toBe(false);
     }, 30000);
 
-    it('Then removing an item is refused up front while the regular Warlock save is accepted', async () => {
+    it('Then the up-front check for removing an item refuses it and the file does not change', async () => {
       // Arrange
       const before = fileStates(unsupported);
 
       // Act
-      const refused = assertSaveFileAllowsItemRemoval(unsupported, 'd2s');
-      const accepted = assertSaveFileAllowsItemRemoval(warlock, 'd2s');
+      const act = assertSaveFileAllowsItemRemoval(unsupported, 'd2s');
 
       // Assert
-      await expect(refused).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      await expect(accepted).resolves.toBeUndefined();
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
       expect(fileStates(unsupported)).toEqual(before);
+    }, 30000);
+
+    it('Then the up-front check for removing an item accepts the regular Warlock save', async () => {
+      // Arrange
+      const before = fileStates(warlock);
+
+      // Act
+      const act = assertSaveFileAllowsItemRemoval(warlock, 'd2s');
+
+      // Assert
+      await expect(act).resolves.toBeUndefined();
+      expect(fileStates(warlock)).toEqual(before);
+    }, 30000);
+
+    it('Then splitting a rune stack of a modern stash into it is refused before any copy is written', async () => {
+      // Arrange
+      const entries = await parseFile(stash);
+      const stack = entries.find(
+        (entry) => entry.stashTabKind === 'runes' && entry.stackCount > 2,
+      ) as ParsedEntry;
+      const cell = findFreeCell(entries, 0);
+      const before = fileStates(unsupported, stash);
+
+      // Act
+      const act = splitStackInSaveFile({
+        sourceFilePath: stash,
+        sourceFileType: 'd2i',
+        sourceStashTab: stack.stashTab,
+        sourceItemCode: String(stack.item.code),
+        sourceRawItemJson: JSON.stringify(stack.item),
+        splitCount: 2,
+        targets: [
+          {
+            targetFilePath: stash,
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: cell.x,
+            targetGridY: cell.y,
+          },
+          {
+            targetFilePath: unsupported,
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 5,
+            targetGridY: 0,
+          },
+        ],
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(fileStates(unsupported, stash)).toEqual(before);
+      expect(existsSync(backups)).toBe(false);
     }, 30000);
   });
 });

@@ -72,7 +72,6 @@ export async function assertSaveFileAllowsItemRemoval(
   filePath: string,
   fileType: VaultSourceFileType,
 ): Promise<void> {
-  ensureD2sConstants();
   await assertCharacterSaveWritable(await openSaveFile(filePath, fileType));
 }
 
