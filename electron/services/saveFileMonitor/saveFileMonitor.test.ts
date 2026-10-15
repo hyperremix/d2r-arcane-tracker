@@ -2236,7 +2236,7 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
     });
 
-    it('Then processSingleFile lists a Reign of the Warlock character as a Warlock with a read-only snapshot', async () => {
+    it('Then processSingleFile lists a Reign of the Warlock character as a Warlock with an editable snapshot', async () => {
       // Arrange
       vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         items: [],
@@ -2249,8 +2249,8 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.success).toBe(true);
-      // The save file editor cannot write v105 character saves, so drag-and-drop is disabled
-      expect(parseResult.inventorySnapshot?.readOnly).toBe(true);
+      // The save file editor writes v105 character saves, so their items can be dragged
+      expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.saveFile).toMatchObject({ characterClass: 'warlock', level: 1 });
     });
 

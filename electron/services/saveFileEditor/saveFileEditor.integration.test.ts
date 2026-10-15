@@ -1,9 +1,13 @@
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import type { types as d2sTypes } from '@dschu012/d2s';
+import * as d2s from '@dschu012/d2s';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   addItemToRotwCharacterSave,
+  finalizeSave,
+  hasValidSizeAndChecksum,
   readModernStashItem,
   readWarlockSave,
 } from '../../test/helpers/rotwCharacterSave';
@@ -449,10 +453,91 @@ describe('When the real saveFileEditor modifies a v105 shared stash', () => {
   });
 });
 
-describe('When the real saveFileEditor is asked to edit a Reign of the Warlock character save', () => {
+/** Fixed-size header of a v105 character save: everything before the attributes section. */
+const ROTW_HEADER_END = 833;
+/** Checksum and file size, which every write updates. */
+const ROTW_SIZE_AND_CHECKSUM = { start: 8, end: 16 };
+const CHAOS_SC_FIXTURE_PATH = resolve(process.cwd(), 'electron/services/fixtures/ChaosSCV105.d2s');
+/** The unique Annihilus small charm in ChaosSC's inventory (id unique in the save). */
+const ANNIHILUS_ID = 2620541511;
+/** The unique Hellfire Torch large charm in ChaosSC's inventory. */
+const HELLFIRE_TORCH_ID = 771980075;
+
+async function readCharacter(path: string): Promise<d2sTypes.ID2S> {
+  return d2s.read(readFileSync(path));
+}
+
+/** Number of items with this id among the character's, corpse and mercenary items. */
+function countCharacterItems(save: d2sTypes.ID2S, itemId: number): number {
+  return [...save.items, ...(save.corpse_items ?? []), ...(save.merc_items ?? [])].filter(
+    (item: d2sTypes.IItem) => item.id === itemId,
+  ).length;
+}
+
+/** Item codes of a character's own items, sorted, to compare item sets. */
+function characterItemCodes(save: d2sTypes.ID2S): string[] {
+  return save.items.map((item: d2sTypes.IItem) => item.type).sort();
+}
+
+/**
+ * Offset of the mercenary section: "jf", then the mercenary item list ("JM") or, without a hired
+ * mercenary, the golem section ("kf"). Everything from here to the end of the file (mercenary,
+ * golem and the Reign of the Warlock "lf" section) must survive an edit of the character's items.
+ */
+function mercenarySectionOffset(save: Buffer): number {
+  const withItems = save.lastIndexOf(Buffer.from('jfJM', 'latin1'));
+  return withItems >= 0 ? withItems : save.lastIndexOf(Buffer.from('jfkf', 'latin1'));
+}
+
+/** Asserts a valid file whose header and sections after the character's items are unchanged. */
+function expectOnlyCharacterItemsChanged(before: Buffer, after: Buffer): void {
+  expect(hasValidSizeAndChecksum(after)).toBe(true);
+  expect(
+    after
+      .subarray(ROTW_SIZE_AND_CHECKSUM.end, ROTW_HEADER_END)
+      .equals(before.subarray(ROTW_SIZE_AND_CHECKSUM.end, ROTW_HEADER_END)),
+  ).toBe(true);
+  expect(
+    after
+      .subarray(0, ROTW_SIZE_AND_CHECKSUM.start)
+      .equals(before.subarray(0, ROTW_SIZE_AND_CHECKSUM.start)),
+  ).toBe(true);
+  const tail = before.subarray(mercenarySectionOffset(before));
+  expect(after.subarray(mercenarySectionOffset(after)).equals(tail)).toBe(true);
+}
+
+/** Free top-left cell for an item of this size in the first shared tab of a stash. */
+async function findFreeStashCell(stash: string, width = 1, height = 1) {
+  return findFreeCell(await parseFile(stash), 0, width, height);
+}
+
+/**
+ * A copy of a v105 character save that lists two empty corpses. The d2s library reads both but
+ * writes only one corpse, so it cannot write this save back unchanged.
+ */
+function withTwoEmptyCorpses(save: Buffer): Buffer {
+  const corpseAndMercenary = Buffer.from('JM\x00\x00jf', 'latin1');
+  const offset = save.lastIndexOf(corpseAndMercenary);
+  if (offset === -1) {
+    throw new Error('The save has no empty corpse list');
+  }
+  const emptyCorpse = Buffer.concat([Buffer.alloc(12), Buffer.from('JM\x00\x00', 'latin1')]);
+  return finalizeSave(
+    Buffer.concat([
+      save.subarray(0, offset),
+      Buffer.from('JM\x02\x00', 'latin1'),
+      emptyCorpse,
+      emptyCorpse,
+      save.subarray(offset + 4),
+    ]),
+  );
+}
+
+describe('When the real saveFileEditor edits a Reign of the Warlock character save', () => {
   let directory: string;
   let stash: string;
   let warlock: string;
+  let chaos: string;
   let warTravelerId: number;
 
   beforeEach(async () => {
@@ -460,7 +545,9 @@ describe('When the real saveFileEditor is asked to edit a Reign of the Warlock c
     directory = mkdtempSync(join(tmpdir(), 'editor-rotw-character-'));
     stash = join(directory, 'Stash.d2i');
     warlock = join(directory, 'Warlock.d2s');
+    chaos = join(directory, 'ChaosSC.d2s');
     copyFileSync(FIXTURE_PATH, stash);
+    copyFileSync(CHAOS_SC_FIXTURE_PATH, chaos);
     const warTraveler = await readModernStashItem('War Traveler');
     warTravelerId = warTraveler.id as number;
     writeFileSync(warlock, await addItemToRotwCharacterSave(readWarlockSave(), warTraveler, 0, 0));
@@ -470,15 +557,18 @@ describe('When the real saveFileEditor is asked to edit a Reign of the Warlock c
     rmSync(directory, { recursive: true, force: true });
   });
 
-  describe('If an item is moved from the Warlock to a stash', () => {
-    it('Then the move is refused and neither file changes', async () => {
+  describe('If an item is moved from the Warlock to a stash and back', () => {
+    it('Then each move leaves the item in exactly one file and the rest of the Warlock save unchanged', async () => {
       // Arrange
-      const cell = findFreeCell(await parseFile(stash), 0, 2, 2);
-      const warlockBytes = readFileSync(warlock);
-      const stashBytes = readFileSync(stash);
+      const warlockBefore = readFileSync(warlock);
+      const itemCodesBefore = characterItemCodes(await readCharacter(warlock));
+      const stashCopiesBefore = (await parseFile(stash)).filter(
+        (entry) => entry.item.id === warTravelerId,
+      ).length;
+      const cell = await findFreeStashCell(stash, 2, 2);
 
       // Act
-      const act = moveItemBetweenSaveFiles({
+      await moveItemBetweenSaveFiles({
         sourceFilePath: warlock,
         sourceFileType: 'd2s',
         sourceItemId: warTravelerId,
@@ -489,130 +579,168 @@ describe('When the real saveFileEditor is asked to edit a Reign of the Warlock c
         targetGridX: cell.x,
         targetGridY: cell.y,
       });
-
-      // Assert
-      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
-    }, 30000);
-  });
-
-  describe('If an item is moved from a stash to the Warlock', () => {
-    it('Then the move is refused and neither file changes', async () => {
-      // Arrange
-      const source = (await parseFile(stash)).find(
-        (entry) => entry.stashTab === 0 && entry.item.inv_width === 1,
+      const warlockWithoutItem = readFileSync(warlock);
+      const movedEntry = (await parseFile(stash)).find(
+        (entry) =>
+          entry.item.unique_name === 'War Traveler' &&
+          entry.stashTab === 0 &&
+          entry.item.position_x === cell.x &&
+          entry.item.position_y === cell.y,
       ) as ParsedEntry;
-      const warlockBytes = readFileSync(warlock);
-      const stashBytes = readFileSync(stash);
-
-      // Act
-      const act = moveItemBetweenSaveFiles({
+      await moveItemBetweenSaveFiles({
         sourceFilePath: stash,
         sourceFileType: 'd2i',
-        ...toLocator(source),
+        ...toLocator(movedEntry),
         targetFilePath: warlock,
         targetFileType: 'd2s',
         targetLocationContext: 'inventory',
-        targetGridX: 5,
+        targetGridX: 0,
         targetGridY: 0,
       });
 
       // Assert
-      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+      expect(countCharacterItems(await d2s.read(warlockWithoutItem), warTravelerId)).toBe(0);
+      expectOnlyCharacterItemsChanged(warlockBefore, warlockWithoutItem);
+      const warlockAfter = readFileSync(warlock);
+      const warlockSave = await d2s.read(warlockAfter);
+      expect(countCharacterItems(warlockSave, warTravelerId)).toBe(1);
+      expect(characterItemCodes(warlockSave)).toEqual(itemCodesBefore);
+      expectOnlyCharacterItemsChanged(warlockBefore, warlockAfter);
+      const stashEntries = await parseFile(stash);
+      expect(stashEntries.filter((entry) => entry.item.id === warTravelerId)).toHaveLength(
+        stashCopiesBefore,
+      );
     }, 30000);
   });
 
-  describe('If an item is written back (unvaulted) into the Warlock', () => {
-    it('Then the write is refused and the save does not change', async () => {
+  describe('If an item of a high level Warlock with a hired mercenary is moved to a stash and back', () => {
+    it('Then the mercenary, its items and the Reign of the Warlock section are kept byte for byte', async () => {
       // Arrange
-      const warTraveler = await readModernStashItem('War Traveler');
-      const warlockBytes = readFileSync(warlock);
+      const chaosBefore = readFileSync(chaos);
+      const saveBefore = await d2s.read(chaosBefore);
+      const cell = await findFreeStashCell(stash);
 
       // Act
-      const act = addItemToSaveFile({
-        filePath: warlock,
-        fileType: 'd2s',
-        item: warTraveler,
-        locationContext: 'inventory',
-        targetGridX: 5,
-        targetGridY: 0,
-      });
-
-      // Assert
-      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-    }, 30000);
-  });
-
-  describe('If it is checked whether items can be removed from a save file', () => {
-    it('Then the Warlock is refused while a shared stash is accepted', async () => {
-      // Arrange
-      const warlockBytes = readFileSync(warlock);
-
-      // Act
-      const refused = assertSaveFileAllowsItemRemoval(warlock, 'd2s');
-      const accepted = assertSaveFileAllowsItemRemoval(stash, 'd2i');
-
-      // Assert
-      await expect(refused).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      await expect(accepted).resolves.toBeUndefined();
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-    }, 30000);
-  });
-
-  describe('If a stack is split off the Warlock', () => {
-    it('Then the split is refused and neither file changes', async () => {
-      // Arrange
-      const cell = findFreeCell(await parseFile(stash), 0);
-      const warlockBytes = readFileSync(warlock);
-      const stashBytes = readFileSync(stash);
-
-      // Act
-      const act = splitStackInSaveFile({
-        sourceFilePath: warlock,
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: chaos,
         sourceFileType: 'd2s',
-        sourceStashTab: 0,
-        sourceItemCode: 'hp1',
-        splitCount: 2,
-        targets: [
-          {
-            targetFilePath: stash,
-            targetFileType: 'd2i',
-            targetLocationContext: 'stash',
-            targetStashTab: 0,
-            targetGridX: cell.x,
-            targetGridY: cell.y,
-          },
-        ],
+        sourceItemId: ANNIHILUS_ID,
+        targetFilePath: stash,
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 0,
+        targetGridX: cell.x,
+        targetGridY: cell.y,
+      });
+      const chaosWithoutItem = readFileSync(chaos);
+      const movedEntry = (await parseFile(stash)).find(
+        (entry) => entry.item.id === ANNIHILUS_ID,
+      ) as ParsedEntry;
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: stash,
+        sourceFileType: 'd2i',
+        ...toLocator(movedEntry),
+        targetFilePath: chaos,
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 9,
+        targetGridY: 0,
       });
 
       // Assert
-      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+      expect(countCharacterItems(await d2s.read(chaosWithoutItem), ANNIHILUS_ID)).toBe(0);
+      expectOnlyCharacterItemsChanged(chaosBefore, chaosWithoutItem);
+      const chaosAfter = readFileSync(chaos);
+      const saveAfter = await d2s.read(chaosAfter);
+      expect(countCharacterItems(saveAfter, ANNIHILUS_ID)).toBe(1);
+      expect(characterItemCodes(saveAfter)).toEqual(characterItemCodes(saveBefore));
+      expect(saveAfter.merc_items.map((item: d2sTypes.IItem) => item.runeword_name)).toEqual(
+        saveBefore.merc_items.map((item: d2sTypes.IItem) => item.runeword_name),
+      );
+      expectOnlyCharacterItemsChanged(chaosBefore, chaosAfter);
+      expect((await parseFile(stash)).filter((entry) => entry.item.id === ANNIHILUS_ID)).toEqual(
+        [],
+      );
     }, 30000);
   });
 
-  describe('If a rune stack is split into a free shared cell and then into the Warlock', () => {
-    it('Then the split is refused before any copy is written and no file changes', async () => {
+  describe('If an item is moved within the Warlock save, from the inventory to the personal stash', () => {
+    it('Then the item is in its new place once and the rest of the save is unchanged', async () => {
+      // Arrange
+      const chaosBefore = readFileSync(chaos);
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: chaos,
+        sourceFileType: 'd2s',
+        sourceItemId: ANNIHILUS_ID,
+        targetFilePath: chaos,
+        targetFileType: 'd2s',
+        targetLocationContext: 'stash',
+        targetGridX: 0,
+        targetGridY: 0,
+      });
+
+      // Assert
+      const chaosAfter = readFileSync(chaos);
+      const moved = (await d2s.read(chaosAfter)).items.filter(
+        (item: d2sTypes.IItem) => item.id === ANNIHILUS_ID,
+      );
+      expect(moved).toHaveLength(1);
+      expect(moved[0]).toMatchObject({ alt_position_id: 5, position_x: 0, position_y: 0 });
+      expectOnlyCharacterItemsChanged(chaosBefore, chaosAfter);
+    }, 30000);
+  });
+
+  describe('If an item of the Warlock is vaulted and later written back', () => {
+    it('Then it is removed and restored once and the rest of the save is unchanged', async () => {
+      // Arrange
+      const chaosBefore = readFileSync(chaos);
+
+      // Act: the vault checks the source, keeps the item as JSON and removes it from the save
+      await assertSaveFileAllowsItemRemoval(chaos, 'd2s');
+      const vaulted = JSON.stringify(await readSaveFileItem(chaos, 'd2s', HELLFIRE_TORCH_ID));
+      await removeItemFromSaveFile(chaos, 'd2s', HELLFIRE_TORCH_ID);
+      const chaosVaulted = readFileSync(chaos);
+      await addItemToSaveFile({
+        filePath: chaos,
+        fileType: 'd2s',
+        item: JSON.parse(vaulted),
+        locationContext: 'inventory',
+        targetGridX: 9,
+        targetGridY: 1,
+      });
+
+      // Assert
+      expect(countCharacterItems(await d2s.read(chaosVaulted), HELLFIRE_TORCH_ID)).toBe(0);
+      expectOnlyCharacterItemsChanged(chaosBefore, chaosVaulted);
+      const chaosAfter = readFileSync(chaos);
+      const restored = (await d2s.read(chaosAfter)).items.filter(
+        (item: d2sTypes.IItem) => item.id === HELLFIRE_TORCH_ID,
+      );
+      expect(restored).toHaveLength(1);
+      expect(restored[0]).toMatchObject({ unique_name: 'Hellfire Torch', position_x: 9 });
+      expectOnlyCharacterItemsChanged(chaosBefore, chaosAfter);
+    }, 30000);
+  });
+
+  describe('If a rune stack is split into a free shared cell and into the Warlock', () => {
+    it('Then each target gets one rune, the stack shrinks by two and the Warlock save stays valid', async () => {
       // Arrange
       const entries = await parseFile(stash);
       const stack = entries.find(
         (entry) => entry.stashTabKind === 'runes' && entry.stackCount > 2,
       ) as ParsedEntry;
       const cell = findFreeCell(entries, 0);
-      const warlockBytes = readFileSync(warlock);
-      const stashBytes = readFileSync(stash);
+      const warlockBefore = readFileSync(warlock);
+      const runeCode = String(stack.item.code);
 
       // Act
-      const act = splitStackInSaveFile({
+      await splitStackInSaveFile({
         sourceFilePath: stash,
         sourceFileType: 'd2i',
         sourceStashTab: stack.stashTab,
-        sourceItemCode: String(stack.item.code),
+        sourceItemCode: runeCode,
         sourceRawItemJson: JSON.stringify(stack.item),
         splitCount: 2,
         targets: [
@@ -635,25 +763,108 @@ describe('When the real saveFileEditor is asked to edit a Reign of the Warlock c
       });
 
       // Assert
-      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
-      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+      const after = await parseFile(stash);
+      const afterStack = after.find(
+        (entry) => entry.stashTabKind === 'runes' && entry.item.code === stack.item.code,
+      ) as ParsedEntry;
+      expect(afterStack.stackCount).toBe(stack.stackCount - 2);
+      expect(
+        after.filter((entry) => entry.stashTab === 0 && entry.item.code === stack.item.code),
+      ).toHaveLength(1);
+      const warlockAfter = readFileSync(warlock);
+      const runes = (await d2s.read(warlockAfter)).items.filter(
+        (item: d2sTypes.IItem) => item.type.trim() === runeCode.trim(),
+      );
+      expect(runes).toHaveLength(1);
+      expect(runes[0]).toMatchObject({ position_x: 5, position_y: 0, alt_position_id: 1 });
+      expectOnlyCharacterItemsChanged(warlockBefore, warlockAfter);
     }, 30000);
   });
 
-  describe('If an item of the Warlock is read and then removed', () => {
-    it('Then it can be read, but the removal is refused and the save does not change', async () => {
+  describe('If a potion is split off within the Warlock save', () => {
+    it('Then it lands in the target cell, no potion is lost and the rest of the save is unchanged', async () => {
       // Arrange
-      const warlockBytes = readFileSync(warlock);
+      const warlockBefore = readFileSync(warlock);
+      const isPotion = (item: d2sTypes.IItem) => item.type.trim() === 'hp1';
+      const potionsBefore = (await d2s.read(warlockBefore)).items.filter(isPotion).length;
 
       // Act
-      const item = await readSaveFileItem(warlock, 'd2s', warTravelerId);
-      const act = removeItemFromSaveFile(warlock, 'd2s', warTravelerId);
+      await splitStackInSaveFile({
+        sourceFilePath: warlock,
+        sourceFileType: 'd2s',
+        sourceStashTab: 0,
+        sourceItemCode: 'hp1',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: warlock,
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 5,
+            targetGridY: 0,
+          },
+        ],
+      });
 
       // Assert
-      expect(item?.unique_name).toBe('War Traveler');
+      const warlockAfter = readFileSync(warlock);
+      const potionsAfter = (await d2s.read(warlockAfter)).items.filter(isPotion);
+      expect(potionsAfter).toHaveLength(potionsBefore);
+      expect(
+        potionsAfter.filter(
+          (item: d2sTypes.IItem) => item.position_x === 5 && item.alt_position_id === 1,
+        ),
+      ).toHaveLength(1);
+      expectOnlyCharacterItemsChanged(warlockBefore, warlockAfter);
+    }, 30000);
+  });
+
+  describe('If a Warlock save holds data the d2s library cannot write back unchanged', () => {
+    let unsupported: string;
+
+    beforeEach(() => {
+      unsupported = join(directory, 'TwoCorpses.d2s');
+      writeFileSync(unsupported, withTwoEmptyCorpses(readWarlockSave()));
+    });
+
+    it('Then an item move into it is refused and neither file changes', async () => {
+      // Arrange
+      const source = (await parseFile(stash)).find(
+        (entry) => entry.stashTab === 0 && entry.item.inv_width === 1,
+      ) as ParsedEntry;
+      const saveBytes = readFileSync(unsupported);
+      const stashBytes = readFileSync(stash);
+
+      // Act
+      const act = moveItemBetweenSaveFiles({
+        sourceFilePath: stash,
+        sourceFileType: 'd2i',
+        ...toLocator(source),
+        targetFilePath: unsupported,
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 5,
+        targetGridY: 0,
+      });
+
+      // Assert
       await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
-      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+      expect(readFileSync(unsupported).equals(saveBytes)).toBe(true);
+      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+    }, 30000);
+
+    it('Then removing an item is refused up front while the regular Warlock save is accepted', async () => {
+      // Arrange
+      const saveBytes = readFileSync(unsupported);
+
+      // Act
+      const refused = assertSaveFileAllowsItemRemoval(unsupported, 'd2s');
+      const accepted = assertSaveFileAllowsItemRemoval(warlock, 'd2s');
+
+      // Assert
+      await expect(refused).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      await expect(accepted).resolves.toBeUndefined();
+      expect(readFileSync(unsupported).equals(saveBytes)).toBe(true);
     }, 30000);
   });
 });

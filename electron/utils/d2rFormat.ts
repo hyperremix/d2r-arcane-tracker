@@ -71,18 +71,14 @@ export function isModernStashVersion(version: number | undefined): boolean {
  */
 export const ROTW_CHARACTER_HEADER_MIN_VERSION = ROTW_SAVE_VERSION;
 
-/** First character save (.d2s) version that the d2s library can read but not write back. */
-export const READ_ONLY_CHARACTER_SAVE_MIN_VERSION = ROTW_SAVE_VERSION;
-
 /** Version of a character save (.d2s) from its header, or undefined when the file is too short. */
 export function readCharacterSaveVersion(buffer: Buffer): number | undefined {
   return buffer.length >= 8 ? buffer.readUInt32LE(4) : undefined;
 }
 
-/** True when the character save (.d2s) is read but never written (v105+, which the d2s library cannot write back). */
-export function isReadOnlyCharacterSave(buffer: Buffer): boolean {
-  const version = readCharacterSaveVersion(buffer);
-  return version !== undefined && version >= READ_ONLY_CHARACTER_SAVE_MIN_VERSION;
+/** True when the character save (.d2s) uses the Reign of the Warlock (v105+) header layout. */
+export function isRotwCharacterSave(buffer: Buffer): boolean {
+  return (readCharacterSaveVersion(buffer) ?? 0) >= ROTW_CHARACTER_HEADER_MIN_VERSION;
 }
 
 /** Returns the value when it is a finite number, otherwise undefined. */

@@ -3,7 +3,7 @@ import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
-import { isReadOnlyCharacterSave } from '../../utils/d2rFormat';
+import { isRotwCharacterSave } from '../../utils/d2rFormat';
 import {
   type ClassicStashCodec,
   detectSaveFormat,
@@ -60,13 +60,29 @@ export async function openSaveFile(
   return { filePath, format, buffer };
 }
 
+/** True when the d2s library reads the save and writes it back byte for byte. */
+async function writesBackUnchanged(buffer: Buffer): Promise<boolean> {
+  try {
+    return Buffer.from(await d2s.write(await d2s.read(buffer))).equals(buffer);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Refuses every edit of a Reign of the Warlock (v105+) character save: the d2s library reads it
- * but cannot write it back. Checked before any file is written, so a move or split that involves
- * such a save changes no file at all.
+ * Refuses an edit of a Reign of the Warlock (v105+) character save that the d2s library would not
+ * write back unchanged. The library writes such a save from the bytes it read and only changes what
+ * was edited, so reading and writing the unchanged save must reproduce the file byte for byte. A
+ * save for which it does not holds data the library would lose or cannot read. Checked before any
+ * file is written, so a move or split that involves such a save changes no file at all. Older saves
+ * are not checked: the library rebuilds their header, so they never come back byte for byte.
  */
-export function assertCharacterSaveWritable(file: OpenedSaveFile): void {
-  if (file.format.kind === 'character' && isReadOnlyCharacterSave(file.buffer)) {
+export async function assertCharacterSaveWritable(file: OpenedSaveFile): Promise<void> {
+  if (
+    file.format.kind === 'character' &&
+    isRotwCharacterSave(file.buffer) &&
+    !(await writesBackUnchanged(file.buffer))
+  ) {
     throw new Error(CHARACTER_SAVE_READ_ONLY_ERROR);
   }
 }
@@ -75,11 +91,11 @@ export function assertCharacterSaveWritable(file: OpenedSaveFile): void {
  * Refuses whole-file edits of a modern stash (only its sectors can be edited) and of a character
  * save that cannot be written (see `assertCharacterSaveWritable`).
  */
-export function assertWholeFileWritable(file: OpenedSaveFile): void {
+export async function assertWholeFileWritable(file: OpenedSaveFile): Promise<void> {
   if (file.format.kind === 'modernStash') {
     throw new Error(MODERN_STASH_READ_ONLY_ERROR);
   }
-  assertCharacterSaveWritable(file);
+  await assertCharacterSaveWritable(file);
 }
 
 /** Opens the save file and refuses it when it cannot be written whole (see `assertWholeFileWritable`). */
@@ -87,7 +103,7 @@ export async function assertWritableSaveFile(
   filePath: string,
   fileType: VaultSourceFileType,
 ): Promise<void> {
-  assertWholeFileWritable(await openSaveFile(filePath, fileType));
+  await assertWholeFileWritable(await openSaveFile(filePath, fileType));
 }
 
 /** Where `DecodedSaveFile.placeItem` puts an item. */

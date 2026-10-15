@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,6 +27,8 @@ import { buildSaveFileHeader } from './saveFileMonitor/saveFileFormat';
 import { parseSaveContent } from './saveFileMonitor/saveFileParser';
 
 const WARLOCK_SAVE_PATH = '/saves/Warlock.d2s';
+/** A real level 90 Warlock with a hired mercenary, from D2SSharp (see the license next to it). */
+const CHAOS_SC_SAVE_PATH = resolve(process.cwd(), 'electron/services/fixtures/ChaosSCV105.d2s');
 const LAST_MODIFIED = new Date('2026-10-15T10:00:00.000Z');
 
 function findCatalogItem(id: string): Item {
@@ -126,22 +130,40 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
     });
   });
 
-  describe('If the mercenary section of the Warlock save cannot be read', () => {
-    it('Then the character items are kept but the scan is only partial', async () => {
-      // Arrange: a mercenary id without the item list that has to follow the "jf" header. The d2s
-      // library tolerates that for a level 1 character only, so the level is raised.
-      const save = readWarlockSave();
-      save.writeUInt32LE(1, 163);
-      save.writeUInt8(2, 27);
-      const bytesBefore = Buffer.from(save);
+  describe('If a real level 90 Warlock save with a hired mercenary is parsed', () => {
+    it('Then the whole file is read, including the items the mercenary wears', async () => {
+      // Arrange
+      const save = readFileSync(CHAOS_SC_SAVE_PATH);
 
       // Act
       const result = await parseWarlockSave(save);
 
       // Assert
-      expect(result.status).toBe('partial');
-      expect(result.items).toHaveLength(7);
-      expect(save.equals(bytesBefore)).toBe(true);
+      expect(result.status).toBe('parsed');
+      const mercenaryItems = result.items.filter(
+        (item) => item.locationContext === 'mercenary' && !item.isSocketedItem,
+      );
+      expect(mercenaryItems.map((item) => item.rawParsedItem.runeword_name).sort()).toEqual([
+        'Fortitude',
+        'Infinity',
+        undefined,
+      ]);
+    });
+  });
+
+  describe('If the mercenary section of the Warlock save cannot be read', () => {
+    it('Then the scan fails like for older saves instead of reporting only some items', async () => {
+      // Arrange: a mercenary id without the item list that has to follow the "jf" header. The d2s
+      // library tolerates that for a level 1 character only, so the level is raised.
+      const save = readWarlockSave();
+      save.writeUInt32LE(1, 163);
+      save.writeUInt8(2, 27);
+
+      // Act
+      const act = parseWarlockSave(save);
+
+      // Assert
+      await expect(act).rejects.toThrow("Item list header 'JM' not found");
     });
   });
 

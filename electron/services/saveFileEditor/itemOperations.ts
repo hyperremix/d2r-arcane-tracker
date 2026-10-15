@@ -72,7 +72,8 @@ export async function assertSaveFileAllowsItemRemoval(
   filePath: string,
   fileType: VaultSourceFileType,
 ): Promise<void> {
-  assertCharacterSaveWritable(await openSaveFile(filePath, fileType));
+  ensureD2sConstants();
+  await assertCharacterSaveWritable(await openSaveFile(filePath, fileType));
 }
 
 export async function removeItemFromSaveFileUnlocked(
@@ -96,7 +97,7 @@ export async function removeItemFromSaveFileUnlocked(
     );
   }
 
-  assertCharacterSaveWritable(file);
+  await assertCharacterSaveWritable(file);
   const decoded = await decodeSaveFile(file);
   // Remove exactly one item: ids are not guaranteed to be unique, and removing every match would
   // silently delete other items that happen to share the id.
@@ -175,7 +176,7 @@ export async function addItemToSaveFileUnlocked({
     return;
   }
 
-  assertCharacterSaveWritable(file);
+  await assertCharacterSaveWritable(file);
   const decoded = await decodeSaveFile(file);
   decoded.placeItem(stripResourceStashStackMetadata(sourceItem), {
     locationContext,

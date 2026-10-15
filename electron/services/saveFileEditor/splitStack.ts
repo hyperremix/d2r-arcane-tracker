@@ -224,7 +224,7 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
 
   // Validate the source and all targets before touching any file. A modern stash source without
   // raw item JSON cannot be split.
-  assertWholeFileWritable(source);
+  await assertWholeFileWritable(source);
   for (const target of options.targets) {
     await assertWritableSaveFile(target.targetFilePath, target.targetFileType);
   }

@@ -33,3 +33,5 @@ Each dependency keeps its own license. For the full list and versions, see [`pac
 Memory-reading research builds on [d2go](https://github.com/hectorgimenez/d2go) (see [MEMORY_READING.md](MEMORY_READING.md)).
 
 The Warlock save file used as a test fixture (`electron/services/fixtures/WarlockV105.d2s`) comes from [halbu](https://github.com/feored/halbu) and is used under its MIT License (Copyright (c) 2023 feor); the license text is next to the file.
+
+The level 90 Warlock save used as a test fixture (`electron/services/fixtures/ChaosSCV105.d2s`) comes from [D2SSharp](https://github.com/ResurrectedTrader/D2SSharp), whose README states the MIT License; the license text is next to the file.

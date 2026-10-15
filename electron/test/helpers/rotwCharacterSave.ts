@@ -147,8 +147,18 @@ export async function hireRotwMercenary(save: Buffer, wornItems: WornItem[]): Pr
   return finalizeSave(result);
 }
 
+/** True when the file size and checksum stored in the save header match its content. */
+export function hasValidSizeAndChecksum(save: Buffer): boolean {
+  const withoutChecksum = Buffer.from(save);
+  withoutChecksum.writeUInt32LE(0, CHECKSUM_OFFSET);
+  return (
+    save.readUInt32LE(FILE_SIZE_OFFSET) === save.length &&
+    save.readUInt32LE(CHECKSUM_OFFSET) === computeSaveChecksum(withoutChecksum)
+  );
+}
+
 /** Updates the file size and checksum of a save whose content was changed. */
-function finalizeSave(save: Buffer): Buffer {
+export function finalizeSave(save: Buffer): Buffer {
   save.writeUInt32LE(save.length, FILE_SIZE_OFFSET);
   save.writeUInt32LE(0, CHECKSUM_OFFSET);
   save.writeUInt32LE(computeSaveChecksum(save), CHECKSUM_OFFSET);
