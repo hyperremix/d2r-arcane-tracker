@@ -1790,7 +1790,7 @@ export const sets: Item[] = [
     treasureClass: 'normal',
     code: 'kri',
     itemBase: 'Kris',
-    imageFilename: 'the_jade_tan_do.png',
+    imageFilename: 'banes_spire.png',
     setName: "Bane's Garments",
   },
   {
@@ -1832,7 +1832,7 @@ export const sets: Item[] = [
     treasureClass: 'elite',
     code: 'usk',
     itemBase: 'Demonhead',
-    imageFilename: 'mask.png',
+    imageFilename: 'horazons_countenance.png',
     setName: "Horazon's Splendor",
   },
   {
@@ -1874,7 +1874,7 @@ export const sets: Item[] = [
     treasureClass: 'elite',
     code: 'utb',
     itemBase: 'Mirrored Boots',
-    imageFilename: 'chain_boots.png',
+    imageFilename: 'light_plate_boots.png',
     setName: "Horazon's Splendor",
   },
   {
@@ -1888,6 +1888,7 @@ export const sets: Item[] = [
     treasureClass: 'elite',
     code: 'wad',
     itemBase: 'Occult Codex',
+    imageFilename: 'ars_torbaalos.png',
     setName: "Horazon's Splendor",
   },
 ];

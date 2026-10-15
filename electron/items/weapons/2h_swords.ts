@@ -207,6 +207,6 @@ export const twoHandedSwords: Item[] = [
     treasureClass: 'elite',
     code: '72h',
     itemBase: 'Legend Sword',
-    imageFilename: 'shadowfang.png',
+    imageFilename: 'two_handed_sword.png',
   },
 ];

@@ -337,6 +337,6 @@ export const helms: Item[] = [
     treasureClass: 'exceptional',
     code: 'xsk',
     itemBase: 'Death Mask',
-    imageFilename: 'mask.png',
+    imageFilename: 'unique_warlock_helm.png',
   },
 ];

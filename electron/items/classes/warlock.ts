@@ -12,6 +12,7 @@ export const warlock: Item[] = [
     treasureClass: 'exceptional',
     code: 'wa6',
     itemBase: 'Burnt Text',
+    imageFilename: 'measured_wrath.png',
   },
   {
     id: 'arstorbaalos',
@@ -24,6 +25,7 @@ export const warlock: Item[] = [
     treasureClass: 'elite',
     code: 'wae',
     itemBase: 'Blasphemous Compendium',
+    imageFilename: 'ars_aldiablolos.png',
   },
   {
     id: 'arsdulmephistos',
@@ -36,6 +38,7 @@ export const warlock: Item[] = [
     treasureClass: 'elite',
     code: 'wac',
     itemBase: 'Occult Tome',
+    imageFilename: 'ars_aldiablolos.png',
   },
   {
     id: 'arsaldiabolos',
@@ -48,5 +51,6 @@ export const warlock: Item[] = [
     treasureClass: 'elite',
     code: 'waf',
     itemBase: 'Blasphemous Grimoire',
+    imageFilename: 'ars_aldiablolos.png',
   },
 ];

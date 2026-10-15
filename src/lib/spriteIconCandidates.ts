@@ -1,3 +1,4 @@
+import { resolveBaseItemIconFilename } from 'electron/items/baseItemIcons';
 import type { Item, ParsedInventoryItem, VaultItem } from 'electron/types/grail';
 import { normalizeItemCodeKey } from 'electron/utils/d2rFormat';
 import { normalizeIconFilename, toSnakeCaseIconFilename } from 'electron/utils/iconFilename';
@@ -83,6 +84,16 @@ function addCodeLookupCandidate(
   hasExplicitUniqueSignal: boolean,
 ): void {
   if (typeof code !== 'string') {
+    return;
+  }
+
+  // Items with a dedicated base sprite (grimoires, Colossal Jewel) skip the shared code lookup,
+  // which would pick a unique's sprite; they get the base sprite unless a unique signal is present
+  const baseItemIcon = resolveBaseItemIconFilename(code);
+  if (baseItemIcon) {
+    if (!hasExplicitUniqueSignal) {
+      addCandidate(candidates, baseItemIcon);
+    }
     return;
   }
 

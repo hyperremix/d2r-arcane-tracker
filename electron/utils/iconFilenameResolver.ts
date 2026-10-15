@@ -1,4 +1,5 @@
 import { items } from '../items';
+import { resolveBaseItemIconFilename } from '../items/baseItemIcons';
 import { normalizeItemCodeKey } from './d2rFormat';
 import { normalizeIconFilename, toSnakeCaseIconFilename } from './iconFilename';
 import { simplifyItemName } from './objects';
@@ -107,6 +108,14 @@ export function resolveCanonicalIconFilename(
     input.setName,
     input.parsedName,
   ]);
+
+  // Items with a dedicated base sprite (grimoires, Colossal Jewel) skip the shared code lookup,
+  // which would pick a unique's sprite. A grailItemId match wins first above; after that only a
+  // catalog name match beats the base sprite.
+  const baseItemIcon = resolveBaseItemIconFilename(input.itemCode);
+  if (baseItemIcon) {
+    return nameIcon ?? baseItemIcon;
+  }
 
   const codeIcon = resolveIconByCode({
     itemCode: input.itemCode,
