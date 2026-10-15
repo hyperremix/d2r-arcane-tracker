@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/date';
 import { isEtherealOnly } from '@/lib/ethereal';
-import { etherealTypeLabelKeys } from '@/lib/labelKeys';
+import { characterClassLabelKey, etherealTypeLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
 import { CharacterIcon } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
@@ -105,7 +105,7 @@ export function DiscoveryAttribution({
               </TooltipTrigger>
               <TooltipContent>
                 <p>
-                  {character.name} ({character.characterClass})
+                  {character.name} ({t(characterClassLabelKey(character.characterClass))})
                 </p>
               </TooltipContent>
             </Tooltip>

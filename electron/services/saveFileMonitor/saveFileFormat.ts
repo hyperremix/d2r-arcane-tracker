@@ -1,6 +1,11 @@
 import { basename, extname } from 'node:path';
 import type { D2SaveFile } from '../../types/grail';
-import { isModernStashVersion, SAVE_FILE_EXTENSIONS } from '../../utils/d2rFormat';
+import {
+  isModernStashVersion,
+  ROTW_CHARACTER_SAVE_VERSION,
+  readCharacterSaveVersion,
+  SAVE_FILE_EXTENSIONS,
+} from '../../utils/d2rFormat';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { readD2iMetadata } from '../stashFormat';
 
@@ -32,7 +37,36 @@ const CHARACTER_CLASSES = [
   'barbarian',
   'druid',
   'assassin',
+  'warlock',
 ];
+
+/** Byte offsets of the header fields a character save (.d2s) is listed with. */
+interface CharacterHeaderOffsets {
+  status: number;
+  classId: number;
+  level: number;
+}
+
+/** Header offsets of character saves before Reign of the Warlock (D2 1.10+ and D2R up to v99). */
+const LEGACY_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
+  status: 36,
+  classId: 40,
+  level: 43,
+};
+
+/** Header offsets of Reign of the Warlock (v105+) character saves, which moved the fields forward. */
+const ROTW_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
+  status: 20,
+  classId: 24,
+  level: 27,
+};
+
+/**
+ * Offset of the game mode byte of a v105+ character save: 1 = classic, 2 = Lord of Destruction,
+ * 3 = Reign of the Warlock. These saves no longer set the expansion bit of the status byte.
+ */
+const ROTW_GAME_MODE_OFFSET = 248;
+const ROTW_GAME_MODE_CLASSIC = 1;
 
 /**
  * True when the file name marks a hardcore stash. D2R tells its stashes apart by name only
@@ -207,17 +241,18 @@ export function buildSaveFileHeader(
 
   // Basic header parsing (D2 save files have a specific structure)
   if (buffer.length >= 765) {
-    // Character class at offset 40
-    const classId = buffer.readUInt8(40);
-    characterClass = getCharacterClass(classId);
+    const version = readCharacterSaveVersion(buffer) ?? 0;
+    const isRotwSave = version >= ROTW_CHARACTER_SAVE_VERSION;
+    const offsets = isRotwSave ? ROTW_CHARACTER_HEADER_OFFSETS : LEGACY_CHARACTER_HEADER_OFFSETS;
 
-    // Level at offset 43
-    level = buffer.readUInt8(43);
+    characterClass = getCharacterClass(buffer.readUInt8(offsets.classId));
+    level = buffer.readUInt8(offsets.level);
 
-    // Status flags at offset 36
-    const status = buffer.readUInt8(36);
+    const status = buffer.readUInt8(offsets.status);
     hardcore = (status & 0x04) !== 0;
-    expansion = (status & 0x20) !== 0;
+    expansion = isRotwSave
+      ? buffer.readUInt8(ROTW_GAME_MODE_OFFSET) > ROTW_GAME_MODE_CLASSIC
+      : (status & 0x20) !== 0;
   }
 
   return {

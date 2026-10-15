@@ -2,6 +2,7 @@ import { items } from 'electron/items';
 import i18n from 'i18next';
 import { describe, expect, it } from 'vitest';
 import {
+  characterClassLabelKey,
   etherealTypeLabelKeys,
   itemCategoryLabelKeys,
   itemSubCategoryLabelKeys,
@@ -73,5 +74,18 @@ describe('When item label key maps are used', () => {
       expect(items.length).toBeGreaterThan(0);
       expect([...new Set(missing)]).toEqual([]);
     });
+  });
+});
+
+describe('When the label of a character class is looked up', () => {
+  it('Then a known class gets its translated label and an unknown one the generic label', () => {
+    // Arrange
+    const classes = ['warlock', 'assassin', 'shared_stash', 'unknown'];
+
+    // Act
+    const labels = classes.map((characterClass) => i18n.t(characterClassLabelKey(characterClass)));
+
+    // Assert
+    expect(labels).toEqual(['Warlock', 'Assassin', 'Shared stash', 'Unknown']);
   });
 });

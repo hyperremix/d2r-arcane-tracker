@@ -397,6 +397,36 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       ).toBeInTheDocument();
     });
 
+    it('Then a read-only character snapshot (Reign of the Warlock) explains why and its items cannot be dragged', async () => {
+      // Arrange
+      const defaultResult = await searchAllMock();
+      searchAllMock.mockReset();
+      searchAllMock.mockResolvedValue({
+        ...defaultResult,
+        inventory: {
+          ...defaultResult.inventory,
+          snapshots: defaultResult.inventory.snapshots.map((snapshot: object) => ({
+            ...snapshot,
+            readOnly: true,
+          })),
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      const inventoryBoard = await waitFor(() => screen.getByTestId('inventory-board-snap-1'));
+      expect(
+        screen.getByText(
+          "Items of this character can't be moved yet: Reign of the Warlock character saves are read-only.",
+        ),
+      ).toBeInTheDocument();
+      for (const tile of within(inventoryBoard).getAllByTestId('inventory-item-tile')) {
+        expect(tile).toHaveAttribute('draggable', 'false');
+      }
+    });
+
     it('Then it renders extended stash cells in the same stash board without a separate overflow board', async () => {
       // Arrange
       searchAllMock.mockResolvedValueOnce({

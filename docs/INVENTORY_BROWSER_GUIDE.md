@@ -25,3 +25,4 @@ Vaulting and unvaulting are the only ways the app keeps an item outside a save f
 - Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here. On Windows, writes are refused while the game is running, because it would overwrite the change. Other platforms can't check this, so close the game yourself before editing.
 - The app only edits files inside your configured save folder, and refuses a change if the file changed since the last scan (refresh and try again).
 - Bookmarks never appear here and can't be unvaulted, since they hold no item.
+- Character saves in the Reign of the Warlock format (version 105), which includes every Warlock, can be viewed but not changed yet. Their windows say so, their items can't be dragged, and a move, vault or unvault that involves such a save is refused before any file is written.

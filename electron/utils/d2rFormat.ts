@@ -61,6 +61,22 @@ export function isModernStashVersion(version: number | undefined): boolean {
   return version !== undefined && version >= MODERN_STASH_MIN_VERSION;
 }
 
+/**
+ * First character save (.d2s) version of Reign of the Warlock. It moved the character header
+ * fields, and the d2s library can read it but not write it back.
+ */
+export const ROTW_CHARACTER_SAVE_VERSION = 105;
+
+/** Version of a character save (.d2s) from its header, or undefined when the file is too short. */
+export function readCharacterSaveVersion(buffer: Buffer): number | undefined {
+  return buffer.length >= 8 ? buffer.readUInt32LE(4) : undefined;
+}
+
+/** True when a character save of this version is read but never written (v105+, see above). */
+export function isReadOnlyCharacterSaveVersion(version: number | undefined): boolean {
+  return version !== undefined && version >= ROTW_CHARACTER_SAVE_VERSION;
+}
+
 /** Returns the value when it is a finite number, otherwise undefined. */
 export function toFiniteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;

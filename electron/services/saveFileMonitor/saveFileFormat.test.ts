@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readWarlockSave } from '../../test/helpers/rotwCharacterSave';
 import {
   buildSaveFileHeader,
   getCharacterClass,
@@ -19,7 +20,7 @@ const LAST_MODIFIED = new Date('2024-05-01T10:00:00.000Z');
 describe('When a character class id is mapped', () => {
   it('Then should return correct character class for valid ID', () => {
     // Arrange
-    const classIds = [0, 1, 2, 3, 4, 5, 6];
+    const classIds = [0, 1, 2, 3, 4, 5, 6, 7];
 
     // Act
     const classes = classIds.map((id) => getCharacterClass(id));
@@ -33,18 +34,19 @@ describe('When a character class id is mapped', () => {
       'barbarian',
       'druid',
       'assassin',
+      'warlock',
     ]);
   });
 
   it('Then should return unknown for invalid character class ID', () => {
     // Arrange
-    const invalidIds = [99, -1];
+    const invalidIds = [8, 99, -1];
 
     // Act
     const classes = invalidIds.map((id) => getCharacterClass(id));
 
     // Assert
-    expect(classes).toEqual(['unknown', 'unknown']);
+    expect(classes).toEqual(['unknown', 'unknown', 'unknown']);
   });
 });
 
@@ -242,6 +244,55 @@ describe('When the header of a save file is built from its content', () => {
         hardcore: true,
         expansion: true,
       });
+    });
+  });
+
+  describe('If a real Reign of the Warlock (v105) Warlock save is described', () => {
+    it('Then it is a level 1 softcore expansion Warlock', () => {
+      // Arrange
+      const save = readWarlockSave();
+
+      // Act
+      const saveFile = buildSaveFileHeader('/saves/Warlock.d2s', save, LAST_MODIFIED);
+
+      // Assert
+      expect(saveFile).toEqual({
+        name: 'Warlock',
+        path: '/saves/Warlock.d2s',
+        lastModified: LAST_MODIFIED,
+        characterClass: 'warlock',
+        level: 1,
+        hardcore: false,
+        expansion: true,
+      });
+    });
+  });
+
+  describe('If a v105 character save has its fields at the moved offsets', () => {
+    it('Then class, level and hardcore come from the new offsets and expansion from the game mode byte', () => {
+      // Arrange
+      const header = Buffer.alloc(800);
+      header.writeUInt32LE(105, 4);
+      header.writeUInt8(0x04, 20); // hardcore
+      header.writeUInt8(7, 24); // warlock
+      header.writeUInt8(85, 27);
+      header.writeUInt8(1, 248); // classic game mode
+      header.writeUInt8(0xff, 36); // the pre-v105 offsets must not be read
+      header.writeUInt8(4, 40);
+      header.writeUInt8(92, 43);
+
+      // Act
+      const saveFile = buildSaveFileHeader('/saves/Hero.d2s', header, LAST_MODIFIED);
+
+      // Assert
+      expect(saveFile).toEqual(
+        expect.objectContaining({
+          characterClass: 'warlock',
+          level: 85,
+          hardcore: true,
+          expansion: false,
+        }),
+      );
     });
   });
 

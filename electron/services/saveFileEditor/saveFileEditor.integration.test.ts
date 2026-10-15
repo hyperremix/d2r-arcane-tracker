@@ -1,7 +1,13 @@
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  addItemToRotwCharacterSave,
+  readModernStashItem,
+  readWarlockSave,
+} from '../../test/helpers/rotwCharacterSave';
+import { ensureD2sConstants } from '../d2s/constants';
 import { parseModernStash } from '../modernStashParser';
 import {
   addItemToSaveFile,
@@ -438,6 +444,99 @@ describe('When the real saveFileEditor modifies a v105 shared stash', () => {
       // Assert
       await expect(act).rejects.toThrow('STACK_MOVE_REQUIRES_SPLIT');
       expect(readFileSync(stashA).equals(originalBytes)).toBe(true);
+    }, 30000);
+  });
+});
+
+describe('When the real saveFileEditor is asked to edit a Reign of the Warlock character save', () => {
+  let directory: string;
+  let stash: string;
+  let warlock: string;
+  let warTravelerId: number;
+
+  beforeEach(async () => {
+    ensureD2sConstants();
+    directory = mkdtempSync(join(tmpdir(), 'editor-rotw-character-'));
+    stash = join(directory, 'Stash.d2i');
+    warlock = join(directory, 'Warlock.d2s');
+    copyFileSync(FIXTURE_PATH, stash);
+    const warTraveler = await readModernStashItem('War Traveler');
+    warTravelerId = warTraveler.id as number;
+    writeFileSync(warlock, await addItemToRotwCharacterSave(readWarlockSave(), warTraveler, 0, 0));
+  });
+
+  afterEach(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  describe('If an item is moved from the Warlock to a stash', () => {
+    it('Then the move is refused and neither file changes', async () => {
+      // Arrange
+      const cell = findFreeCell(await parseFile(stash), 0, 2, 2);
+      const warlockBytes = readFileSync(warlock);
+      const stashBytes = readFileSync(stash);
+
+      // Act
+      const act = moveItemBetweenSaveFiles({
+        sourceFilePath: warlock,
+        sourceFileType: 'd2s',
+        sourceItemId: warTravelerId,
+        targetFilePath: stash,
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 0,
+        targetGridX: cell.x,
+        targetGridY: cell.y,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If an item is moved from a stash to the Warlock', () => {
+    it('Then the move is refused and neither file changes', async () => {
+      // Arrange
+      const source = (await parseFile(stash)).find(
+        (entry) => entry.stashTab === 0 && entry.item.inv_width === 1,
+      ) as ParsedEntry;
+      const warlockBytes = readFileSync(warlock);
+      const stashBytes = readFileSync(stash);
+
+      // Act
+      const act = moveItemBetweenSaveFiles({
+        sourceFilePath: stash,
+        sourceFileType: 'd2i',
+        ...toLocator(source),
+        targetFilePath: warlock,
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 5,
+        targetGridY: 0,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If an item of the Warlock is read and then removed', () => {
+    it('Then it can be read, but the removal is refused and the save does not change', async () => {
+      // Arrange
+      const warlockBytes = readFileSync(warlock);
+
+      // Act
+      const item = await readSaveFileItem(warlock, 'd2s', warTravelerId);
+      const act = removeItemFromSaveFile(warlock, 'd2s', warTravelerId);
+
+      // Assert
+      expect(item?.unique_name).toBe('War Traveler');
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
     }, 30000);
   });
 });
