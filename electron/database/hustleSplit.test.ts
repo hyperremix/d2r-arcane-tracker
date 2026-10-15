@@ -106,6 +106,9 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
       expect(getFinds(ctx, 'no-vault-char')).toEqual([
         { id: 'find-no-vault-char', itemId: 'mania' },
       ]);
+      const bothFinds = getFinds(ctx, 'both-char');
+      expect(bothFinds.map((find) => find.itemId)).toEqual(['hysteria', 'mania']);
+      expect(bothFinds.find((find) => find.itemId === 'mania')?.id).toBe('find-both-char');
       expect(getItemIdsById(ctx, 'vault_items', 'grail_item_id')).toEqual({
         'dusk-shroud': 'hysteria',
         'phase-blade': 'mania',
@@ -126,9 +129,10 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
       ctx.rawDb
         .prepare(
           `INSERT INTO grail_progress (id, character_id, item_id, found_date, manually_added,
-             auto_detected, difficulty, notes, is_ethereal, from_initial_scan)
+             auto_detected, difficulty, notes, is_ethereal, from_initial_scan,
+             created_at, updated_at)
            VALUES ('find-both', 'both-char', ?, '2025-01-02T03:04:05.000Z', 1, 0, 'hell',
-             'found in Pit', 1, 1)`,
+             'found in Pit', 1, 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00')`,
         )
         .run(HUSTLE_ITEM_ID);
       insertHustleVaultItem(ctx, 'both-armor', 'xtp', 'both-char');
@@ -148,7 +152,7 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
            FROM grail_progress WHERE character_id = 'both-char' ORDER BY item_id`,
         )
         .all() as Record<string, unknown>[];
-      expect(details[0]).toMatchObject({
+      const copiedDetails = {
         found_date: '2025-01-02T03:04:05.000Z',
         manually_added: 1,
         auto_detected: 0,
@@ -156,8 +160,37 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
         notes: 'found in Pit',
         is_ethereal: 1,
         from_initial_scan: 1,
-      });
-      expect(details[1]).toMatchObject(details[0] as Record<string, unknown>);
+        created_at: '2020-01-01 00:00:00',
+      };
+      expect(details).toHaveLength(2);
+      expect(details[0]).toMatchObject(copiedDetails);
+      expect(details[1]).toMatchObject(copiedDetails);
+    });
+
+    it('Then the copy has the same updated_at as the find that the update stamped', () => {
+      // Arrange
+      insertHustleItem(ctx);
+      insertCharacter(ctx, 'both-char');
+      ctx.rawDb
+        .prepare(
+          `INSERT INTO grail_progress (id, character_id, item_id, updated_at)
+           VALUES ('find-both', 'both-char', ?, '2020-01-01 00:00:00')`,
+        )
+        .run(HUSTLE_ITEM_ID);
+      insertHustleVaultItem(ctx, 'both-armor', 'xtp', 'both-char');
+      insertHustleVaultItem(ctx, 'both-weapon', 'crs', 'both-char');
+
+      // Act
+      splitHustleIntoSuccessors(ctx);
+
+      // Assert
+      const updatedAts = ctx.rawDb
+        .prepare(
+          `SELECT updated_at AS updatedAt FROM grail_progress WHERE character_id = 'both-char'`,
+        )
+        .all() as Array<{ updatedAt: string }>;
+      expect(updatedAts).toHaveLength(2);
+      expect(updatedAts[0]?.updatedAt).toBe(updatedAts[1]?.updatedAt);
     });
   });
 
@@ -245,7 +278,7 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
   });
 
   describe('If the split fails halfway', () => {
-    it('Then nothing is changed and the split runs again on the next start', () => {
+    it('Then nothing is changed', () => {
       // Arrange
       insertHustleItem(ctx);
       insertCharacter(ctx, 'armor-char');
@@ -265,9 +298,26 @@ describe('When the Hustle runeword is split into Mania and Hysteria', () => {
       expect(getItemIdsById(ctx, 'vault_items', 'grail_item_id')).toEqual({
         'dusk-shroud': 'hustle',
       });
+    });
 
+    it('Then the split succeeds on the next start', () => {
+      // Arrange
+      insertHustleItem(ctx);
+      insertCharacter(ctx, 'armor-char');
+      insertHustleFind(ctx, 'find-armor-char', 'armor-char');
+      insertHustleVaultItem(ctx, 'dusk-shroud', 'uui', 'armor-char');
+      ctx.rawDb.exec(
+        `CREATE TRIGGER block_hustle_delete BEFORE DELETE ON items
+         BEGIN SELECT RAISE(ABORT, 'blocked'); END`,
+      );
+      expect(() => splitHustleIntoSuccessors(ctx)).toThrow('blocked');
       ctx.rawDb.exec('DROP TRIGGER block_hustle_delete');
-      expect(splitHustleIntoSuccessors(ctx)).toBe(true);
+
+      // Act
+      const split = splitHustleIntoSuccessors(ctx);
+
+      // Assert
+      expect(split).toBe(true);
       expect(getFinds(ctx, 'armor-char')).toEqual([{ id: 'find-armor-char', itemId: 'hysteria' }]);
     });
   });

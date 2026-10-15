@@ -81,11 +81,22 @@ export function splitHustleIntoSuccessors(ctx: DatabaseContext): boolean {
         .set({ itemId: firstId })
         .where(eq(grailProgress.id, find.id))
         .run();
-      // Rows that point at the find, such as run items, stay with the original row
+      if (otherIds.length === 0) {
+        continue;
+      }
+
+      // Copy the row as the update left it, so a trigger that stamps updated_at on the update
+      // does not make the copies differ from the original. Rows that point at the find, such as
+      // run items, stay with the original row.
+      const updatedFind = ctx.db
+        .select()
+        .from(grailProgress)
+        .where(eq(grailProgress.id, find.id))
+        .get();
       for (const itemId of otherIds) {
         ctx.db
           .insert(grailProgress)
-          .values({ ...find, id: randomUUID(), itemId })
+          .values({ ...(updatedFind ?? find), id: randomUUID(), itemId })
           .run();
       }
     }
