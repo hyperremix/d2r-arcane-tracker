@@ -402,6 +402,25 @@ describe('SaveFileMonitor', () => {
       expect(screen.queryByRole('button', { name: /^Show / })).not.toBeInTheDocument();
     });
 
+    it('If a Warlock and a character of an unknown class are detected, Then their classes are shown with translated labels', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      const [warlock, unknown] = createSaveFiles(2);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue([
+        { ...warlock, characterClass: 'warlock', level: 1 },
+        { ...unknown, characterClass: 'unknown', level: 7 },
+      ]);
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      const list = await screen.findByRole('list');
+      expect(await within(list).findByText('Level 1 Warlock')).toBeInTheDocument();
+      expect(within(list).getByText('Level 7 Unknown')).toBeInTheDocument();
+    });
+
     it('If more than five characters are detected, Then the first five are listed in the page without an inner scroll area', async () => {
       // Arrange
       mockGameMode(GameMode.Both);

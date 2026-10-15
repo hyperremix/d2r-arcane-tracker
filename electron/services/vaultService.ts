@@ -22,6 +22,7 @@ import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../uti
 import { isCurrentlyVaulted, isGrailBookmark } from '../utils/vaultState';
 import type {
   addItemToSaveFile,
+  assertSaveFileAllowsItemRemoval,
   moveItemBetweenSaveFiles,
   readSaveFileItem,
   removeItemFromSaveFile,
@@ -268,6 +269,7 @@ export type VaultDatabase = Pick<
 /** Save file editing operations the vault service needs. */
 export interface VaultSaveFileEditor {
   addItemToSaveFile: typeof addItemToSaveFile;
+  assertSaveFileAllowsItemRemoval: typeof assertSaveFileAllowsItemRemoval;
   moveItemBetweenSaveFiles: typeof moveItemBetweenSaveFiles;
   readSaveFileItem: typeof readSaveFileItem;
   removeItemFromSaveFile: typeof removeItemFromSaveFile;
@@ -483,6 +485,11 @@ export class VaultService {
 
     if (sourceFilePath && sourceLocator) {
       await this.deps.assertGameNotRunning();
+      // Refuse a source that cannot be written now: after the vault row is written it would only be rolled back.
+      await this.deps.saveFileEditor.assertSaveFileAllowsItemRemoval(
+        sourceFilePath,
+        item.sourceFileType,
+      );
       await this.assertSourceItemMatchesVaultInput(item, sourceFilePath, sourceLocator);
     }
 

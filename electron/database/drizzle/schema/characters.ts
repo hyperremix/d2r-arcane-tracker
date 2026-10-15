@@ -16,6 +16,7 @@ export const characters = sqliteTable(
         'necromancer',
         'paladin',
         'sorceress',
+        'warlock',
         'shared_stash',
       ],
     })
@@ -35,7 +36,7 @@ export const characters = sqliteTable(
     index('idx_characters_updated_at').on(table.updatedAt),
     check(
       'characters_character_class_check',
-      sql`character_class IN ('amazon', 'assassin', 'barbarian', 'druid', 'necromancer', 'paladin', 'sorceress', 'shared_stash')`,
+      sql`character_class IN ('amazon', 'assassin', 'barbarian', 'druid', 'necromancer', 'paladin', 'sorceress', 'warlock', 'shared_stash')`,
     ),
   ],
 );

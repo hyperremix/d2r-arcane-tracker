@@ -217,7 +217,7 @@ describe('When the schema is initialized', () => {
       // Act
       const insertInvalidClass = () =>
         ctx.rawDb.exec(
-          "INSERT INTO characters (id, name, character_class) VALUES ('c', 'X', 'warlock')",
+          "INSERT INTO characters (id, name, character_class) VALUES ('c', 'X', 'unknown')",
         );
 
       // Assert

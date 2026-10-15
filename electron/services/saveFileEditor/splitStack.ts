@@ -183,6 +183,7 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
       Math.min(splitTargets.length, resolveStackCount(countEntry.item)),
     );
 
+    // Validate every target before writing any copy, so that a refused target leaves no copies.
     for (const target of placeableTargets) {
       // Modern .d2i shared stash pages (tabs 0–4) are writable via sector patching.
       const isModernSharedStash =
@@ -193,7 +194,9 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
       if (!isModernSharedStash) {
         await assertWritableSaveFile(target.targetFilePath, target.targetFileType);
       }
+    }
 
+    for (const target of placeableTargets) {
       const copy = withQuantityOne(
         withTargetCoordinates(sourceItem, target.targetGridX, target.targetGridY),
       );

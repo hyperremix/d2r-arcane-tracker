@@ -14,7 +14,12 @@ import {
   isModernResourceTab,
   stripResourceStashStackMetadata,
 } from './resourceStacks';
-import { decodeSaveFile, describeDecodedSaveFile, openSaveFile } from './saveFileAdapters';
+import {
+  assertCharacterSaveWritable,
+  decodeSaveFile,
+  describeDecodedSaveFile,
+  openSaveFile,
+} from './saveFileAdapters';
 
 /**
  * Reads, adds and removes a single item in any supported save file.
@@ -59,6 +64,17 @@ export async function readSaveFileItem(
   return (await decodeSaveFile(file)).findItem(itemId);
 }
 
+/**
+ * Refuses up front, before anything is changed anywhere, when items cannot be removed from the
+ * save file because it is a character save that cannot be written (see `assertCharacterSaveWritable`).
+ */
+export async function assertSaveFileAllowsItemRemoval(
+  filePath: string,
+  fileType: VaultSourceFileType,
+): Promise<void> {
+  assertCharacterSaveWritable(await openSaveFile(filePath, fileType));
+}
+
 export async function removeItemFromSaveFileUnlocked(
   filePath: string,
   fileType: VaultSourceFileType,
@@ -80,6 +96,7 @@ export async function removeItemFromSaveFileUnlocked(
     );
   }
 
+  assertCharacterSaveWritable(file);
   const decoded = await decodeSaveFile(file);
   // Remove exactly one item: ids are not guaranteed to be unique, and removing every match would
   // silently delete other items that happen to share the id.
@@ -158,6 +175,7 @@ export async function addItemToSaveFileUnlocked({
     return;
   }
 
+  assertCharacterSaveWritable(file);
   const decoded = await decodeSaveFile(file);
   decoded.placeItem(stripResourceStashStackMetadata(sourceItem), {
     locationContext,

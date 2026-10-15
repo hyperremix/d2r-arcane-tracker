@@ -1,4 +1,5 @@
 import type {
+  CharacterClass,
   EtherealType,
   ItemCategory,
   ItemSubCategory,
@@ -183,6 +184,29 @@ export const itemSubCategoryLabelKeys: Record<ItemSubCategory, string> = {
   warlock: subCategoryKeys.warlock,
   shared_stash: subCategoryKeys.sharedStash,
 };
+
+const CHARACTER_CLASS_LABEL_KEYS: Record<CharacterClass, string> = {
+  amazon: itemSubCategoryLabelKeys.amazon,
+  assassin: itemSubCategoryLabelKeys.assassin,
+  barbarian: itemSubCategoryLabelKeys.barbarian,
+  druid: itemSubCategoryLabelKeys.druid,
+  necromancer: itemSubCategoryLabelKeys.necromancer,
+  paladin: itemSubCategoryLabelKeys.paladin,
+  sorceress: itemSubCategoryLabelKeys.sorceress,
+  warlock: itemSubCategoryLabelKeys.warlock,
+  shared_stash: itemSubCategoryLabelKeys.shared_stash,
+};
+
+/**
+ * Translation key of a character class label (e.g. "Warlock"). A class the app does not know
+ * (a save file reports `unknown`) gets the generic "Unknown" label.
+ * @param characterClass - Character class as stored or reported by the save file monitor
+ */
+export function characterClassLabelKey(characterClass: string): string {
+  return (
+    CHARACTER_CLASS_LABEL_KEYS[characterClass as CharacterClass] ?? translations.common.unknown
+  );
+}
 
 /**
  * Translation keys for item treasure class tiers.

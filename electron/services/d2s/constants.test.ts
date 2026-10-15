@@ -1,6 +1,7 @@
 import type { types as d2sTypes } from '@dschu012/d2s';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
+import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
 import { D2S_CONSTANT_VERSIONS, type D2sConstantRegistry, registerD2sConstants } from './constants';
 
@@ -28,17 +29,21 @@ function createRegistry(initial: Record<number, d2sTypes.IConstantData> = {}) {
 
 describe('When the d2s constants are registered', () => {
   describe('If no version has constants yet', () => {
-    it('Then every supported version gets constants, with the 99 data only for version 99', () => {
+    it('Then every supported version gets constants, with the 99 and 105 data only for their versions', () => {
       // Arrange
       const { registry, stored } = createRegistry();
+      const expectedConstants = (version: number) => {
+        if (version === 105) return constants105;
+        return version === 99 ? constants99 : constants96;
+      };
 
       // Act
       registerD2sConstants(registry);
 
       // Assert
-      expect([...stored.keys()]).toEqual([96, 97, 98, 99, 0, 1, 2]);
+      expect([...stored.keys()]).toEqual([96, 97, 98, 99, 0, 1, 2, 105]);
       for (const version of D2S_CONSTANT_VERSIONS) {
-        expect(stored.get(version)).toBe(version === 99 ? constants99 : constants96);
+        expect(stored.get(version)).toBe(expectedConstants(version));
       }
     });
   });
@@ -53,7 +58,7 @@ describe('When the d2s constants are registered', () => {
       registerD2sConstants(registry);
 
       // Assert
-      expect(setCalls).toEqual([97, 98, 0, 1, 2]);
+      expect(setCalls).toEqual([97, 98, 0, 1, 2, 105]);
       expect(stored.get(96)).toBe(custom);
       expect(stored.get(99)).toBe(custom);
     });

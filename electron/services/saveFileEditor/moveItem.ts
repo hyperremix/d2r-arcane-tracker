@@ -18,6 +18,7 @@ import {
   shouldKeepQuantity,
 } from './resourceStacks';
 import {
+  assertCharacterSaveWritable,
   decodeSaveFile,
   describeDecodedSaveFile,
   type OpenedSaveFile,
@@ -134,6 +135,7 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
     return;
   }
 
+  assertCharacterSaveWritable(file);
   const decoded = await decodeSaveFile(file);
   // Character saves and classic stashes always receive a numeric item id (non-simple items only).
   const sourceItem = decoded.extractItem(options.sourceItemId as number);
@@ -169,6 +171,9 @@ export async function moveItemBetweenSaveFilesUnlocked(
 
   const source = await openSaveFile(options.sourceFilePath, options.sourceFileType);
   const target = await openSaveFile(options.targetFilePath, options.targetFileType);
+  // The target is written before the item is removed from the source, so both are checked first.
+  assertCharacterSaveWritable(source);
+  assertCharacterSaveWritable(target);
   const sourceIsModernD2i = source.format.kind === 'modernStash';
 
   // Only the shared and resource tabs of a modern .d2i target can be written.

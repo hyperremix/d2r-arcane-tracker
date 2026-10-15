@@ -3,6 +3,7 @@ import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
+import { isReadOnlyCharacterSave } from '../../utils/d2rFormat';
 import {
   type ClassicStashCodec,
   detectSaveFormat,
@@ -26,6 +27,7 @@ import { writeClassicStashFile, writeD2sSaveFile } from './saveFileWrites';
  */
 
 const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
+const CHARACTER_SAVE_READ_ONLY_ERROR = 'CHARACTER_SAVE_READ_ONLY';
 
 /** A save file read from disk, with its detected format. */
 export interface OpenedSaveFile {
@@ -58,14 +60,29 @@ export async function openSaveFile(
   return { filePath, format, buffer };
 }
 
-/** Refuses whole-file edits of a modern stash: only its sectors can be edited. */
+/**
+ * Refuses every edit of a Reign of the Warlock (v105+) character save: the d2s library reads it
+ * but cannot write it back. Checked before any file is written, so a move or split that involves
+ * such a save changes no file at all.
+ */
+export function assertCharacterSaveWritable(file: OpenedSaveFile): void {
+  if (file.format.kind === 'character' && isReadOnlyCharacterSave(file.buffer)) {
+    throw new Error(CHARACTER_SAVE_READ_ONLY_ERROR);
+  }
+}
+
+/**
+ * Refuses whole-file edits of a modern stash (only its sectors can be edited) and of a character
+ * save that cannot be written (see `assertCharacterSaveWritable`).
+ */
 export function assertWholeFileWritable(file: OpenedSaveFile): void {
   if (file.format.kind === 'modernStash') {
     throw new Error(MODERN_STASH_READ_ONLY_ERROR);
   }
+  assertCharacterSaveWritable(file);
 }
 
-/** Opens the save file and refuses it when it is a modern stash (see `assertWholeFileWritable`). */
+/** Opens the save file and refuses it when it cannot be written whole (see `assertWholeFileWritable`). */
 export async function assertWritableSaveFile(
   filePath: string,
   fileType: VaultSourceFileType,

@@ -84,6 +84,7 @@ Things to know:
 
 - **D2R only writes save files when you leave a game**, so new finds show up after you exit to the menu, not when you pick them up.
 - **You don't need mule characters.** Once an item is recorded you can sell, drop or use it.
+- Character saves in the Reign of the Warlock format (version 105), which includes every Warlock, are read like older saves, and their finds are recorded with the character. Items your hireling wears should also be recorded. If a save's hireling data can't be read, the scan keeps the character's own items but doesn't count as complete, so no item is treated as gone from that file.
 - Shared stash finds are attributed to the shared stash, not a character. Shared stashes in the newer v105+ `.d2i` format are listed as **Modern Shared Stash Softcore** or **Modern Shared Stash Hardcore**, the older format as **Shared Stash Softcore** or **Shared Stash Hardcore**. Like the game, the app tells softcore and hardcore stashes apart by file name (for example `SharedStashHardCoreV2.d2i`). Backup copies of a stash, such as `SharedStashSoftCoreV2_Backup.d2i`, are not scanned, so their items don't count twice.
 
 ### Manual entry

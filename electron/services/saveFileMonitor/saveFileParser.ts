@@ -12,14 +12,14 @@ import { createServiceLogger } from '../../utils/serviceLogger';
 import { normalizeItemsWithSocketedItems } from '../itemNormalizer';
 import { parseModernStash } from '../modernStashParser';
 import { detectSaveFormat, getClassicStashCodec, type SaveFormat } from '../saveFormat/saveFormat';
-import { isHardcoreStashFileName } from './saveFileFormat';
+import { isHardcoreStashFileName, isRotwExpansionSave, withExpansionBit } from './saveFileFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 
 /**
  * How much of a save file a parse really read.
  * - 'parsed': the whole file was read.
- * - 'partial': only some of the file could be read (a damaged .d2i sector); the items found so far are kept.
+ * - 'partial': only some of the file could be read (a damaged .d2i sector, or the mercenary of a v105 character save); the items found so far are kept.
  * - 'skipped': filtered out by the configured game mode.
  * - 'errored': a parse error was swallowed.
  * Only 'parsed' proves which items are gone from a file; every other status yields no or only some items.
@@ -55,6 +55,34 @@ export type GameModeReader = () => GameMode | undefined;
 /** True when a save's softcore/hardcore status is excluded by the configured game mode. */
 export const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
   (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
+
+/** A character save as the d2s library read it, and whether that read included the mercenary. */
+interface CharacterSaveRead {
+  response: d2s.types.ID2S;
+  /** False when the mercenary items of an expansion save could not be read and are missing. */
+  complete: boolean;
+}
+
+/**
+ * Reads a character save (.d2s). The d2s library reads the mercenary and golem sections only when
+ * the expansion bit of the status byte is set, but a Reign of the Warlock (v105+) save leaves that
+ * bit unset and records the expansion in its game mode byte. Such a save is therefore read from a
+ * copy with the bit set; the file content itself is never changed or written back. If that read
+ * fails, the save is read as is and reported incomplete, because it is then missing the
+ * mercenary items.
+ */
+async function readCharacterSave(content: Buffer): Promise<CharacterSaveRead> {
+  if (!isRotwExpansionSave(content)) {
+    return { response: await d2s.read(content), complete: true };
+  }
+
+  try {
+    return { response: await d2s.read(withExpansionBit(content)), complete: true };
+  } catch (error) {
+    log.warn('parseSaveFile', `Failed to read the mercenary of a v105 character save: ${error}`);
+    return { response: await d2s.read(content), complete: false };
+  }
+}
 
 /**
  * Parses a single save file and extracts items from it.
@@ -94,7 +122,7 @@ export async function parseSaveContent(
   };
 
   // Each parser reports how much of the file it really read, so no shared mutable status is needed.
-  const parseD2S = (response: d2s.types.ID2S): SaveParseStatus => {
+  const parseD2S = ({ response, complete }: CharacterSaveRead): SaveParseStatus => {
     if (!readGameMode) {
       return 'skipped';
     }
@@ -111,7 +139,8 @@ export async function parseSaveContent(
     parseItems(inventoryItems, 'inventory');
     parseItems(mercItems, 'mercenary');
     parseItems(corpseItems, 'corpse');
-    return 'parsed';
+    // Without its mercenary items the scan must not prove that an item left the file.
+    return complete ? 'parsed' : 'partial';
   };
 
   const parseStash = (response: d2s.types.IStash): SaveParseStatus => {
@@ -159,7 +188,7 @@ export async function parseSaveContent(
   const parseFormat = async (format: SaveFormat): Promise<SaveParseStatus> => {
     switch (format.kind) {
       case 'character':
-        return parseD2S(await d2s.read(content));
+        return parseD2S(await readCharacterSave(content));
       case 'classicStash':
         return parseStash(
           await d2stash.read(content, getClassicStashCodec(format.fileType).constants),

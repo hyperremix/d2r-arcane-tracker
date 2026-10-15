@@ -47,6 +47,8 @@ export function showInventoryOperationErrorToast(error: unknown, t: Translate): 
     toast.error(t(messages.targetOccupied));
   } else if (includesAny(message, ['STACK_MOVE_REQUIRES_SPLIT'])) {
     toast.error(t(messages.stackNeedsSplit));
+  } else if (includesAny(message, ['CHARACTER_SAVE_READ_ONLY'])) {
+    toast.error(t(messages.characterSaveReadOnly));
   } else if (includesAny(message, ['target position is required'])) {
     toast.error(t(messages.unvaultNeedsPosition));
   } else if (includesAny(message, STALE_ITEM_FRAGMENTS)) {

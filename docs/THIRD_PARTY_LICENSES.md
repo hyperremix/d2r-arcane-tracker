@@ -31,3 +31,5 @@ Each dependency keeps its own license. For the full list and versions, see [`pac
 | [Inter](https://github.com/rsms/inter) and [Cinzel](https://github.com/NDISCOVER/Cinzel) fonts, bundled via [Fontsource](https://github.com/fontsource/fontsource) | OFL-1.1 |
 
 Memory-reading research builds on [d2go](https://github.com/hectorgimenez/d2go) (see [MEMORY_READING.md](MEMORY_READING.md)).
+
+The Warlock save file used as a test fixture (`electron/services/fixtures/WarlockV105.d2s`) comes from [halbu](https://github.com/feored/halbu) and is used under its MIT License (Copyright (c) 2023 feor); the license text is next to the file.

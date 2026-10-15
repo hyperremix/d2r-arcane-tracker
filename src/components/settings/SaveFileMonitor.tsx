@@ -28,7 +28,7 @@ import { useSaveDirectoryChange } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/date';
 import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
-import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
+import { characterClassLabelKey, saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
 
@@ -437,7 +437,7 @@ export function SaveFileMonitor() {
               <div className="text-muted-foreground">
                 {t(translations.settings.saveFileMonitor.levelClass, {
                   level: lastEvent.file.level,
-                  characterClass: lastEvent.file.characterClass,
+                  characterClass: t(characterClassLabelKey(lastEvent.file.characterClass)),
                 })}
                 {lastEvent.file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
               </div>
@@ -464,7 +464,7 @@ export function SaveFileMonitor() {
                     <div className="text-muted-foreground">
                       {t(translations.settings.saveFileMonitor.levelClass, {
                         level: file.level,
-                        characterClass: file.characterClass,
+                        characterClass: t(characterClassLabelKey(file.characterClass)),
                       })}
                       {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
                     </div>

@@ -142,6 +142,11 @@ export function SnapshotInventoryCard({
             date: snapshot.capturedAt.toLocaleString(),
           })}
         </div>
+        {snapshotReadOnly && !stashOnlySnapshot && (
+          <p className="text-muted-foreground text-sm">
+            {t(translations.inventoryBrowser.characterSaveReadOnlyNotice)}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="columns-1 gap-4 sm:columns-[20rem] [&>*]:mb-4 [&>*]:break-inside-avoid">
         {!stashOnlySnapshot && showsLocation('equipped') && (

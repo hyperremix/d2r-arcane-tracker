@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readWarlockSave } from '../../test/helpers/rotwCharacterSave';
 import {
   buildSaveFileHeader,
   getCharacterClass,
   getSaveNameFromPath,
   isHardcoreStashFileName,
+  isRotwExpansionSave,
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
@@ -19,7 +21,7 @@ const LAST_MODIFIED = new Date('2024-05-01T10:00:00.000Z');
 describe('When a character class id is mapped', () => {
   it('Then should return correct character class for valid ID', () => {
     // Arrange
-    const classIds = [0, 1, 2, 3, 4, 5, 6];
+    const classIds = [0, 1, 2, 3, 4, 5, 6, 7];
 
     // Act
     const classes = classIds.map((id) => getCharacterClass(id));
@@ -33,18 +35,19 @@ describe('When a character class id is mapped', () => {
       'barbarian',
       'druid',
       'assassin',
+      'warlock',
     ]);
   });
 
   it('Then should return unknown for invalid character class ID', () => {
     // Arrange
-    const invalidIds = [99, -1];
+    const invalidIds = [8, 99, -1];
 
     // Act
     const classes = invalidIds.map((id) => getCharacterClass(id));
 
     // Assert
-    expect(classes).toEqual(['unknown', 'unknown']);
+    expect(classes).toEqual(['unknown', 'unknown', 'unknown']);
   });
 });
 
@@ -245,6 +248,55 @@ describe('When the header of a save file is built from its content', () => {
     });
   });
 
+  describe('If a real Reign of the Warlock (v105) Warlock save is described', () => {
+    it('Then it is a level 1 softcore expansion Warlock', () => {
+      // Arrange
+      const save = readWarlockSave();
+
+      // Act
+      const saveFile = buildSaveFileHeader('/saves/Warlock.d2s', save, LAST_MODIFIED);
+
+      // Assert
+      expect(saveFile).toEqual({
+        name: 'Warlock',
+        path: '/saves/Warlock.d2s',
+        lastModified: LAST_MODIFIED,
+        characterClass: 'warlock',
+        level: 1,
+        hardcore: false,
+        expansion: true,
+      });
+    });
+  });
+
+  describe('If a v105 character save has its fields at the moved offsets', () => {
+    it('Then class, level and hardcore come from the new offsets and expansion from the game mode byte', () => {
+      // Arrange
+      const header = Buffer.alloc(800);
+      header.writeUInt32LE(105, 4);
+      header.writeUInt8(0x04, 20); // hardcore
+      header.writeUInt8(7, 24); // warlock
+      header.writeUInt8(85, 27);
+      header.writeUInt8(1, 248); // classic game mode
+      header.writeUInt8(0xff, 36); // the pre-v105 offsets must not be read
+      header.writeUInt8(4, 40);
+      header.writeUInt8(92, 43);
+
+      // Act
+      const saveFile = buildSaveFileHeader('/saves/Hero.d2s', header, LAST_MODIFIED);
+
+      // Assert
+      expect(saveFile).toEqual(
+        expect.objectContaining({
+          characterClass: 'warlock',
+          level: 85,
+          hardcore: true,
+          expansion: false,
+        }),
+      );
+    });
+  });
+
   describe('If a character save is too short for a header', () => {
     it('Then the defaults of an unknown softcore expansion character are used', () => {
       // Arrange
@@ -352,6 +404,56 @@ describe('When the header of a save file is built from its content', () => {
 
       // Assert
       expect(headerInfo).toEqual({ hardcore: true });
+    });
+  });
+});
+
+describe('When it is checked whether a character save was made for an expansion game mode', () => {
+  function makeSave(version: number, gameMode: number, length = 800): Buffer {
+    const save = Buffer.alloc(length);
+    save.writeUInt32LE(version, 4);
+    if (length > 248) {
+      save.writeUInt8(gameMode, 248);
+    }
+    return save;
+  }
+
+  describe('If a v105 save has the Lord of Destruction or Reign of the Warlock game mode', () => {
+    it('Then it is an expansion save', () => {
+      // Arrange
+      const saves = [makeSave(105, 2), makeSave(105, 3)];
+
+      // Act
+      const results = saves.map((save) => isRotwExpansionSave(save));
+
+      // Assert
+      expect(results).toEqual([true, true]);
+    });
+  });
+
+  describe('If a v105 save has the classic game mode', () => {
+    it('Then it is not an expansion save', () => {
+      // Arrange
+      const save = makeSave(105, 1);
+
+      // Act
+      const result = isRotwExpansionSave(save);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('If the save is older than v105 or too short to hold a game mode byte', () => {
+    it('Then it is not judged by a game mode byte', () => {
+      // Arrange
+      const saves = [makeSave(99, 3), makeSave(105, 3, 100), Buffer.alloc(4)];
+
+      // Act
+      const results = saves.map((save) => isRotwExpansionSave(save));
+
+      // Assert
+      expect(results).toEqual([false, false, false]);
     });
   });
 });

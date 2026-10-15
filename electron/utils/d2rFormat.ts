@@ -25,8 +25,11 @@ export function saveFileTypeFromExtension(extension: string): VaultSourceFileTyp
   return SAVE_FILE_TYPES.find((supported) => supported === fileType);
 }
 
+/** Save file version of Reign of the Warlock, the first version of every format the app reads here. */
+export const ROTW_SAVE_VERSION = 105;
+
 /** First .d2i version that uses the modern sector layout with resource tabs. */
-export const MODERN_STASH_MIN_VERSION = 105;
+export const MODERN_STASH_MIN_VERSION = ROTW_SAVE_VERSION;
 
 /** Number of regular (grid) tabs at the start of a modern shared stash. */
 export const SHARED_TAB_COUNT = 5;
@@ -59,6 +62,27 @@ const MATERIAL_ITEM_CODES: ReadonlySet<string> = new Set(
 /** True when a .d2i file of this version uses the modern (v105+) stash layout. */
 export function isModernStashVersion(version: number | undefined): boolean {
   return version !== undefined && version >= MODERN_STASH_MIN_VERSION;
+}
+
+/**
+ * First character save (.d2s) version with the Reign of the Warlock header layout, which moved the
+ * header fields forward. The d2s library switches its header layout at version 0x64 (100), so a
+ * version 100-104 save would be laid out differently; D2R writes no such version.
+ */
+export const ROTW_CHARACTER_HEADER_MIN_VERSION = ROTW_SAVE_VERSION;
+
+/** First character save (.d2s) version that the d2s library can read but not write back. */
+export const READ_ONLY_CHARACTER_SAVE_MIN_VERSION = ROTW_SAVE_VERSION;
+
+/** Version of a character save (.d2s) from its header, or undefined when the file is too short. */
+export function readCharacterSaveVersion(buffer: Buffer): number | undefined {
+  return buffer.length >= 8 ? buffer.readUInt32LE(4) : undefined;
+}
+
+/** True when the character save (.d2s) is read but never written (v105+, which the d2s library cannot write back). */
+export function isReadOnlyCharacterSave(buffer: Buffer): boolean {
+  const version = readCharacterSaveVersion(buffer);
+  return version !== undefined && version >= READ_ONLY_CHARACTER_SAVE_MIN_VERSION;
 }
 
 /** Returns the value when it is a finite number, otherwise undefined. */

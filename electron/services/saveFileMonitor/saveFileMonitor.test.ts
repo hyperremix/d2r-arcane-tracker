@@ -44,6 +44,7 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
+import { WARLOCK_SAVE_FIXTURE_PATH } from '../../test/helpers/rotwCharacterSave';
 import { GameMode, type SaveFileEvent } from '../../types/grail';
 import * as d2sConstants from '../d2s/constants';
 import { EventBus } from '../EventBus';
@@ -2233,6 +2234,24 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.inventorySnapshot?.sourceFileVersion).toBe(105);
       expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
+    });
+
+    it('Then processSingleFile lists a Reign of the Warlock character as a Warlock with a read-only snapshot', async () => {
+      // Arrange
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        items: [],
+        status: 'parsed',
+      });
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(WARLOCK_SAVE_FIXTURE_PATH);
+
+      // Assert
+      expect(parseResult.success).toBe(true);
+      // The save file editor cannot write v105 character saves, so drag-and-drop is disabled
+      expect(parseResult.inventorySnapshot?.readOnly).toBe(true);
+      expect(parseResult.saveFile).toMatchObject({ characterClass: 'warlock', level: 1 });
     });
 
     it('Then processSingleFile stamps every snapshot item with the stored character id', async () => {
