@@ -89,7 +89,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9b7',
-    itemBase: 'Edge Bow',
+    itemBase: 'Lochaber Axe',
     imageFilename: 'short_bow.png',
   },
   {
@@ -115,7 +115,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9s8',
-    itemBase: 'Short Siege Bow',
+    itemBase: 'Battle Scythe',
     imageFilename: 'short_battle_bow.png',
   },
   {
@@ -141,7 +141,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9h9',
-    itemBase: 'Bec-De-Corbin',
+    itemBase: 'Bec-de-Corbin',
     imageFilename: 'halberd.png',
   },
   {

@@ -6,6 +6,7 @@ import { druid } from './druid';
 import { necromancer } from './necromancer';
 import { paladin } from './paladin';
 import { sorceress } from './sorceress';
+import { warlock } from './warlock';
 
 export const classes: Item[] = [
   ...amazon,
@@ -15,4 +16,5 @@ export const classes: Item[] = [
   ...necromancer,
   ...paladin,
   ...sorceress,
+  ...warlock,
 ];

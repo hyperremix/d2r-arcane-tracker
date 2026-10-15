@@ -10,7 +10,7 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
-import { getGrailItemId } from '../utils/grailItemUtils';
+import { getGrailItemId, resolveRunewordName } from '../utils/grailItemUtils';
 import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune, simplifyItemName } from '../utils/objects';
 import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
@@ -69,18 +69,14 @@ export function resolveGrailLookupName(item: D2SItem): string {
   return simplifyItemName(item.unique_name || item.set_name || '');
 }
 
-/** Returns the runeword name when it is a known runeword, fixing the d2s "Love" -> "Lore" bug. */
+/** Returns the in-game runeword name (see `resolveRunewordName`) when it is a known runeword. */
 function getValidatedRunewordName(item: D2SItem): string | undefined {
-  if (!item.runeword_name) {
+  const runewordName = resolveRunewordName(item);
+  if (!runewordName || !runewordsByNameSimple[simplifyItemName(runewordName)]) {
     return undefined;
   }
 
-  const normalized = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
-  if (!runewordsByNameSimple[simplifyItemName(normalized)]) {
-    return undefined;
-  }
-
-  return normalized;
+  return runewordName;
 }
 
 function toDisplayString(value: unknown): string | undefined {

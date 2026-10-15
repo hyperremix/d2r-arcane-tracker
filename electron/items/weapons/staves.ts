@@ -102,7 +102,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8cs',
-    itemBase: 'Shillelagh',
+    itemBase: 'Cedar Staff',
     imageFilename: 'staff_of_the_kings.png',
   },
   {

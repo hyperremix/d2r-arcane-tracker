@@ -107,6 +107,16 @@ describe('When class-specific items are checked', () => {
     expect(requiredClass).toBe('sorceress');
   });
 
+  it('If the item is a Warlock grimoire, Then the Warlock is the required class', () => {
+    // Arrange / Act
+    const requiredClass = resolveRequiredCharacterClass(
+      normalizeEquipCategories(['Grimoire', 'Any Shield', 'Warlock Item', 'Class Specific']),
+    );
+
+    // Assert
+    expect(requiredClass).toBe('warlock');
+  });
+
   it('If the item has no class category, Then no class is required', () => {
     // Arrange / Act
     const requiredClass = resolveRequiredCharacterClass(normalizeEquipCategories(['Helm']));

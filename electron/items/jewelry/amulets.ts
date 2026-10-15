@@ -157,4 +157,17 @@ export const amulets: Item[] = [
     imageFilename: 'amulet3.png',
     treasureClass: 'normal',
   },
+  {
+    id: 'entropylocket',
+    name: 'Entropy Locket',
+    link: 'https://diablo2.io/uniques/entropy-locket-t1673931.html',
+    etherealType: 'none',
+    type: 'unique',
+    category: 'jewelry',
+    subCategory: 'amulets',
+    treasureClass: 'normal',
+    code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet1.png',
+  },
 ];

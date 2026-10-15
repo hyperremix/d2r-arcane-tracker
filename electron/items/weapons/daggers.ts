@@ -144,4 +144,17 @@ export const daggers: Item[] = [
     itemBase: 'Bone Knife',
     imageFilename: 'dagger.png',
   },
+  {
+    id: 'bloodpactshard',
+    name: 'Bloodpact Shard',
+    link: 'https://diablo2.io/uniques/bloodpact-shard-t1673928.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'daggers',
+    treasureClass: 'elite',
+    code: '7di',
+    itemBase: 'Mithril Point',
+    imageFilename: 'dirk.png',
+  },
 ];

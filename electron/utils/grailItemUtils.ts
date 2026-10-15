@@ -1,7 +1,39 @@
+import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { itemsByNameSimple, runesByCode, runewordsByNameSimple } from '../items/indexes';
 import type { D2SItem } from '../types/grail';
 import { isRuneCode, normalizeItemCodeKey } from './d2rFormat';
 import { simplifyItemName } from './objects';
+
+// The v105 table is a superset of the v99 one and includes the Reign of the Warlock base items
+const armorItemCodes = new Set(Object.keys(constants105.armor_items));
+
+/**
+ * Runeword that took over a Hustle find. Reign of the Warlock renamed Hustle to Hysteria in body
+ * armor and to Mania in weapons, but the d2s parser still names both Hustle.
+ * @param itemCode - Code of the base item, for example `uui` (Dusk Shroud)
+ */
+export function resolveHustleSuccessorName(itemCode: unknown): 'Hysteria' | 'Mania' {
+  const codeKey = normalizeItemCodeKey(itemCode);
+  return codeKey && armorItemCodes.has(codeKey) ? 'Hysteria' : 'Mania';
+}
+
+/**
+ * In-game name of the runeword of an item, correcting the names the d2s parser gets wrong: "Love"
+ * is Lore, and Hustle is Mania or Hysteria depending on the base item.
+ * @returns The runeword name, or `undefined` when the item is no runeword
+ */
+export function resolveRunewordName(item: D2SItem): string | undefined {
+  const name = item.runeword_name;
+  if (typeof name !== 'string' || !name) {
+    return undefined;
+  }
+
+  if (name === 'Love') {
+    return 'Lore';
+  }
+
+  return name === 'Hustle' ? resolveHustleSuccessorName(item.type) : name;
+}
 
 /**
  * Resolves the specific Rainbow Facet name based on magic attributes.
@@ -50,11 +82,9 @@ export function getGrailItemId(d2sItem: unknown): string | null {
   }
 
   // Handle runewords by name
-  if (item?.runeword_name && typeof item.runeword_name === 'string') {
-    // Fix known D2S parser bug: "Love" should be "Lore"
-    const runewordName = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
-    const simpleName = simplifyItemName(runewordName);
-    const runeword = runewordsByNameSimple[simpleName];
+  const runewordName = item ? resolveRunewordName(item) : undefined;
+  if (runewordName) {
+    const runeword = runewordsByNameSimple[simplifyItemName(runewordName)];
     return runeword?.id || null;
   }
 

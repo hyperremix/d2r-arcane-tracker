@@ -37,7 +37,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7ta',
-    itemBase: 'Tomahawk',
+    itemBase: 'Flying Axe',
     imageFilename: 'throwing_axe.png',
   },
   {

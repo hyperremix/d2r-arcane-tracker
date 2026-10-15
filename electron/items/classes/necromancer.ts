@@ -11,7 +11,7 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'exceptional',
     code: 'nea',
-    itemBase: 'Hierophant Mask',
+    itemBase: 'Hierophant Trophy',
     imageFilename: 'demon_head.png',
   },
   {
@@ -24,7 +24,7 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'nee',
-    itemBase: 'Succubus Skill',
+    itemBase: 'Succubus Skull',
     imageFilename: 'gargoyle_head.png',
   },
   {

@@ -82,6 +82,9 @@ function normalizeCharacterClass(rawClass: unknown): CharacterClass | undefined 
     case 'sorc':
     case 'sor':
       return 'sorceress';
+    case 'warlock':
+    case 'war':
+      return 'warlock';
     case 'sharedstash':
       return 'shared_stash';
     default:

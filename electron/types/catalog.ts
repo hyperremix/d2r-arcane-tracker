@@ -53,7 +53,12 @@ export type ArmorSubCategory = 'helms' | 'body_armor' | 'shields' | 'gloves' | '
 /**
  * Type representing the subcategories of jewelry items.
  */
-export type JewelrySubCategory = 'amulets' | 'rings' | 'rainbow_facets' | 'dies';
+export type JewelrySubCategory =
+  | 'amulets'
+  | 'rings'
+  | 'rainbow_facets'
+  | 'dies'
+  | 'colossal_jewels';
 
 /**
  * Type representing the subcategories of charm items.
@@ -86,12 +91,14 @@ export type CharacterClass =
   | 'necromancer'
   | 'paladin'
   | 'sorceress'
+  | 'warlock'
   | 'shared_stash';
 
 export type ItemSet =
   | 'Angelic Raiment'
   | "Arcanna's Tricks"
   | 'Arctic Gear'
+  | "Bane's Garments"
   | "Berserker's Arsenal"
   | "Cathan's Traps"
   | "Civerb's Vestments"
@@ -110,6 +117,7 @@ export type ItemSet =
   | "Cow King's Leathers"
   | "Griswold's Legacy"
   | "Heaven's Brethren"
+  | "Horazon's Splendor"
   | "Hwanin's Majesty"
   | 'Immortal King'
   | "M'avina's Battle Hymn"

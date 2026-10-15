@@ -1,11 +1,13 @@
 import type { Item } from '../types/grail';
 import { simplifyItemName } from '../utils/objects';
 import { items } from './index';
+import { parserNameAliases } from './parserNameAliases';
 
 /**
  * Read-only indexes for efficient item lookups.
- * `itemsByNameSimple` holds every non-runeword catalog entry by simplified name. Today it is only read
- * for uniques and sets: runes are in it too, but they are resolved through `runesByCode`.
+ * `itemsByNameSimple` holds every non-runeword catalog entry by simplified name, plus the d2s parser
+ * name aliases. Today it is only read for uniques and sets: runes are in it too, but they are
+ * resolved through `runesByCode`.
  */
 export const itemsByNameSimple: Record<string, Item> = {};
 export const runesByCode: Record<string, Item> = {};
@@ -26,5 +28,14 @@ for (const item of items) {
     runewordsByNameSimple[simpleName] = item;
   } else {
     itemsByNameSimple[simpleName] = item;
+  }
+}
+
+for (const [parserName, catalogName] of Object.entries(parserNameAliases)) {
+  const parserKey = simplifyItemName(parserName);
+  const item = itemsByNameSimple[simplifyItemName(catalogName)];
+  // An alias never shadows a catalog item that has the parser name as its own name
+  if (item && !itemsByNameSimple[parserKey]) {
+    itemsByNameSimple[parserKey] = item;
   }
 }

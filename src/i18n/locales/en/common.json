@@ -136,6 +136,7 @@
         "rings": "Rings",
         "rainbowFacets": "Rainbow Facets (Level-up)",
         "dies": "Rainbow Facets (Death)",
+        "colossalJewels": "Colossal Ancient jewels",
         "smallCharms": "Small charms",
         "largeCharms": "Large charms",
         "grandCharms": "Grand charms",
@@ -148,6 +149,7 @@
         "necromancer": "Necromancer",
         "paladin": "Paladin",
         "sorceress": "Sorceress",
+        "warlock": "Warlock",
         "sharedStash": "Shared stash"
       }
     },
@@ -253,6 +255,7 @@
         "rings": "Rings",
         "rainbow_facets": "Rainbow Facets (Level-up)",
         "dies": "Rainbow Facets (Death)",
+        "colossal_jewels": "Colossal Ancient jewels",
         "small_charms": "Small charms",
         "large_charms": "Large charms",
         "grand_charms": "Grand charms",
@@ -265,6 +268,7 @@
         "necromancer": "Necromancer",
         "paladin": "Paladin",
         "sorceress": "Sorceress",
+        "warlock": "Warlock",
         "shared_stash": "Shared stash"
       }
     },

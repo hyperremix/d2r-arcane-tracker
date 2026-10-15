@@ -1,5 +1,6 @@
 import {
   Axe,
+  BookOpen,
   BowArrow,
   Circle,
   Crown,
@@ -44,6 +45,7 @@ export function CharacterIcon({ characterClass, className }: CharacterIconProps)
     necromancer: Skull,
     paladin: Sword,
     sorceress: WandSparkles,
+    warlock: BookOpen,
     shared_stash: Package,
   };
 

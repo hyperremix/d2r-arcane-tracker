@@ -41,6 +41,7 @@ const CLASS_SPECIFIC_CATEGORY_TO_CLASS: Record<string, Exclude<CharacterClass, '
   'necromancer item': 'necromancer',
   'paladin item': 'paladin',
   'sorceress item': 'sorceress',
+  'warlock item': 'warlock',
 };
 
 /** Item table entry of d2s constant data (`c` holds the item type categories). */
