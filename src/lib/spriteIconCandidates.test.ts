@@ -379,8 +379,30 @@ describe('When sprite icon candidates are generated', () => {
     });
   });
 
+  describe('If a Colossal Jewel is not a unique item', () => {
+    it('Then it includes the base jewel icon', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex(grailItems);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: undefined,
+          itemCode: 'cjw',
+          itemName: 'Colossal Jewel',
+          rawItemJson: JSON.stringify({ code: 'cjw', type_name: 'Colossal Jewel' }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates).toContain('perfect_diamond.png');
+    });
+  });
+
   describe('If a grimoire is the unique Measured Wrath', () => {
-    it('Then its unique icon comes before any base icon', () => {
+    it('Then its unique icon is the first candidate and the base icon is left out', () => {
       // Arrange
       const lookup = createSpriteIconLookupIndex([...grailItems, measuredWrath]);
 

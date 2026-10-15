@@ -109,7 +109,9 @@ export function resolveCanonicalIconFilename(
     input.parsedName,
   ]);
 
-  // Bases whose uniques and sets use other sprites: only a catalog name match beats the base sprite
+  // Items with a dedicated base sprite (grimoires, Colossal Jewel) skip the shared code lookup,
+  // which would pick a unique's sprite. A grailItemId match wins first above; after that only a
+  // catalog name match beats the base sprite.
   const baseItemIcon = resolveBaseItemIconFilename(input.itemCode);
   if (baseItemIcon) {
     return nameIcon ?? baseItemIcon;

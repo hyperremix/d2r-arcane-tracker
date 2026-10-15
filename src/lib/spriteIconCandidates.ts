@@ -87,7 +87,8 @@ function addCodeLookupCandidate(
     return;
   }
 
-  // Bases whose uniques and sets use other sprites never take a catalog item's sprite by code
+  // Items with a dedicated base sprite (grimoires, Colossal Jewel) skip the shared code lookup,
+  // which would pick a unique's sprite; they get the base sprite unless a unique signal is present
   const baseItemIcon = resolveBaseItemIconFilename(code);
   if (baseItemIcon) {
     if (!hasExplicitUniqueSignal) {
