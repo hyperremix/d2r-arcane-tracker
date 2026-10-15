@@ -558,7 +558,6 @@ class SaveFileMonitor {
         sourceFileType: extension.replace('.', '') as VaultSourceFileType,
         sourceFilePath: filePath,
         sourceFileVersion: d2iHeader?.version,
-        readOnly: false,
         capturedAt: new Date(),
         items: snapshotItems,
       };

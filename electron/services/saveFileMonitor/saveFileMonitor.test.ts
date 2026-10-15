@@ -2217,7 +2217,7 @@ describe('When SaveFileMonitor is used', () => {
       ).toBe(true);
     }, 20000);
 
-    it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
+    it('Then processSingleFile records the source file version of modern snapshots', async () => {
       // Arrange
       vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         items: [],
@@ -2230,13 +2230,11 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.success).toBe(true);
-      // Modern stash shared tabs are now writable — drag-and-drop is enabled
-      expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.inventorySnapshot?.sourceFileVersion).toBe(105);
       expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
     });
 
-    it('Then processSingleFile lists a Reign of the Warlock character as a Warlock with an editable snapshot', async () => {
+    it('Then processSingleFile lists a Reign of the Warlock character as a Warlock', async () => {
       // Arrange
       vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         items: [],
@@ -2249,8 +2247,6 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.success).toBe(true);
-      // The save file editor writes v105 character saves, so their items can be dragged
-      expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.saveFile).toMatchObject({ characterClass: 'warlock', level: 1 });
     });
 

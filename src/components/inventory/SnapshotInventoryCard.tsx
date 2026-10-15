@@ -96,7 +96,6 @@ export function SnapshotInventoryCard({
   const stashTabsToRender = buildStashTabsToRender(snapshot, grouped.stashByTab);
   const stashOnlySnapshot = isStashSourceFileType(snapshot.sourceFileType);
   const { belt: beltItems, otherUnknown } = partitionUnknownItems(grouped.unknown);
-  const snapshotReadOnly = snapshot.readOnly === true;
   const showsLocation = (location: VaultLocationContext) =>
     locationContext === 'all' || locationContext === location;
   const {
@@ -111,7 +110,6 @@ export function SnapshotInventoryCard({
       item={item}
       iconLookup={tileProps.iconLookup}
       selected={item.fingerprint === tileProps.selectedFingerprint}
-      disableInteractions={snapshotReadOnly}
       isVaultPresent={getEffectiveVaultPresent(
         item,
         tileProps.vaultItemsByFingerprint,
@@ -150,7 +148,6 @@ export function SnapshotInventoryCard({
             items={grouped.equipped}
             weaponSet={weaponSet}
             onWeaponSetChange={onWeaponSetChange}
-            disableInteractions={snapshotReadOnly}
             snapshotSourceFilePath={snapshot.sourceFilePath}
             snapshotSourceFileType={snapshot.sourceFileType}
             draggingInventoryItem={activeInventoryDragItem}
@@ -183,7 +180,6 @@ export function SnapshotInventoryCard({
             items={grouped.inventory}
             gridSize={DEFAULT_INVENTORY_GRID_SIZE}
             showRawOverflowBoard
-            disableInteractions={snapshotReadOnly}
             snapshotSourceFilePath={snapshot.sourceFilePath}
             snapshotSourceFileType={snapshot.sourceFileType}
             sectionLocationContext="inventory"
@@ -211,7 +207,6 @@ export function SnapshotInventoryCard({
                   title={title}
                   testId={testId}
                   items={items.map(applyPickupAdjustment)}
-                  disableInteractions={snapshotReadOnly}
                   onItemClick={onStartPickup}
                   onItemContextMenu={onDecrementPickup}
                   onDropInventoryItem={(event, targetGridX, targetGridY) =>
@@ -238,7 +233,6 @@ export function SnapshotInventoryCard({
                 items={items}
                 gridSize={DEFAULT_STASH_GRID_SIZE}
                 showRawOverflowBoard
-                disableInteractions={snapshotReadOnly}
                 snapshotSourceFilePath={snapshot.sourceFilePath}
                 snapshotSourceFileType={snapshot.sourceFileType}
                 sectionLocationContext="stash"
@@ -259,7 +253,6 @@ export function SnapshotInventoryCard({
             testId={`belt-board-${snapshot.snapshotId}`}
             items={beltItems}
             gridSize={DEFAULT_BELT_GRID_SIZE}
-            disableInteractions={snapshotReadOnly}
           />
         )}
 
@@ -269,7 +262,6 @@ export function SnapshotInventoryCard({
             title={t(translations.inventoryBrowser.sections.mercenary)}
             testId={`mercenary-board-${snapshot.snapshotId}`}
             items={grouped.mercenary}
-            disableInteractions={snapshotReadOnly}
           />
         )}
 
@@ -280,7 +272,6 @@ export function SnapshotInventoryCard({
             testId={`corpse-board-${snapshot.snapshotId}`}
             items={grouped.corpse}
             gridSize={DEFAULT_INVENTORY_GRID_SIZE}
-            disableInteractions={snapshotReadOnly}
           />
         )}
 

@@ -30,7 +30,6 @@ export interface MercenaryEquipmentSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
-  disableInteractions?: boolean;
 }
 
 export function MercenaryEquipmentSection({
@@ -44,7 +43,6 @@ export function MercenaryEquipmentSection({
   onSelect,
   onDragStart,
   onDragEnd,
-  disableInteractions = false,
 }: MercenaryEquipmentSectionProps) {
   const { t } = useTranslation();
   const mappedMercenaryItems = useMemo(() => {
@@ -110,7 +108,6 @@ export function MercenaryEquipmentSection({
                     item={slotItem}
                     iconLookup={iconLookup}
                     selected={slotItem.fingerprint === selectedFingerprint}
-                    disableInteractions={disableInteractions}
                     isVaultPresent={getEffectiveVaultPresent(
                       slotItem,
                       vaultItemsByFingerprint,
@@ -141,7 +138,6 @@ export function MercenaryEquipmentSection({
                   item={item}
                   iconLookup={iconLookup}
                   selected={item.fingerprint === selectedFingerprint}
-                  disableInteractions={disableInteractions}
                   isVaultPresent={getEffectiveVaultPresent(
                     item,
                     vaultItemsByFingerprint,

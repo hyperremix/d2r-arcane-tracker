@@ -28,7 +28,6 @@ export interface InventoryTileProps {
   item: ParsedInventoryItem;
   iconLookup: SpriteIconLookupIndex;
   selected: boolean;
-  disableInteractions?: boolean;
   isVaultPresent?: boolean;
   unplacedReason?: EquipmentUnplacedReason;
   onSelect: (item: ParsedInventoryItem) => void;
@@ -40,7 +39,6 @@ export function InventoryTile({
   item,
   iconLookup,
   selected,
-  disableInteractions = false,
   isVaultPresent,
   unplacedReason,
   onSelect,
@@ -75,7 +73,7 @@ export function InventoryTile({
         render={
           <button
             type="button"
-            draggable={!disableInteractions && !!onDragStart}
+            draggable={!!onDragStart}
             data-testid="inventory-item-tile"
             aria-label={formatInventoryTileLabel(item, t)}
             className={cn(
@@ -86,7 +84,7 @@ export function InventoryTile({
             )}
             onClick={() => onSelect(item)}
             onDragStart={(event) => {
-              if (!disableInteractions && onDragStart) {
+              if (onDragStart) {
                 onDragStart(event, item);
               }
             }}

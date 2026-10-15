@@ -42,7 +42,6 @@ export interface EquipmentSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
-  disableInteractions?: boolean;
   snapshotSourceFilePath?: string;
   snapshotSourceFileType?: VaultSourceFileType;
   draggingInventoryItem?: ActiveInventoryDragItem | null;
@@ -66,7 +65,6 @@ export function EquipmentSection({
   onSelect,
   onDragStart,
   onDragEnd,
-  disableInteractions = false,
   snapshotSourceFilePath,
   snapshotSourceFileType,
   draggingInventoryItem,
@@ -81,8 +79,7 @@ export function EquipmentSection({
     () => buildEquippedSlotMapForSet(items, weaponSet),
     [items, weaponSet],
   );
-  const canDropOnSection =
-    !disableInteractions && !!snapshotSourceFilePath && !!snapshotSourceFileType;
+  const canDropOnSection = !!snapshotSourceFilePath && !!snapshotSourceFileType;
   const clearSlotPreview = useCallback(() => {
     setDragPreviewSlot(null);
   }, []);
@@ -229,7 +226,6 @@ export function EquipmentSection({
                       item={slotItem}
                       iconLookup={iconLookup}
                       selected={slotItem.fingerprint === selectedFingerprint}
-                      disableInteractions={disableInteractions}
                       isVaultPresent={getEffectiveVaultPresent(
                         slotItem,
                         vaultItemsByFingerprint,

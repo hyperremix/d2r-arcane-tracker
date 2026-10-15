@@ -45,7 +45,6 @@ function createSnapshot(sourceFilePath: string): ParsedInventorySnapshot {
     characterName: 'Hero',
     sourceFileType: 'd2s',
     sourceFilePath,
-    readOnly: false,
     capturedAt: new Date('2024-01-02T00:00:00.000Z'),
     items: [],
   };
