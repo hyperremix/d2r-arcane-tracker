@@ -24,6 +24,15 @@ const MODERN_STASH_FIXTURE_PATH = resolve(
 const FILE_SIZE_OFFSET = 0x08;
 const CHECKSUM_OFFSET = 0x0c;
 const ITEM_LIST_HEADER = Buffer.from('JM', 'latin1');
+/** The mercenary item list header "jf", followed directly by the golem header "kf" when no items are listed. */
+const MERCENARY_AND_GOLEM_HEADERS = Buffer.from('jfkf', 'latin1');
+const MERCENARY_HEADER_LENGTH = 2;
+/**
+ * Offset of the mercenary id in a v105 character header: the d2s fork reads it there, and halbu's
+ * v105 layout puts the mercenary block at 161 (the v99 offset 0xb3 minus the 16 bytes the name moved).
+ */
+const MERCENARY_ID_OFFSET = 163;
+const EQUIPPED_LOCATION_ID = 1;
 /** Location ids of an item in the character's inventory grid. */
 const STORED_LOCATION_ID = 0;
 const INVENTORY_ALT_POSITION_ID = 1;
@@ -90,8 +99,58 @@ export async function addItemToRotwCharacterSave(
   ]);
   const itemCountOffset = itemListOffset + ITEM_LIST_HEADER.length;
   result.writeUInt16LE(result.readUInt16LE(itemCountOffset) + 1, itemCountOffset);
-  result.writeUInt32LE(result.length, FILE_SIZE_OFFSET);
-  result.writeUInt32LE(0, CHECKSUM_OFFSET);
-  result.writeUInt32LE(computeSaveChecksum(result), CHECKSUM_OFFSET);
-  return result;
+  return finalizeSave(result);
+}
+
+/** An item a hired mercenary wears, with the equipment slot it sits in. */
+export interface WornItem {
+  item: d2sTypes.IItem;
+  equippedId: number;
+}
+
+/**
+ * Returns a copy of a v105 character save that has a hired mercenary wearing the given items. The
+ * save gets a mercenary id and, behind the "jf" header, the item list ("JM", count, items) written
+ * with the d2s v105 item writer, as the game does for a hired mercenary.
+ * @param save - A v105 character save without a mercenary
+ * @param wornItems - The items the mercenary wears; none hires a mercenary with an empty list
+ */
+export async function hireRotwMercenary(save: Buffer, wornItems: WornItem[]): Promise<Buffer> {
+  const headersOffset = save.lastIndexOf(MERCENARY_AND_GOLEM_HEADERS);
+  if (headersOffset === -1) {
+    throw new Error('The save has no empty mercenary item list');
+  }
+  const itemBytes: Buffer[] = [];
+  for (const { item, equippedId } of wornItems) {
+    const worn: d2sTypes.IItem = {
+      ...structuredClone(item),
+      location_id: EQUIPPED_LOCATION_ID,
+      equipped_id: equippedId,
+      position_x: 0,
+      position_y: 0,
+      alt_position_id: 0,
+    };
+    itemBytes.push(Buffer.from(await writeItem(worn, 105, constants105, {})));
+  }
+  const itemCount = Buffer.alloc(2);
+  itemCount.writeUInt16LE(wornItems.length);
+
+  const listOffset = headersOffset + MERCENARY_HEADER_LENGTH;
+  const result = Buffer.concat([
+    save.subarray(0, listOffset),
+    ITEM_LIST_HEADER,
+    itemCount,
+    ...itemBytes,
+    save.subarray(listOffset),
+  ]);
+  result.writeUInt32LE(1, MERCENARY_ID_OFFSET);
+  return finalizeSave(result);
+}
+
+/** Updates the file size and checksum of a save whose content was changed. */
+function finalizeSave(save: Buffer): Buffer {
+  save.writeUInt32LE(save.length, FILE_SIZE_OFFSET);
+  save.writeUInt32LE(0, CHECKSUM_OFFSET);
+  save.writeUInt32LE(computeSaveChecksum(save), CHECKSUM_OFFSET);
+  return save;
 }

@@ -16,7 +16,7 @@ import { type SplitStackOptions, splitStackInSaveFileUnlocked } from './splitSta
 
 export type { SaveFileItemLocator } from './itemLocators';
 export type { AddItemToSaveFileOptions } from './itemOperations';
-export { readSaveFileItem } from './itemOperations';
+export { assertSaveFileAllowsItemRemoval, readSaveFileItem } from './itemOperations';
 export type { MoveSaveFileItemOptions } from './moveItem';
 export type { SplitStackOptions, SplitStackTarget } from './splitStack';
 

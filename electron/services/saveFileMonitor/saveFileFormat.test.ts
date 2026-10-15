@@ -7,6 +7,7 @@ import {
   getCharacterClass,
   getSaveNameFromPath,
   isHardcoreStashFileName,
+  isRotwExpansionSave,
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
@@ -403,6 +404,56 @@ describe('When the header of a save file is built from its content', () => {
 
       // Assert
       expect(headerInfo).toEqual({ hardcore: true });
+    });
+  });
+});
+
+describe('When it is checked whether a character save was made for an expansion game mode', () => {
+  function makeSave(version: number, gameMode: number, length = 800): Buffer {
+    const save = Buffer.alloc(length);
+    save.writeUInt32LE(version, 4);
+    if (length > 248) {
+      save.writeUInt8(gameMode, 248);
+    }
+    return save;
+  }
+
+  describe('If a v105 save has the Lord of Destruction or Reign of the Warlock game mode', () => {
+    it('Then it is an expansion save', () => {
+      // Arrange
+      const saves = [makeSave(105, 2), makeSave(105, 3)];
+
+      // Act
+      const results = saves.map((save) => isRotwExpansionSave(save));
+
+      // Assert
+      expect(results).toEqual([true, true]);
+    });
+  });
+
+  describe('If a v105 save has the classic game mode', () => {
+    it('Then it is not an expansion save', () => {
+      // Arrange
+      const save = makeSave(105, 1);
+
+      // Act
+      const result = isRotwExpansionSave(save);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('If the save is older than v105 or too short to hold a game mode byte', () => {
+    it('Then it is not judged by a game mode byte', () => {
+      // Arrange
+      const saves = [makeSave(99, 3), makeSave(105, 3, 100), Buffer.alloc(4)];
+
+      // Act
+      const results = saves.map((save) => isRotwExpansionSave(save));
+
+      // Assert
+      expect(results).toEqual([false, false, false]);
     });
   });
 });

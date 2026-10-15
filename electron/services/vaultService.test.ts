@@ -16,6 +16,7 @@ const mocks = {
   assertGameNotRunning: vi.fn<() => Promise<void>>(),
   saveFileEditorMock: {
     addItemToSaveFile: vi.fn(),
+    assertSaveFileAllowsItemRemoval: vi.fn(),
     readSaveFileItem: vi.fn(),
     removeItemFromSaveFile: vi.fn(),
     moveItemBetweenSaveFiles: vi.fn(),
@@ -91,6 +92,7 @@ describe('When the vault service handles a renderer request', () => {
     mocks.assertGameNotRunning.mockResolvedValue(undefined);
     mocks.saveDirectory.mockReturnValue('/tmp');
     mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'uap', code: 'uap' });
+    mocks.saveFileEditorMock.assertSaveFileAllowsItemRemoval.mockResolvedValue(undefined);
     mocks.saveFileEditorMock.addItemToSaveFile.mockResolvedValue(undefined);
     mocks.saveFileEditorMock.removeItemFromSaveFile.mockResolvedValue(undefined);
   });
@@ -266,6 +268,38 @@ describe('When the vault service handles a renderer request', () => {
       // Assert
       await expect(promise).rejects.toThrow('Vault add persisted but source item removal failed');
       expect(undo).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If vault:addItem is given an item of a character save that cannot be written', () => {
+    it('Then it refuses before the vault row is written or the save is touched', async () => {
+      // Arrange
+      const service = createService();
+      mocks.saveFileEditorMock.assertSaveFileAllowsItemRemoval.mockRejectedValue(
+        new Error('CHARACTER_SAVE_READ_ONLY'),
+      );
+
+      // Act
+      const promise = service.addItem({
+        fingerprint: 'fp-war-traveler',
+        itemName: 'War Traveler',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"id":42}',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/warlock.d2s',
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      await expect(promise).rejects.not.toThrow('Vault add persisted');
+      expect(mocks.saveFileEditorMock.assertSaveFileAllowsItemRemoval).toHaveBeenCalledWith(
+        '/tmp/warlock.d2s',
+        'd2s',
+      );
+      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
+      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
     });
   });
 

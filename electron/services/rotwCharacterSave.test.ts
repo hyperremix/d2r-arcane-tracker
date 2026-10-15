@@ -1,3 +1,4 @@
+import * as d2s from '@dschu012/d2s';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as characters from '../database/characters';
@@ -11,6 +12,7 @@ import { items as catalogItems } from '../items';
 import { createInMemoryDatabase, initializeDatabaseSchema } from '../test/helpers/databaseHelpers';
 import {
   addItemToRotwCharacterSave,
+  hireRotwMercenary,
   readModernStashItem,
   readWarlockSave,
 } from '../test/helpers/rotwCharacterSave';
@@ -67,6 +69,80 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
     });
   });
 
+  describe('If the real Warlock save is read by the d2s library', () => {
+    it('Then the Warlock skill tree is read with the character', async () => {
+      // Arrange
+      const save = readWarlockSave();
+
+      // Act
+      const character = await d2s.read(save);
+
+      // Assert
+      expect(character.header.class).toBe('Warlock');
+      expect(character.skills).toHaveLength(30);
+      expect(character.skills.slice(0, 4).map((skill: { name: string }) => skill.name)).toEqual([
+        'Summon Goatman',
+        'Demonic Mastery',
+        'Death Mark',
+        'Summon Tainted',
+      ]);
+    });
+  });
+
+  describe('If the Warlock has a hired mercenary who wears an item', () => {
+    it('Then the mercenary item is read from the save and located on the mercenary', async () => {
+      // Arrange
+      const warTraveler = await readModernStashItem('War Traveler');
+      const save = await hireRotwMercenary(readWarlockSave(), [
+        { item: warTraveler, equippedId: 9 },
+      ]);
+      const bytesBefore = Buffer.from(save);
+
+      // Act
+      const result = await parseWarlockSave(save);
+
+      // Assert
+      expect(result.status).toBe('parsed');
+      const mercenaryItems = result.items.filter((item) => item.locationContext === 'mercenary');
+      expect(mercenaryItems.map((item) => item.rawParsedItem.unique_name)).toEqual([
+        'War Traveler',
+      ]);
+      expect(result.items).toHaveLength(8);
+      expect(save.equals(bytesBefore)).toBe(true);
+    });
+  });
+
+  describe('If the Warlock has a hired mercenary who wears nothing', () => {
+    it('Then the save is fully read and finds only the starting items', async () => {
+      // Arrange
+      const save = await hireRotwMercenary(readWarlockSave(), []);
+
+      // Act
+      const result = await parseWarlockSave(save);
+
+      // Assert
+      expect(result.status).toBe('parsed');
+      expect(result.items).toHaveLength(7);
+    });
+  });
+
+  describe('If the mercenary section of the Warlock save cannot be read', () => {
+    it('Then the character items are kept but the scan is only partial', async () => {
+      // Arrange: a mercenary id without the item list that has to follow the "jf" header. The d2s
+      // library tolerates that for a level 1 character only, so the level is raised.
+      const save = readWarlockSave();
+      save.writeUInt32LE(1, 163);
+      save.writeUInt8(2, 27);
+
+      // Act
+      const result = await parseWarlockSave(save);
+
+      // Assert
+      expect(result.status).toBe('partial');
+      expect(result.items).toHaveLength(7);
+    });
+  });
+
   describe('If the Warlock carries a grail item', () => {
     let rawDb: DatabaseType;
     let ctx: DatabaseContext;
@@ -87,10 +163,8 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
       consoleLog.mockRestore();
     });
 
-    it('Then the item is detected and recorded as found by a stored Warlock character', async () => {
-      // Arrange
-      const warTraveler = await readModernStashItem('War Traveler');
-      const save = await addItemToRotwCharacterSave(readWarlockSave(), warTraveler, 0, 0);
+    /** Scans the save the way the monitor does and records what it found. */
+    async function scanAndRecord(save: Buffer) {
       const itemDetection = new ItemDetectionService(eventBus);
       itemDetection.setGrailItems([findCatalogItem('wartraveler')]);
       const grailProgress = new GrailProgressService({
@@ -108,11 +182,20 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
         broadcastToRenderers: vi.fn() as unknown as BroadcastToRenderers,
       });
 
-      // Act
       const { items: parsedItems, status } = await parseWarlockSave(save);
       const saveFile = buildSaveFileHeader(WARLOCK_SAVE_PATH, save, LAST_MODIFIED);
       const foundItems = await itemDetection.analyzeSaveFile(saveFile, parsedItems);
       const recorded = grailProgress.recordSaveFile(saveFile, foundItems);
+      return { status, foundItems, recorded };
+    }
+
+    it('Then the item is detected and recorded as found by a stored Warlock character', async () => {
+      // Arrange
+      const warTraveler = await readModernStashItem('War Traveler');
+      const save = await addItemToRotwCharacterSave(readWarlockSave(), warTraveler, 0, 0);
+
+      // Act
+      const { status, foundItems, recorded } = await scanAndRecord(save);
 
       // Assert
       expect(status).toBe('parsed');
@@ -129,6 +212,26 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
           saveFilePath: WARLOCK_SAVE_PATH,
         }),
       ]);
+      expect(progress.getAllProgress(ctx)).toEqual([
+        expect.objectContaining({ characterId: storedCharacters[0].id, itemId: 'wartraveler' }),
+      ]);
+    });
+
+    it('Then an item worn by the hired mercenary is detected and recorded as well', async () => {
+      // Arrange
+      const warTraveler = await readModernStashItem('War Traveler');
+      const save = await hireRotwMercenary(readWarlockSave(), [
+        { item: warTraveler, equippedId: 9 },
+      ]);
+
+      // Act
+      const { status, foundItems, recorded } = await scanAndRecord(save);
+
+      // Assert
+      expect(status).toBe('parsed');
+      expect(foundItems.map((event) => event.grailItem.id)).toEqual(['wartraveler']);
+      expect(recorded).toBe(true);
+      const storedCharacters = characters.getAllCharacters(ctx);
       expect(progress.getAllProgress(ctx)).toEqual([
         expect.objectContaining({ characterId: storedCharacters[0].id, itemId: 'wartraveler' }),
       ]);

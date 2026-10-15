@@ -11,6 +11,7 @@ import { ensureD2sConstants } from '../d2s/constants';
 import { parseModernStash } from '../modernStashParser';
 import {
   addItemToSaveFile,
+  assertSaveFileAllowsItemRemoval,
   moveItemBetweenSaveFiles,
   readSaveFileItem,
   removeItemFromSaveFile,
@@ -515,6 +516,122 @@ describe('When the real saveFileEditor is asked to edit a Reign of the Warlock c
         targetLocationContext: 'inventory',
         targetGridX: 5,
         targetGridY: 0,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If an item is written back (unvaulted) into the Warlock', () => {
+    it('Then the write is refused and the save does not change', async () => {
+      // Arrange
+      const warTraveler = await readModernStashItem('War Traveler');
+      const warlockBytes = readFileSync(warlock);
+
+      // Act
+      const act = addItemToSaveFile({
+        filePath: warlock,
+        fileType: 'd2s',
+        item: warTraveler,
+        locationContext: 'inventory',
+        targetGridX: 5,
+        targetGridY: 0,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If it is checked whether items can be removed from a save file', () => {
+    it('Then the Warlock is refused while a shared stash is accepted', async () => {
+      // Arrange
+      const warlockBytes = readFileSync(warlock);
+
+      // Act
+      const refused = assertSaveFileAllowsItemRemoval(warlock, 'd2s');
+      const accepted = assertSaveFileAllowsItemRemoval(stash, 'd2i');
+
+      // Assert
+      await expect(refused).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      await expect(accepted).resolves.toBeUndefined();
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If a stack is split off the Warlock', () => {
+    it('Then the split is refused and neither file changes', async () => {
+      // Arrange
+      const cell = findFreeCell(await parseFile(stash), 0);
+      const warlockBytes = readFileSync(warlock);
+      const stashBytes = readFileSync(stash);
+
+      // Act
+      const act = splitStackInSaveFile({
+        sourceFilePath: warlock,
+        sourceFileType: 'd2s',
+        sourceStashTab: 0,
+        sourceItemCode: 'hp1',
+        splitCount: 2,
+        targets: [
+          {
+            targetFilePath: stash,
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: cell.x,
+            targetGridY: cell.y,
+          },
+        ],
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(readFileSync(warlock).equals(warlockBytes)).toBe(true);
+      expect(readFileSync(stash).equals(stashBytes)).toBe(true);
+    }, 30000);
+  });
+
+  describe('If a rune stack is split into a free shared cell and then into the Warlock', () => {
+    it('Then the split is refused before any copy is written and no file changes', async () => {
+      // Arrange
+      const entries = await parseFile(stash);
+      const stack = entries.find(
+        (entry) => entry.stashTabKind === 'runes' && entry.stackCount > 2,
+      ) as ParsedEntry;
+      const cell = findFreeCell(entries, 0);
+      const warlockBytes = readFileSync(warlock);
+      const stashBytes = readFileSync(stash);
+
+      // Act
+      const act = splitStackInSaveFile({
+        sourceFilePath: stash,
+        sourceFileType: 'd2i',
+        sourceStashTab: stack.stashTab,
+        sourceItemCode: String(stack.item.code),
+        sourceRawItemJson: JSON.stringify(stack.item),
+        splitCount: 2,
+        targets: [
+          {
+            targetFilePath: stash,
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: cell.x,
+            targetGridY: cell.y,
+          },
+          {
+            targetFilePath: warlock,
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 5,
+            targetGridY: 0,
+          },
+        ],
       });
 
       // Assert

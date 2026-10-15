@@ -2,7 +2,7 @@ import { basename, extname } from 'node:path';
 import type { D2SaveFile } from '../../types/grail';
 import {
   isModernStashVersion,
-  ROTW_CHARACTER_SAVE_VERSION,
+  ROTW_CHARACTER_HEADER_MIN_VERSION,
   readCharacterSaveVersion,
   SAVE_FILE_EXTENSIONS,
 } from '../../utils/d2rFormat';
@@ -40,6 +40,9 @@ const CHARACTER_CLASSES = [
   'warlock',
 ];
 
+/** Expansion bit of the status byte of a character save before Reign of the Warlock. */
+export const EXPANSION_STATUS_FLAG = 0x20;
+
 /** Byte offsets of the header fields a character save (.d2s) is listed with. */
 interface CharacterHeaderOffsets {
   status: number;
@@ -55,7 +58,7 @@ const LEGACY_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
 };
 
 /** Header offsets of Reign of the Warlock (v105+) character saves, which moved the fields forward. */
-const ROTW_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
+export const ROTW_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
   status: 20,
   classId: 24,
   level: 27,
@@ -67,6 +70,24 @@ const ROTW_CHARACTER_HEADER_OFFSETS: CharacterHeaderOffsets = {
  */
 const ROTW_GAME_MODE_OFFSET = 248;
 const ROTW_GAME_MODE_CLASSIC = 1;
+
+/** True when the character save uses the Reign of the Warlock (v105+) header layout. */
+function usesRotwHeaderLayout(buffer: Buffer): boolean {
+  return (readCharacterSaveVersion(buffer) ?? 0) >= ROTW_CHARACTER_HEADER_MIN_VERSION;
+}
+
+/**
+ * True when a Reign of the Warlock (v105+) character save was made for an expansion game mode
+ * (Lord of Destruction or Reign of the Warlock), judged by its game mode byte. Such saves carry the
+ * mercenary and golem sections that classic saves lack.
+ */
+export function isRotwExpansionSave(buffer: Buffer): boolean {
+  return (
+    usesRotwHeaderLayout(buffer) &&
+    buffer.length > ROTW_GAME_MODE_OFFSET &&
+    buffer.readUInt8(ROTW_GAME_MODE_OFFSET) > ROTW_GAME_MODE_CLASSIC
+  );
+}
 
 /**
  * True when the file name marks a hardcore stash. D2R tells its stashes apart by name only
@@ -241,8 +262,7 @@ export function buildSaveFileHeader(
 
   // Basic header parsing (D2 save files have a specific structure)
   if (buffer.length >= 765) {
-    const version = readCharacterSaveVersion(buffer) ?? 0;
-    const isRotwSave = version >= ROTW_CHARACTER_SAVE_VERSION;
+    const isRotwSave = usesRotwHeaderLayout(buffer);
     const offsets = isRotwSave ? ROTW_CHARACTER_HEADER_OFFSETS : LEGACY_CHARACTER_HEADER_OFFSETS;
 
     characterClass = getCharacterClass(buffer.readUInt8(offsets.classId));
@@ -250,9 +270,7 @@ export function buildSaveFileHeader(
 
     const status = buffer.readUInt8(offsets.status);
     hardcore = (status & 0x04) !== 0;
-    expansion = isRotwSave
-      ? buffer.readUInt8(ROTW_GAME_MODE_OFFSET) > ROTW_GAME_MODE_CLASSIC
-      : (status & 0x20) !== 0;
+    expansion = isRotwSave ? isRotwExpansionSave(buffer) : (status & EXPANSION_STATUS_FLAG) !== 0;
   }
 
   return {

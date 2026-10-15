@@ -3,7 +3,7 @@ import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
-import { isReadOnlyCharacterSaveVersion, readCharacterSaveVersion } from '../../utils/d2rFormat';
+import { isReadOnlyCharacterSave } from '../../utils/d2rFormat';
 import {
   type ClassicStashCodec,
   detectSaveFormat,
@@ -66,10 +66,7 @@ export async function openSaveFile(
  * such a save changes no file at all.
  */
 export function assertCharacterSaveWritable(file: OpenedSaveFile): void {
-  if (
-    file.format.kind === 'character' &&
-    isReadOnlyCharacterSaveVersion(readCharacterSaveVersion(file.buffer))
-  ) {
+  if (file.format.kind === 'character' && isReadOnlyCharacterSave(file.buffer)) {
     throw new Error(CHARACTER_SAVE_READ_ONLY_ERROR);
   }
 }

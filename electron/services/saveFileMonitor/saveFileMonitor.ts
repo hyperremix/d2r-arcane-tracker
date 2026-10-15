@@ -13,7 +13,7 @@ import type {
   VaultSourceFileType,
 } from '../../types/grail';
 import { GameMode } from '../../types/grail';
-import { isReadOnlyCharacterSaveVersion, readCharacterSaveVersion } from '../../utils/d2rFormat';
+import { isReadOnlyCharacterSave } from '../../utils/d2rFormat';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
@@ -560,8 +560,7 @@ class SaveFileMonitor {
         sourceFilePath: filePath,
         sourceFileVersion: d2iHeader?.version,
         // Reign of the Warlock character saves are read, but the save file editor cannot write them
-        readOnly:
-          extension === '.d2s' && isReadOnlyCharacterSaveVersion(readCharacterSaveVersion(buffer)),
+        readOnly: extension === '.d2s' && isReadOnlyCharacterSave(buffer),
         capturedAt: new Date(),
         items: snapshotItems,
       };

@@ -64,6 +64,17 @@ export async function readSaveFileItem(
   return (await decodeSaveFile(file)).findItem(itemId);
 }
 
+/**
+ * Refuses up front, before anything is changed anywhere, when items cannot be removed from the
+ * save file because it is a character save that cannot be written (see `assertCharacterSaveWritable`).
+ */
+export async function assertSaveFileAllowsItemRemoval(
+  filePath: string,
+  fileType: VaultSourceFileType,
+): Promise<void> {
+  assertCharacterSaveWritable(await openSaveFile(filePath, fileType));
+}
+
 export async function removeItemFromSaveFileUnlocked(
   filePath: string,
   fileType: VaultSourceFileType,
