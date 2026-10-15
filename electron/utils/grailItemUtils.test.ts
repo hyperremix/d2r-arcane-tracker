@@ -1,6 +1,6 @@
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
-import { getGrailItemId } from './grailItemUtils';
+import { getGrailItemId, resolveHustleSuccessorName, resolveRunewordName } from './grailItemUtils';
 
 describe('When getGrailItemId is called for a rune', () => {
   it('If the rune type is a lowercase d2s code, Then returns the rune id', () => {
@@ -119,17 +119,21 @@ describe('When getGrailItemId is called for an item parsed with the v105 constan
 
   it('If the item is any unique or set item of the game data, Then it resolves to a catalog item', () => {
     // Arrange
-    // Quest items, unused game data rows and Rainbow Facets (resolved by their stats) are no grail items
+    // Names in the game data that are no grail items. Every other unique and set name must resolve.
     const nonGrailNames = new Set([
+      // Quest items: the Horadric Staff and its parts, Khalim's Will and its flail, the Hell Forge Hammer
       'Amulet of the Viper',
       'Staff of Kings',
       'Horadric Staff',
       'Hell Forge Hammer',
       'KhalimFlail',
       "Khalim's Will",
+      // Unique rows that exist in the game data but are disabled and not listed on diablo2.io
       'Constricting Ring',
       'Darkfear',
+      // Eight game data rows, one per Rainbow Facet; getGrailItemId resolves them by their stats
       'Rainbow Facet',
+      // Unused set rows in the game data; diablo2.io's set items do not include them
       "Warlord's Conquest",
       "Warlord's Lust",
       "Warlord's Mantle",
@@ -151,5 +155,58 @@ describe('When getGrailItemId is called for an item parsed with the v105 constan
 
     // Assert
     expect(unresolved).toEqual([]);
+  });
+});
+
+describe('When resolveHustleSuccessorName is called', () => {
+  it('If the base item code is body armor from the v105 data, Then returns Hysteria', () => {
+    // Arrange
+    const codes = ['uui', 'xtp', 'UUI', ' xpl '];
+
+    // Act
+    const result = codes.map((code) => resolveHustleSuccessorName(code));
+
+    // Assert
+    expect(result).toEqual(['Hysteria', 'Hysteria', 'Hysteria', 'Hysteria']);
+  });
+
+  it('If the base item code is a weapon, missing or not a string, Then returns Mania', () => {
+    // Arrange
+    const codes = ['7cr', 'crs', undefined, null, 42, ''];
+
+    // Act
+    const result = codes.map((code) => resolveHustleSuccessorName(code));
+
+    // Assert
+    expect(result).toEqual(['Mania', 'Mania', 'Mania', 'Mania', 'Mania', 'Mania']);
+  });
+});
+
+describe('When resolveRunewordName is called', () => {
+  it('If the item has no runeword name, Then returns undefined', () => {
+    // Arrange
+    const items = [{ type: 'uui' }, { type: 'uui', runeword_name: '' }];
+
+    // Act
+    const result = items.map((item) => resolveRunewordName(item));
+
+    // Assert
+    expect(result).toEqual([undefined, undefined]);
+  });
+
+  it('If the runeword name is misreported or ordinary, Then returns the in-game name', () => {
+    // Arrange
+    const items = [
+      { type: 'uui', runeword_name: 'Love' },
+      { type: 'uui', runeword_name: 'Hustle' },
+      { type: '7cr', runeword_name: 'Hustle' },
+      { type: '7cr', runeword_name: 'Spirit' },
+    ];
+
+    // Act
+    const result = items.map((item) => resolveRunewordName(item));
+
+    // Assert
+    expect(result).toEqual(['Lore', 'Hysteria', 'Mania', 'Spirit']);
   });
 });

@@ -97,8 +97,8 @@ export type CharacterClass =
 export type ItemSet =
   | 'Angelic Raiment'
   | "Arcanna's Tricks"
-  | "Bane's Garments"
   | 'Arctic Gear'
+  | "Bane's Garments"
   | "Berserker's Arsenal"
   | "Cathan's Traps"
   | "Civerb's Vestments"

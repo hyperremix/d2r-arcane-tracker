@@ -141,7 +141,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7ba',
-    itemBase: 'Silver-Edged Axe',
+    itemBase: 'Silver-edged Axe',
     imageFilename: 'broad_axe.png',
   },
   {

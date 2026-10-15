@@ -1,10 +1,11 @@
-import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
+import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { itemsByNameSimple, runesByCode, runewordsByNameSimple } from '../items/indexes';
 import type { D2SItem } from '../types/grail';
 import { isRuneCode, normalizeItemCodeKey } from './d2rFormat';
 import { simplifyItemName } from './objects';
 
-const armorItemCodes = new Set(Object.keys(constants99.armor_items));
+// The v105 table is a superset of the v99 one and includes the Reign of the Warlock base items
+const armorItemCodes = new Set(Object.keys(constants105.armor_items));
 
 /**
  * Runeword that took over a Hustle find. Reign of the Warlock renamed Hustle to Hysteria in body

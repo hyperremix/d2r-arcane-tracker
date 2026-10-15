@@ -141,7 +141,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9h9',
-    itemBase: 'Bec-De-Corbin',
+    itemBase: 'Bec-de-Corbin',
     imageFilename: 'halberd.png',
   },
   {

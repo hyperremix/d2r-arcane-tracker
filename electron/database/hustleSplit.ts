@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { resolveHustleSuccessorName } from '../utils/grailItemUtils';
 import { simplifyItemName } from '../utils/objects';
@@ -9,6 +10,9 @@ const { grailProgress, items, vaultItems } = schema;
 /** Id of the Hustle runeword, which the item catalog no longer has. */
 export const HUSTLE_ITEM_ID = 'hustle';
 
+/** Catalog ids of the runewords that took over Hustle, in the order a find is assigned to them. */
+const SUCCESSOR_ITEM_IDS = ['mania', 'hysteria'];
+
 /** Catalog id of the runeword that took over Hustle in an item with this base item code. */
 function getSuccessorItemId(itemCode: string | null): string {
   return simplifyItemName(resolveHustleSuccessorName(itemCode));
@@ -16,10 +20,11 @@ function getSuccessorItemId(itemCode: string | null): string {
 
 /**
  * Reign of the Warlock split the Hustle runeword into Mania (weapons) and Hysteria (body armor).
- * Moves Hustle vault items to the runeword their base item makes them, and Hustle finds to the
- * runeword of the same character's Hustle vault items. A find becomes Hysteria only when that
- * character's Hustle vault items are all body armor; otherwise it becomes Mania. Then removes the
- * Hustle item. Does nothing once Hustle is gone, so it runs only once.
+ * Moves Hustle vault items to the runeword their base item makes them. A Hustle find becomes a
+ * find of each runeword that the same character's Hustle vault items moved to: the find keeps its
+ * row for Mania (or Hysteria when that is the only one), and a copy of the row is added for the
+ * other. A find of a character without Hustle vault items becomes Mania, because the base item is
+ * unknown. Then removes the Hustle item. Does nothing once Hustle is gone, so it runs only once.
  * Must run after the item catalog sync, which adds Mania and Hysteria.
  * @param ctx - Database context
  * @returns Whether Hustle was split
@@ -62,14 +67,27 @@ export function splitHustleIntoSuccessors(ctx: DatabaseContext): boolean {
     }
 
     const hustleFinds = ctx.db
-      .select({ id: grailProgress.id, characterId: grailProgress.characterId })
+      .select()
       .from(grailProgress)
       .where(eq(grailProgress.itemId, HUSTLE_ITEM_ID))
       .all();
     for (const find of hustleFinds) {
-      const successorIds = successorIdsByCharacter.get(find.characterId);
-      const itemId = successorIds?.size === 1 ? [...successorIds][0] : 'mania';
-      ctx.db.update(grailProgress).set({ itemId }).where(eq(grailProgress.id, find.id)).run();
+      const characterSuccessorIds = successorIdsByCharacter.get(find.characterId);
+      const [firstId = 'mania', ...otherIds] = SUCCESSOR_ITEM_IDS.filter((id) =>
+        characterSuccessorIds?.has(id),
+      );
+      ctx.db
+        .update(grailProgress)
+        .set({ itemId: firstId })
+        .where(eq(grailProgress.id, find.id))
+        .run();
+      // Rows that point at the find, such as run items, stay with the original row
+      for (const itemId of otherIds) {
+        ctx.db
+          .insert(grailProgress)
+          .values({ ...find, id: randomUUID(), itemId })
+          .run();
+      }
     }
 
     ctx.db.delete(items).where(eq(items.id, HUSTLE_ITEM_ID)).run();
