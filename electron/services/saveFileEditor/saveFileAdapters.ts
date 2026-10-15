@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
 import { isRotwCharacterSave } from '../../utils/d2rFormat';
+import { createServiceLogger } from '../../utils/serviceLogger';
+import { ensureD2sConstants } from '../d2s/constants';
 import {
   type ClassicStashCodec,
   detectSaveFormat,
@@ -25,6 +28,8 @@ import { writeClassicStashFile, writeD2sSaveFile } from './saveFileWrites';
  * saves and classic stashes are then decoded into a `DecodedSaveFile` that is edited in memory and
  * written back whole. Modern (v105+) stashes are edited per sector by the modernStash* modules.
  */
+
+const log = createServiceLogger('SaveFileAdapters');
 
 const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
 const CHARACTER_SAVE_READ_ONLY_ERROR = 'CHARACTER_SAVE_READ_ONLY';
@@ -60,11 +65,26 @@ export async function openSaveFile(
   return { filePath, format, buffer };
 }
 
-/** True when the d2s library reads the save and writes it back byte for byte. */
-async function writesBackUnchanged(buffer: Buffer): Promise<boolean> {
+/**
+ * True when the d2s library reads the save and writes it back byte for byte. A save the library
+ * cannot read or write at all counts as not writing back unchanged; the reason is logged, because
+ * the caller only reports the refusal.
+ */
+async function writesBackUnchanged(file: OpenedSaveFile): Promise<boolean> {
+  // d2s.read and d2s.write need their constants registered; the check must not depend on the caller
+  // having done it, or a missing registration would show up as a save that "cannot be written".
+  ensureD2sConstants();
   try {
-    return Buffer.from(await d2s.write(await d2s.read(buffer))).equals(buffer);
-  } catch {
+    return Buffer.from(await d2s.write(await d2s.read(file.buffer))).equals(file.buffer);
+  } catch (error) {
+    log.warn(
+      'writesBackUnchanged',
+      'The d2s library could not read and write the character save back, so it is treated as read-only',
+      {
+        fileName: basename(file.filePath),
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    );
     return false;
   }
 }
@@ -81,7 +101,7 @@ export async function assertCharacterSaveWritable(file: OpenedSaveFile): Promise
   if (
     file.format.kind === 'character' &&
     isRotwCharacterSave(file.buffer) &&
-    !(await writesBackUnchanged(file.buffer))
+    !(await writesBackUnchanged(file))
   ) {
     throw new Error(CHARACTER_SAVE_READ_ONLY_ERROR);
   }

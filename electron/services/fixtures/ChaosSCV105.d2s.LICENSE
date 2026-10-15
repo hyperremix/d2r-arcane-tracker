@@ -1,7 +1,15 @@
 ChaosSCV105.d2s is src/D2SSharp.Tests/Resources/105/ChaosSC.d2s from D2SSharp
-(https://github.com/ResurrectedTrader/D2SSharp, commit baf955a). The D2SSharp
-README states that the project is licensed under the MIT License; the
-repository has no separate license file or copyright line.
+(https://github.com/ResurrectedTrader/D2SSharp), byte for byte as in commit baf955a
+(git blob 4c6b9a78a53b611236b2d8c7a384d6d7cd24da7d). The file was added in commit
+37f367e ("feat: Add version 100-105 format support", 2026-03-01), authored by the
+repository owner ResurrectedTrader, and has not been changed since.
+
+The D2SSharp repository has no LICENSE file and no copyright line. It states the MIT
+License in two places: the "License" section of its README, and the
+<PackageLicenseExpression>MIT</PackageLicenseExpression> property (with
+<Authors>ResurrectedTrader</Authors>) in src/D2SSharp/D2SSharp.csproj. The MIT License
+text below is the standard text; the copyright holder is the author named in the
+csproj, ResurrectedTrader.
 
 MIT License
 

@@ -4,10 +4,12 @@ import { join, resolve } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as d2sConstants from '../d2s/constants';
 import { registerD2sConstants } from '../d2s/constants';
 import { getClassicStashCodec } from '../saveFormat/saveFormat';
 import {
+  assertCharacterSaveWritable,
   assertWritableSaveFile,
   CharacterSaveFile,
   ClassicStashFile,
@@ -20,6 +22,11 @@ const MODERN_FIXTURE_PATH = resolve(
   process.cwd(),
   'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
 );
+
+const WARLOCK_FIXTURE_PATH = resolve(process.cwd(), 'electron/services/fixtures/WarlockV105.d2s');
+
+/** Where the attributes section starts, right after the fixed-size v105 header. Begins with "gf". */
+const WARLOCK_ATTRIBUTES_OFFSET = 833;
 
 const CHARACTER_FIXTURE_PATH = resolve(
   process.cwd(),
@@ -311,6 +318,97 @@ describe('When a save file is decoded for in-memory editing', () => {
       const written = await d2stash.read(readFileSync(filePath), codec.constants);
       expect(written.pages).toHaveLength(2);
       expect(written.pages[1]?.name).toBe('Second');
+    });
+  });
+});
+
+describe('When a Reign of the Warlock character save is checked before it is written', () => {
+  let directory: string;
+
+  beforeEach(() => {
+    registerD2sConstants(d2s);
+    directory = mkdtempSync(join(tmpdir(), 'arcane-save-adapters-'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  describe('If the d2s library writes the save back unchanged', () => {
+    it('Then it is accepted without a warning', async () => {
+      // Arrange
+      const filePath = join(directory, 'Warlock.d2s');
+      writeFileSync(filePath, readFileSync(WARLOCK_FIXTURE_PATH));
+      const file = await openSaveFile(filePath, 'd2s');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      // Act
+      const check = assertCharacterSaveWritable(file);
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the d2s library cannot read the save', () => {
+    it('Then it is refused as read-only and the reason is logged with the file name only', async () => {
+      // Arrange
+      const filePath = join(directory, 'Corrupt.d2s');
+      const corrupt = Buffer.from(readFileSync(WARLOCK_FIXTURE_PATH));
+      corrupt.fill(0, WARLOCK_ATTRIBUTES_OFFSET, WARLOCK_ATTRIBUTES_OFFSET + 2);
+      writeFileSync(filePath, corrupt);
+      const file = await openSaveFile(filePath, 'd2s');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      // Act
+      const check = assertCharacterSaveWritable(file);
+
+      // Assert
+      await expect(check).rejects.toThrow('CHARACTER_SAVE_READ_ONLY');
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [prefix, message, context] = warn.mock.calls[0] as [
+        string,
+        string,
+        Record<string, string>,
+      ];
+      expect(prefix).toContain('writesBackUnchanged');
+      expect(message).toContain('read-only');
+      expect(context.fileName).toBe('Corrupt.d2s');
+      expect(context.reason).not.toBe('');
+      expect(JSON.stringify(context)).not.toContain(directory);
+    });
+  });
+
+  describe('If the check runs before the d2s constants were registered by the caller', () => {
+    it('Then the check registers them itself', async () => {
+      // Arrange
+      const filePath = join(directory, 'Warlock.d2s');
+      writeFileSync(filePath, readFileSync(WARLOCK_FIXTURE_PATH));
+      const file = await openSaveFile(filePath, 'd2s');
+      const ensure = vi.spyOn(d2sConstants, 'ensureD2sConstants');
+
+      // Act
+      await assertCharacterSaveWritable(file);
+
+      // Assert
+      expect(ensure).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the save is older than Reign of the Warlock', () => {
+    it('Then it is accepted', async () => {
+      // Arrange
+      const filePath = join(directory, 'Hero.d2s');
+      writeFileSync(filePath, readFileSync(CHARACTER_FIXTURE_PATH));
+      const file = await openSaveFile(filePath, 'd2s');
+
+      // Act
+      const check = assertCharacterSaveWritable(file);
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
     });
   });
 });
