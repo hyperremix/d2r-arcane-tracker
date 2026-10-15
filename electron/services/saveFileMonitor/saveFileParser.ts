@@ -12,12 +12,7 @@ import { createServiceLogger } from '../../utils/serviceLogger';
 import { normalizeItemsWithSocketedItems } from '../itemNormalizer';
 import { parseModernStash } from '../modernStashParser';
 import { detectSaveFormat, getClassicStashCodec, type SaveFormat } from '../saveFormat/saveFormat';
-import {
-  EXPANSION_STATUS_FLAG,
-  isHardcoreStashFileName,
-  isRotwExpansionSave,
-  ROTW_CHARACTER_HEADER_OFFSETS,
-} from './saveFileFormat';
+import { isHardcoreStashFileName, isRotwExpansionSave, withExpansionBit } from './saveFileFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 
@@ -81,11 +76,8 @@ async function readCharacterSave(content: Buffer): Promise<CharacterSaveRead> {
     return { response: await d2s.read(content), complete: true };
   }
 
-  const { status: statusOffset } = ROTW_CHARACTER_HEADER_OFFSETS;
-  const withExpansionBit = Buffer.from(content);
-  withExpansionBit[statusOffset] |= EXPANSION_STATUS_FLAG;
   try {
-    return { response: await d2s.read(withExpansionBit), complete: true };
+    return { response: await d2s.read(withExpansionBit(content)), complete: true };
   } catch (error) {
     log.warn('parseSaveFile', `Failed to read the mercenary of a v105 character save: ${error}`);
     return { response: await d2s.read(content), complete: false };

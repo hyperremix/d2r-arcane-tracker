@@ -133,6 +133,7 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
       const save = readWarlockSave();
       save.writeUInt32LE(1, 163);
       save.writeUInt8(2, 27);
+      const bytesBefore = Buffer.from(save);
 
       // Act
       const result = await parseWarlockSave(save);
@@ -140,6 +141,7 @@ describe('When a Reign of the Warlock (v105) character save is scanned', () => {
       // Assert
       expect(result.status).toBe('partial');
       expect(result.items).toHaveLength(7);
+      expect(save.equals(bytesBefore)).toBe(true);
     });
   });
 

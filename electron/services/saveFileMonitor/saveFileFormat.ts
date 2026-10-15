@@ -40,8 +40,11 @@ const CHARACTER_CLASSES = [
   'warlock',
 ];
 
+/** Hardcore bit of the status byte of a character save. */
+const HARDCORE_STATUS_FLAG = 0x04;
+
 /** Expansion bit of the status byte of a character save before Reign of the Warlock. */
-export const EXPANSION_STATUS_FLAG = 0x20;
+const EXPANSION_STATUS_FLAG = 0x20;
 
 /** Byte offsets of the header fields a character save (.d2s) is listed with. */
 interface CharacterHeaderOffsets {
@@ -87,6 +90,17 @@ export function isRotwExpansionSave(buffer: Buffer): boolean {
     buffer.length > ROTW_GAME_MODE_OFFSET &&
     buffer.readUInt8(ROTW_GAME_MODE_OFFSET) > ROTW_GAME_MODE_CLASSIC
   );
+}
+
+/**
+ * Returns a copy of a Reign of the Warlock (v105+) character save with the expansion bit of its
+ * status byte set, which is what makes the d2s library read the mercenary and golem sections. The
+ * given buffer is not changed.
+ */
+export function withExpansionBit(buffer: Buffer): Buffer {
+  const copy = Buffer.from(buffer);
+  copy[ROTW_CHARACTER_HEADER_OFFSETS.status] |= EXPANSION_STATUS_FLAG;
+  return copy;
 }
 
 /**
@@ -269,7 +283,7 @@ export function buildSaveFileHeader(
     level = buffer.readUInt8(offsets.level);
 
     const status = buffer.readUInt8(offsets.status);
-    hardcore = (status & 0x04) !== 0;
+    hardcore = (status & HARDCORE_STATUS_FLAG) !== 0;
     expansion = isRotwSave ? isRotwExpansionSave(buffer) : (status & EXPANSION_STATUS_FLAG) !== 0;
   }
 
