@@ -102,7 +102,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9ss',
-    itemBase: 'Falcata',
+    itemBase: 'Gladius',
     imageFilename: 'scimitar.png',
   },
   {
@@ -115,7 +115,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9sm',
-    itemBase: 'Ataghan',
+    itemBase: 'Cutlass',
     imageFilename: 'saber.png',
   },
   {
@@ -128,7 +128,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9sb',
-    itemBase: 'Scissors Katar',
+    itemBase: 'Shamshir',
     imageFilename: 'hexfire.png',
   },
   {
@@ -154,7 +154,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9cr',
-    itemBase: 'Phase Blade',
+    itemBase: 'Dimensional Blade',
     imageFilename: 'crystal_sword.png',
   },
   {
@@ -167,7 +167,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9bs',
-    itemBase: 'Gothic Staff',
+    itemBase: 'Battle Sword',
     imageFilename: 'battle_staff.png',
   },
   {
@@ -180,7 +180,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9ls',
-    itemBase: 'Quarterstaff',
+    itemBase: 'Rune Sword',
     imageFilename: 'plague_bearer.png',
   },
   {
@@ -193,7 +193,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9wd',
-    itemBase: 'Mythical Sword',
+    itemBase: 'Ancient Sword',
     imageFilename: 'war_sword.png',
   },
   {
@@ -232,7 +232,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7sm',
-    itemBase: 'Mythical Sword',
+    itemBase: 'Ataghan',
     imageFilename: 'war_sword.png',
   },
   {

@@ -37,7 +37,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'gis',
-    itemBase: 'Gladius',
+    itemBase: 'Giant Sword',
     imageFilename: 'kinemils_awl.png',
   },
   {
@@ -89,7 +89,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '92h',
-    itemBase: 'Suwayyah',
+    itemBase: 'Espandon',
     imageFilename: 'katar.png',
   },
   {
@@ -167,7 +167,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gs',
-    itemBase: 'Colossus Blade',
+    itemBase: 'Balrog Blade',
     imageFilename: 'kinemils_awl.png',
   },
   {
@@ -193,7 +193,20 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gd',
-    itemBase: 'Glorious Axe',
+    itemBase: 'Colossus Blade',
     imageFilename: 'the_patriarch.png',
+  },
+  {
+    id: 'dreadfang',
+    name: 'Dreadfang',
+    link: 'https://diablo2.io/uniques/dreadfang-t1673926.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: '2h_swords',
+    treasureClass: 'elite',
+    code: '72h',
+    itemBase: 'Legend Sword',
+    imageFilename: 'shadowfang.png',
   },
 ];

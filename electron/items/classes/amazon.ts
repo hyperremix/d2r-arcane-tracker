@@ -11,7 +11,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'am7',
-    itemBase: 'Stag Bow',
+    itemBase: 'Ceremonial Bow',
     imageFilename: 'reflex_bow.png',
   },
   {

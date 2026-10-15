@@ -46,6 +46,7 @@ export const subCategoryLabelKeys: Record<ItemSubCategory, string> = {
   rings: filterSubCategoryKeys.rings,
   rainbow_facets: filterSubCategoryKeys.rainbow_facets,
   dies: filterSubCategoryKeys.dies,
+  colossal_jewels: filterSubCategoryKeys.colossal_jewels,
   small_charms: filterSubCategoryKeys.small_charms,
   large_charms: filterSubCategoryKeys.large_charms,
   grand_charms: filterSubCategoryKeys.grand_charms,
@@ -58,6 +59,7 @@ export const subCategoryLabelKeys: Record<ItemSubCategory, string> = {
   necromancer: filterSubCategoryKeys.necromancer,
   paladin: filterSubCategoryKeys.paladin,
   sorceress: filterSubCategoryKeys.sorceress,
+  warlock: filterSubCategoryKeys.warlock,
   shared_stash: filterSubCategoryKeys.shared_stash,
 };
 
@@ -165,6 +167,7 @@ export const itemSubCategoryLabelKeys: Record<ItemSubCategory, string> = {
   rings: subCategoryKeys.rings,
   rainbow_facets: subCategoryKeys.rainbowFacets,
   dies: subCategoryKeys.dies,
+  colossal_jewels: subCategoryKeys.colossalJewels,
   small_charms: subCategoryKeys.smallCharms,
   large_charms: subCategoryKeys.largeCharms,
   grand_charms: subCategoryKeys.grandCharms,
@@ -177,6 +180,7 @@ export const itemSubCategoryLabelKeys: Record<ItemSubCategory, string> = {
   necromancer: subCategoryKeys.necromancer,
   paladin: subCategoryKeys.paladin,
   sorceress: subCategoryKeys.sorceress,
+  warlock: subCategoryKeys.warlock,
   shared_stash: subCategoryKeys.sharedStash,
 };
 

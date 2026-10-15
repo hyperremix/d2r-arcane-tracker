@@ -323,7 +323,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xtp',
-    itemBase: 'Templar Coat',
+    itemBase: 'Mage Plate',
     imageFilename: 'plate_mail.png',
   },
   {
@@ -362,7 +362,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xth',
-    itemBase: 'Sharktooth Armor',
+    itemBase: 'Embossed Plate',
     imageFilename: 'field_plate.png',
   },
   {
@@ -375,7 +375,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xul',
-    itemBase: 'Embossed Plate',
+    itemBase: 'Chaos Armor',
     imageFilename: 'gothic_plate.png',
   },
   {
@@ -388,7 +388,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xar',
-    itemBase: 'Chaos Armor',
+    itemBase: 'Ornate Plate',
     imageFilename: 'corpsemourn.png',
   },
   {
@@ -453,7 +453,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uul',
-    itemBase: 'Lacquered Plate',
+    itemBase: 'Shadow Plate',
     imageFilename: 'gothic_plate.png',
   },
   {

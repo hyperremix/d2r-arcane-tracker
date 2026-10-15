@@ -17,6 +17,7 @@ const classSubCategories = new Set<string>([
   'necromancer',
   'paladin',
   'sorceress',
+  'warlock',
   'shared_stash',
 ]);
 

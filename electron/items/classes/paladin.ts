@@ -24,7 +24,7 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'elite',
     code: 'pac',
-    itemBase: 'Rondache',
+    itemBase: 'Sacred Rondache',
     imageFilename: 'rondache.png',
   },
   {

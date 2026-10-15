@@ -162,15 +162,23 @@ describe('When the character class of a save is resolved', () => {
       ({ header: { class: characterClass } }) as unknown as d2sTypes.ID2S;
 
     // Act
-    const resolved = ['Barbarian', 'barb', 'Sorc', 'Shared Stash', 'Unknown', 42, undefined].map(
-      (characterClass) => resolveTargetCharacterClass(save(characterClass)),
-    );
+    const resolved = [
+      'Barbarian',
+      'barb',
+      'Sorc',
+      'Warlock',
+      'Shared Stash',
+      'Unknown',
+      42,
+      undefined,
+    ].map((characterClass) => resolveTargetCharacterClass(save(characterClass)));
 
     // Assert
     expect(resolved).toEqual([
       'barbarian',
       'barbarian',
       'sorceress',
+      'warlock',
       'shared_stash',
       undefined,
       undefined,

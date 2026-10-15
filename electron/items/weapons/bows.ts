@@ -115,7 +115,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8sb',
-    itemBase: 'Elegant Blade',
+    itemBase: 'Edge Bow',
     imageFilename: 'falchion.png',
   },
   {

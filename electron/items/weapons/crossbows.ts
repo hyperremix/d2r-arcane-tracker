@@ -63,7 +63,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8lx',
-    itemBase: 'Pellet Bow',
+    itemBase: 'Arbalest',
     imageFilename: 'langer_briser.png',
   },
   {
@@ -76,7 +76,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8mx',
-    itemBase: 'Gorgon Crossbow',
+    itemBase: 'Siege Crossbow',
     imageFilename: 'crossbow.png',
   },
   {
@@ -89,7 +89,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8hx',
-    itemBase: 'Colossus Crossbow',
+    itemBase: 'Ballista',
     imageFilename: 'heavy_crossbow.png',
   },
   {
@@ -102,7 +102,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8rx',
-    itemBase: 'Demon Crossbow',
+    itemBase: 'Chu-Ko-Nu',
     imageFilename: 'repeating_crossbow.png',
   },
   {

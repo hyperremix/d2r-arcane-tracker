@@ -141,7 +141,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'ulc',
-    itemBase: 'Spiderweave Silk',
+    itemBase: 'Spiderweb Sash',
     imageFilename: 'sash_l.png',
   },
   {
@@ -169,5 +169,18 @@ export const belts: Item[] = [
     code: 'umc',
     itemBase: 'Mithril Coil',
     imageFilename: 'belt_m.png',
+  },
+  {
+    id: 'gheedswager',
+    name: "Gheed's Wager",
+    link: 'https://diablo2.io/uniques/gheed-s-wager-t1673932.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'belts',
+    treasureClass: 'elite',
+    code: 'utc',
+    itemBase: 'Troll Belt',
+    imageFilename: 'heavy_belt.png',
   },
 ];

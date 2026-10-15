@@ -140,8 +140,8 @@ export const boots: Item[] = [
     category: 'armor',
     subCategory: 'boots',
     treasureClass: 'elite',
-    code: 'umb1',
-    itemBase: 'Scarabshell Boots',
+    code: 'umb',
+    itemBase: 'Boneweave Boots',
     imageFilename: 'heavy_boots.png',
   },
   {
@@ -154,7 +154,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'uvb',
-    itemBase: 'Wyrmhide Boots',
+    itemBase: 'Scarabshell Boots',
     imageFilename: 'leather_boots.png',
   },
   {
@@ -169,5 +169,18 @@ export const boots: Item[] = [
     code: 'uhb',
     itemBase: 'Myrmidon Greaves',
     imageFilename: 'plate_boots.png',
+  },
+  {
+    id: 'wraithstep',
+    name: 'Wraithstep',
+    link: 'https://diablo2.io/uniques/wraithstep-t1673927.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'boots',
+    treasureClass: 'elite',
+    code: 'utb',
+    itemBase: 'Mirrored Boots',
+    imageFilename: 'chain_boots.png',
   },
 ];

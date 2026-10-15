@@ -167,7 +167,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'elite',
     code: '7br',
-    itemBase: 'War Fist',
+    itemBase: 'Mancatcher',
     imageFilename: 'hatchet_hands.png',
   },
 ];

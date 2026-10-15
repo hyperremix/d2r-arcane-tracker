@@ -17,10 +17,12 @@ The tracker includes:
 
 | Category | Count | Notes |
 | --- | --- | --- |
-| Unique items | 385 | Weapons, armor, jewelry, charms and class-specific items |
-| Set items | 127 | Grouped by set |
+| Unique items | 415 | Weapons, armor, jewelry, charms, Colossal Ancient jewels and class-specific items such as Warlock grimoires |
+| Set items | 135 | Grouped by set |
 | Runes | 33 | El (#1) to Zod (#33), optional |
-| Runewords | 93 | Optional. Runewords are made, not found |
+| Runewords | 99 | Optional. Runewords are made, not found |
+
+Reign of the Warlock renamed the Hustle runeword to Mania in weapons and Hysteria in body armor. The tracker lists both. A Hustle find from an earlier version becomes Hysteria if all of that character's Hustle items in the vault are body armor, and Mania otherwise.
 
 Common variants are the classic grail (normal uniques and sets), the ethereal grail (adds every item that can be ethereal), and the full grail (adds runes and runewords). Hardcore grails are tracked separately by many players.
 

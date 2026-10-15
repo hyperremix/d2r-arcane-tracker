@@ -326,4 +326,17 @@ export const helms: Item[] = [
     itemBase: 'Diadem',
     imageFilename: 'diadem.png',
   },
+  {
+    id: 'hellwardenswill',
+    name: "Hellwarden's Will",
+    link: 'https://diablo2.io/uniques/hellwarden-s-will-t1673933.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'helms',
+    treasureClass: 'exceptional',
+    code: 'xsk',
+    itemBase: 'Death Mask',
+    imageFilename: 'mask.png',
+  },
 ];
