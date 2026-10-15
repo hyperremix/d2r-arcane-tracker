@@ -1,4 +1,5 @@
 import { items } from '../items';
+import { resolveBaseItemIconFilename } from '../items/baseItemIcons';
 import { normalizeItemCodeKey } from './d2rFormat';
 import { normalizeIconFilename, toSnakeCaseIconFilename } from './iconFilename';
 import { simplifyItemName } from './objects';
@@ -107,6 +108,12 @@ export function resolveCanonicalIconFilename(
     input.setName,
     input.parsedName,
   ]);
+
+  // Bases whose uniques and sets use other sprites: only a catalog name match beats the base sprite
+  const baseItemIcon = resolveBaseItemIconFilename(input.itemCode);
+  if (baseItemIcon) {
+    return nameIcon ?? baseItemIcon;
+  }
 
   const codeIcon = resolveIconByCode({
     itemCode: input.itemCode,

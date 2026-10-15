@@ -116,6 +116,7 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_poison.png',
   },
   {
     id: 'guardiansthunder',
@@ -128,6 +129,7 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_lightning.png',
   },
   {
     id: 'protectorsfrost',
@@ -140,6 +142,7 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_cold.png',
   },
   {
     id: 'defendersfire',
@@ -152,6 +155,7 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_fire.png',
   },
   {
     id: 'protectorsstone',
@@ -164,6 +168,7 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_physical.png',
   },
   {
     id: 'guardianslight',
@@ -176,5 +181,6 @@ export const jewels: Item[] = [
     treasureClass: 'normal',
     code: 'cjw',
     itemBase: 'Jewel',
+    imageFilename: 'fragment_magic.png',
   },
 ];

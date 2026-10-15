@@ -133,6 +133,8 @@ To show the game's own item icons:
 
 Conversion only reads game files and is safe to run again. The PNGs are stored in the app's data folder.
 
+Icons of Reign of the Warlock items, such as the Warlock grimoires and the Colossal jewels, only exist in the game files of Reign of the Warlock. If you extracted the game files before installing it, [extract them again](EXTRACTING_GAME_FILES.md) and convert again. Conversion skips icons it already converted.
+
 ## Other features
 
 ### Statistics

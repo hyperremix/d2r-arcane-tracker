@@ -181,6 +181,6 @@ export const boots: Item[] = [
     treasureClass: 'elite',
     code: 'utb',
     itemBase: 'Mirrored Boots',
-    imageFilename: 'chain_boots.png',
+    imageFilename: 'light_plate_boots.png',
   },
 ];

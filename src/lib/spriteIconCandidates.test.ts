@@ -44,6 +44,20 @@ const grailItems: Item[] = [
   } as Item,
 ];
 
+const measuredWrath = {
+  id: 'measuredwrath',
+  name: 'Measured Wrath',
+  code: 'wa6',
+  itemBase: 'Burnt Text',
+  imageFilename: 'measured_wrath.png',
+  link: 'https://example.com/measured-wrath',
+  etherealType: 'optional',
+  type: 'unique',
+  category: 'armor',
+  subCategory: 'warlock',
+  treasureClass: 'exceptional',
+} as Item;
+
 describe('When sprite icon candidates are generated', () => {
   describe('If parser-provided icon filename exists', () => {
     it('Then it is returned as the first lookup candidate', () => {
@@ -319,6 +333,72 @@ describe('When sprite icon candidates are generated', () => {
 
       // Assert
       expect(candidates).toContain('mephisto_soul_stone.png');
+    });
+  });
+
+  describe('If a grimoire is not a unique or set item', () => {
+    it('Then it includes the base grimoire icon instead of the unique icon of its code', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex([...grailItems, measuredWrath]);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: undefined,
+          itemCode: 'wa6',
+          itemName: 'Burnt Text',
+          rawItemJson: JSON.stringify({ code: 'wa6', type_name: 'Burnt Text' }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates).toContain('oldbook.png');
+      expect(candidates).not.toContain('measured_wrath.png');
+    });
+
+    it('Then a grimoire base without a catalog item still gets its base icon', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex([...grailItems, measuredWrath]);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: undefined,
+          itemCode: 'wa3',
+          itemName: 'Unknown Grimoire Name',
+          rawItemJson: '{}',
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates).toContain('codex.png');
+    });
+  });
+
+  describe('If a grimoire is the unique Measured Wrath', () => {
+    it('Then its unique icon comes before any base icon', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex([...grailItems, measuredWrath]);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: 'measuredwrath',
+          itemCode: 'wa6',
+          itemName: 'Measured Wrath',
+          rawItemJson: JSON.stringify({ code: 'wa6', unique_name: 'Measured Wrath' }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates[0]).toBe('measured_wrath.png');
+      expect(candidates).not.toContain('oldbook.png');
     });
   });
 });
