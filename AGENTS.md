@@ -16,13 +16,36 @@ Run these commands in order and ensure all succeed:
 
 If any command fails, fix the issue and re-run from the failing step onward.
 
+## Think before coding
+- State assumptions explicitly; if uncertain, ask before implementing.
+- If a request has multiple interpretations, present them instead of picking one silently.
+- If a simpler approach exists, say so and push back when warranted.
+- If something is unclear, stop, name what is confusing, and ask.
+- These rules favor caution over speed; use judgment for trivial tasks.
+
 ## Agent workflow expectations
-- Keep edits minimal, task-scoped, and reversible.
+- Keep edits minimal, task-scoped, and reversible; every changed line should trace directly to the request.
 - Prefer root-cause fixes over superficial workarounds.
-- Preserve existing architecture and naming conventions unless the task explicitly requires refactoring.
+- Preserve existing architecture, naming conventions, and style unless the task explicitly requires refactoring.
+- Do not "improve" adjacent code, comments, or formatting, and do not refactor code that is not broken.
+- Mention unrelated dead code instead of deleting it; remove only the imports, variables, and functions your own change made unused.
 - Update tests when behavior changes.
 - Update the matching guide in `docs/` when user-facing behavior changes; link to existing docs instead of duplicating them.
 - Always use `git rebase` instead of `git merge` to integrate changes from the base branch; this keeps a linear commit history.
+
+## Simplicity
+- Write the minimum code that solves the problem; add no features, abstractions, or configurability beyond what was asked.
+- Do not add abstractions for single-use code.
+- Do not add error handling for impossible scenarios. This does not relax the IPC, filesystem, and database error-handling rules below.
+- If the solution could be much shorter, rewrite it. Ask: "Would a senior engineer say this is overcomplicated?"
+
+## Goal-driven execution
+- Turn tasks into verifiable goals before implementing:
+  - Bug fix → write a test that reproduces it, then make it pass.
+  - Add validation → write tests for invalid inputs, then make them pass.
+  - Refactor → ensure tests pass before and after.
+- For multi-step tasks, state a brief plan with a verification check for each step.
+- Loop until the success criteria are verified; the required quality gates are the baseline check.
 
 ## Coding conventions agents must follow
 - Use TypeScript and prefer named exports for components/utilities.
