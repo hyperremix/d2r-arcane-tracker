@@ -1,6 +1,7 @@
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type {
+  ChronicleEntry,
   D2SItem,
   ParsedInventoryItemWithRaw,
   StashTabKind,
@@ -35,6 +36,8 @@ export interface SaveParseResult {
    * (.sss/.d2x), taken from the file name of a .d2i stash.
    */
   stashHardcore?: boolean;
+  /** Chronicle entries of a v105+ stash that was not skipped, when it has a readable Chronicle. */
+  chronicle?: ChronicleEntry[];
 }
 
 /** The already read content of one save file. */
@@ -70,6 +73,7 @@ export async function parseSaveContent(
 ): Promise<SaveParseResult> {
   const items: ParsedInventoryItemWithRaw[] = [];
   let stashHardcore: boolean | undefined;
+  let chronicle: ChronicleEntry[] | undefined;
 
   const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
 
@@ -152,6 +156,7 @@ export async function parseSaveContent(
     modern.items.forEach((entry) => {
       parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
     });
+    chronicle = modern.chronicle;
     // A damaged sector leaves its items out: keep what was read, but do not call it a full scan.
     return modern.partial ? 'partial' : 'parsed';
   };
@@ -179,7 +184,7 @@ export async function parseSaveContent(
   };
 
   const status = await parseFormat(detectSaveFormat(filePath, content));
-  return { items, status, stashHardcore };
+  return { items, status, stashHardcore, chronicle };
 }
 
 /**

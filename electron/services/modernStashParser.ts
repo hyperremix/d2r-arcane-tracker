@@ -1,7 +1,7 @@
 import { enhanceItems } from '@dschu012/d2s';
 import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
-import type { D2SItem, StashTabKind } from '../types/grail';
+import type { ChronicleEntry, D2SItem, StashTabKind } from '../types/grail';
 import {
   isRuneCode,
   MODERN_STASH_MIN_VERSION,
@@ -12,7 +12,9 @@ import {
   SHARED_TAB_COUNT,
   toFiniteNumber,
 } from '../utils/d2rFormat';
+import { createServiceLogger } from '../utils/serviceLogger';
 import { createBoundedBitReader } from './boundedBitReader';
+import { readChronicle } from './chronicle';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 
 // Extend magical_properties to cover D2R resource-stash attribute 381 (stack count).
@@ -36,6 +38,8 @@ export const constants105Extended = {
     return arr;
   })(),
 };
+
+const log = createServiceLogger('ModernStashParser');
 
 const STASH_GRID_WIDTH = 10;
 const STASH_GRID_HEIGHT = 10;
@@ -62,6 +66,8 @@ export interface ModernStashParseResult {
    * an item has left it).
    */
   partial: boolean;
+  /** Discoveries recorded in the in-game Chronicle; undefined when the file has no readable Chronicle. */
+  chronicle?: ChronicleEntry[];
 }
 
 /** The items decoded from one JM sector and whether every item the sector declares was read. */
@@ -326,8 +332,8 @@ function applyDeterministicResourcePlacement(items: PendingResourceItem[]): void
 
 /**
  * Payload signature (first two bytes, hex) of the extra-data sector every real v105 stash ends
- * with (payload marker 0xC0EDEAC0). It holds no JM item list, so it is skipped without counting as
- * damage.
+ * with (payload marker 0xC0EDEAC0). It holds the Chronicle (see `chronicle.ts`) and no JM item
+ * list, so the item parsing skips it without counting it as damage.
  */
 const EXTRA_DATA_SECTOR_SIGNATURE = 'c0ed';
 
@@ -335,6 +341,28 @@ function isRecognizedSector(sector: D2iMetadata['sectors'][number]): boolean {
   return (
     sector.payloadSignature === 'JM' || sector.payloadSignature === EXTRA_DATA_SECTOR_SIGNATURE
   );
+}
+
+/**
+ * Reads the Chronicle from the extra-data sector. A missing or unreadable Chronicle yields
+ * undefined: it does not affect the items of the file.
+ */
+function readChronicleSector(buffer: Buffer, metadata: D2iMetadata): ChronicleEntry[] | undefined {
+  const sector = metadata.sectors.find(
+    (candidate) => candidate.payloadSignature === EXTRA_DATA_SECTOR_SIGNATURE,
+  );
+  if (!sector) {
+    return undefined;
+  }
+
+  try {
+    return readChronicle(
+      buffer.subarray(sector.payloadOffset, sector.payloadOffset + sector.payloadSize),
+    );
+  } catch (error) {
+    log.warn('readChronicleSector', 'Failed to read the Chronicle', { error: String(error) });
+    return undefined;
+  }
 }
 
 async function parseJmSectors(buffer: Buffer, metadata: D2iMetadata): Promise<ParsedSector[]> {
@@ -466,5 +494,6 @@ export async function parseModernStash(buffer: Buffer): Promise<ModernStashParse
     items,
     metadata,
     partial,
+    chronicle: readChronicleSector(buffer, metadata),
   };
 }

@@ -97,7 +97,21 @@ export type ItemDetectionEvent = {
    */
   isInitialScan?: boolean;
   d2sItemId?: string | number;
+  /** When the game recorded the find (an entry of the Chronicle); otherwise it is the detection time. */
+  foundDate?: Date;
 };
+
+/** List of the in-game Chronicle an entry belongs to. */
+export type ChronicleCategory = 'set' | 'unique' | 'runeword';
+
+/** A discovery the in-game Chronicle of a v105+ shared stash recorded. */
+export interface ChronicleEntry {
+  category: ChronicleCategory;
+  /** Row of the item in the game data: setitems.txt, uniqueitems.txt or runes.txt. */
+  index: number;
+  /** When the game recorded the discovery. */
+  foundAt: Date;
+}
 
 /**
  * Type representing a Diablo 2 save file with character information.
@@ -125,6 +139,11 @@ export type SaveFileEvent = {
    * forwarded to renderer windows.
    */
   parsedItems?: ParsedInventoryItemWithRaw[];
+  /**
+   * The Chronicle entries of a v105+ shared stash, when the file has a readable Chronicle. Only
+   * present in the main process, like `parsedItems`.
+   */
+  chronicle?: ChronicleEntry[];
   /**
    * When true, suppresses all user-facing notifications for this event.
    * Used during initial startup parsing to prevent notification spam for

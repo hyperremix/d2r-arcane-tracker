@@ -1,4 +1,5 @@
 import type {
+  ChronicleEntry,
   D2SaveFile,
   ParsedInventoryItemWithRaw,
   ParsedInventorySnapshot,
@@ -13,6 +14,8 @@ export interface FileParseSuccess {
   saveFile: D2SaveFile;
   /** Every item of the file, including socketed ones the snapshot omits. */
   parsedItems: ParsedInventoryItemWithRaw[];
+  /** Chronicle entries of a v105+ shared stash, when the file has a readable Chronicle. */
+  chronicle?: ChronicleEntry[];
 }
 
 /** A complete parse: the only result vault reconciliation may act on. */

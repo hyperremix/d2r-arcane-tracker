@@ -136,6 +136,20 @@ describe('When a parsed save file is recorded in the database', () => {
     });
   });
 
+  describe('If a found item carries the time the Chronicle recorded it', () => {
+    it('Then the progress is found at that time', () => {
+      // Arrange
+      const saveFile = sorceressSaveFile('Sorc').withPath('/saves/Sorc.d2s').build();
+      const foundDate = new Date('2026-02-12T19:57:00.000Z');
+
+      // Act
+      service.recordSaveFile(saveFile, [{ ...createFoundItem(), foundDate }]);
+
+      // Assert
+      expect(progress.getAllProgress(ctx)).toEqual([expect.objectContaining({ foundDate })]);
+    });
+  });
+
   describe('If the save file contains no new grail items', () => {
     it('Then only the character is stored', () => {
       // Arrange

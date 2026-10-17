@@ -1,4 +1,6 @@
 import type {
+  ChronicleEntry,
+  D2Item,
   D2SaveFile,
   D2SItem,
   GrailProgress,
@@ -7,6 +9,7 @@ import type {
   ParsedInventoryItemWithRaw,
 } from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { resolveChronicleGrailItemId } from './chronicle';
 import type { EventBus } from './EventBus';
 import {
   resolveGrailLookupName,
@@ -15,6 +18,25 @@ import {
 } from './itemNormalizer';
 
 const log = createServiceLogger('ItemDetection');
+
+/** Item id of every Chronicle find, so its grail progress row is the same on every scan. */
+const CHRONICLE_ITEM_ID = 'chronicle';
+
+/** The detected item of a Chronicle entry, which only names the grail item and when it was found. */
+function toChronicleItem(entry: ChronicleEntry, grailItem: Item, saveFile: D2SaveFile): D2Item {
+  return {
+    id: `${CHRONICLE_ITEM_ID}_${entry.category}_${entry.index}`,
+    name: grailItem.name,
+    type: grailItem.type,
+    quality: entry.category === 'runeword' ? 'normal' : entry.category,
+    location: 'stash',
+    characterName: saveFile.name,
+    level: 1,
+    ethereal: false,
+    sockets: 0,
+    timestamp: entry.foundAt,
+  };
+}
 
 /**
  * Service for detecting Holy Grail items in Diablo 2 save files.
@@ -102,6 +124,52 @@ class ItemDetectionService {
       }
     } catch (error) {
       log.error('analyzeSaveFile', error, { saveFile: saveFile.name });
+    }
+    return foundItems;
+  }
+
+  /**
+   * Matches the entries of the in-game Chronicle of a shared stash against the Holy Grail database
+   * and emits an `item-detection` event for every grail item seen for the first time, found at the
+   * time the Chronicle recorded it. These finds are always silent: they fill in history the save
+   * files no longer show (an item that was sold, dropped or used up), while a new find notifies
+   * through the item itself, which the save files hold. The Chronicle does not record whether an
+   * item was ethereal, so its finds count as normal items.
+   * @param {D2SaveFile} saveFile - The shared stash the Chronicle comes from.
+   * @param {ChronicleEntry[]} entries - The entries of its Chronicle.
+   * @param {boolean} [isInitialScan=false] - If true, marks items as being from initial scan for statistics exclusion.
+   * @returns {ItemDetectionEvent[]} The items found for the first time (also emitted as `item-detection` events).
+   */
+  analyzeChronicle(
+    saveFile: D2SaveFile,
+    entries: ChronicleEntry[],
+    isInitialScan: boolean = false,
+  ): ItemDetectionEvent[] {
+    const foundItems: ItemDetectionEvent[] = [];
+    for (const entry of entries) {
+      const grailItem = this.grailItemsById.get(resolveChronicleGrailItemId(entry) ?? '');
+      if (!grailItem) {
+        continue;
+      }
+
+      const itemKey = `${grailItem.id}_false`;
+      if (this.previouslySeenItems.has(itemKey)) {
+        continue;
+      }
+
+      log.info('analyzeChronicle', `New item from the Chronicle: ${grailItem.name}`);
+      const foundItem: ItemDetectionEvent = {
+        type: 'item-found',
+        item: toChronicleItem(entry, grailItem, saveFile),
+        grailItem,
+        silent: true,
+        isInitialScan,
+        d2sItemId: CHRONICLE_ITEM_ID,
+        foundDate: entry.foundAt,
+      };
+      this.eventBus.emit('item-detection', foundItem);
+      foundItems.push(foundItem);
+      this.previouslySeenItems.add(itemKey);
     }
     return foundItems;
   }

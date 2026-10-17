@@ -14,7 +14,10 @@ export interface GrailDetectionPipelineDependencies {
   eventBus: EventBus;
   settings: Pick<SettingsService, 'get' | 'onUpdated'>;
   saveFileMonitor: Pick<SaveFileMonitor, 'startMonitoring' | 'stopMonitoringIfActive'>;
-  itemDetection: Pick<ItemDetectionService, 'analyzeSaveFile' | 'forgetFoundItems'>;
+  itemDetection: Pick<
+    ItemDetectionService,
+    'analyzeSaveFile' | 'analyzeChronicle' | 'forgetFoundItems'
+  >;
   grailProgress: Pick<GrailProgressService, 'recordSaveFile'>;
 }
 
@@ -84,19 +87,27 @@ export class GrailDetectionPipeline {
   }
 
   /**
-   * Analyzes a modified save file for grail items and records the character together with the
-   * items found. Other events only record the character.
+   * Analyzes a modified save file for grail items, then its Chronicle, and records the character
+   * together with the items found. The items come first, so a find that is in both counts as an
+   * item of the file. Other events only record the character.
    */
   private async recordSaveFile(event: SaveFileEvent): Promise<void> {
     const { itemDetection, grailProgress } = this.deps;
     const foundItems =
       event.type === 'modified'
-        ? await itemDetection.analyzeSaveFile(
-            event.file,
-            event.parsedItems ?? [],
-            event.silent,
-            event.isInitialScan,
-          )
+        ? [
+            ...(await itemDetection.analyzeSaveFile(
+              event.file,
+              event.parsedItems ?? [],
+              event.silent,
+              event.isInitialScan,
+            )),
+            ...itemDetection.analyzeChronicle(
+              event.file,
+              event.chronicle ?? [],
+              event.isInitialScan,
+            ),
+          ]
         : [];
 
     // Store the character and the progress of the found items in one transaction
