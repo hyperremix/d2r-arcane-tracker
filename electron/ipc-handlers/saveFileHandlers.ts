@@ -95,8 +95,8 @@ export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): (
 
   // Forward save file events to renderer processes
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', (event: SaveFileEvent) => {
-    // The parsed items stay in the main process; renderers only need the file header.
-    const { parsedItems: _parsedItems, ...rendererEvent } = event;
+    // The parsed items and the Chronicle stay in the main process; renderers only need the file header.
+    const { parsedItems: _parsedItems, chronicle: _chronicle, ...rendererEvent } = event;
     broadcastToRenderers('save-file-event', rendererEvent);
   });
   eventUnsubscribers.push(unsubscribeSaveFileEvent);

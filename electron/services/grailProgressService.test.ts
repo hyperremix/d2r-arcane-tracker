@@ -136,6 +136,20 @@ describe('When a parsed save file is recorded in the database', () => {
     });
   });
 
+  describe('If a found item carries the time the Chronicle recorded it', () => {
+    it('Then the progress is found at that time', () => {
+      // Arrange
+      const saveFile = sorceressSaveFile('Sorc').withPath('/saves/Sorc.d2s').build();
+      const foundDate = new Date('2026-02-12T19:57:00.000Z');
+
+      // Act
+      service.recordSaveFile(saveFile, [{ ...createFoundItem(), foundDate }]);
+
+      // Assert
+      expect(progress.getAllProgress(ctx)).toEqual([expect.objectContaining({ foundDate })]);
+    });
+  });
+
   describe('If the save file contains no new grail items', () => {
     it('Then only the character is stored', () => {
       // Arrange
@@ -482,6 +496,24 @@ describe('When a parsed save file is recorded in the database', () => {
       service.recordSaveFile(saveFile, [createFoundItem({ silent: true })]);
 
       // Assert
+      expect(runItems.getRunItems(ctx, 'run-1')).toEqual([]);
+    });
+
+    it('If the find is a silent Chronicle find, Then it is stored with its date and no run item is added', () => {
+      // Arrange
+      const saveFile = sorceressSaveFile('Sorc').build();
+      const foundDate = new Date('2026-02-12T19:57:00.000Z');
+      const chronicleFind = {
+        ...createFoundItem({ characterName: 'Modern Shared Stash Softcore', silent: true }),
+        d2sItemId: 'chronicle',
+        foundDate,
+      } as ItemDetectionEvent;
+
+      // Act
+      service.recordSaveFile(saveFile, [chronicleFind]);
+
+      // Assert
+      expect(progress.getAllProgress(ctx)).toEqual([expect.objectContaining({ foundDate })]);
       expect(runItems.getRunItems(ctx, 'run-1')).toEqual([]);
     });
   });

@@ -10,6 +10,7 @@ import {
 } from 'vitest';
 import { D2ItemBuilder, D2SaveFileBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import {
+  type ChronicleEntry,
   GameMode,
   type ItemDetectionEvent,
   type ParsedInventoryItemWithRaw,
@@ -52,6 +53,7 @@ describe('When the grail detection pipeline runs', () => {
   };
   let itemDetection: {
     analyzeSaveFile: ReturnType<typeof vi.fn>;
+    analyzeChronicle: ReturnType<typeof vi.fn>;
     forgetFoundItems: ReturnType<typeof vi.fn>;
   };
   let grailProgress: { recordSaveFile: ReturnType<typeof vi.fn> };
@@ -98,6 +100,7 @@ describe('When the grail detection pipeline runs', () => {
     };
     itemDetection = {
       analyzeSaveFile: vi.fn().mockResolvedValue([]),
+      analyzeChronicle: vi.fn().mockReturnValue([]),
       forgetFoundItems: vi.fn(),
     };
     grailProgress = { recordSaveFile: vi.fn().mockReturnValue(true) };
@@ -185,6 +188,43 @@ describe('When the grail detection pipeline runs', () => {
 
       // Assert
       expect(itemDetection.analyzeSaveFile).toHaveBeenCalledWith(file, [], undefined, undefined);
+      expect(itemDetection.analyzeChronicle).toHaveBeenCalledWith(file, [], undefined);
+    });
+
+    it('Then its Chronicle is analyzed after its items and both are recorded together', async () => {
+      // Arrange
+      const file = D2SaveFileBuilder.new().withName('Modern Shared Stash Softcore').build();
+      const chronicle: ChronicleEntry[] = [
+        { category: 'runeword', index: 155, foundAt: new Date('2026-10-17T06:56:00.000Z') },
+      ];
+      const itemFind = {
+        type: 'item-found',
+        item: D2ItemBuilder.new().build(),
+        grailItem: HolyGrailItemBuilder.new().withId('shako').build(),
+      } as ItemDetectionEvent;
+      const chronicleFind = {
+        type: 'item-found',
+        item: D2ItemBuilder.new().build(),
+        grailItem: HolyGrailItemBuilder.new().withId('spirit').build(),
+      } as ItemDetectionEvent;
+      itemDetection.analyzeSaveFile.mockResolvedValue([itemFind]);
+      itemDetection.analyzeChronicle.mockReturnValue([chronicleFind]);
+      startPipeline();
+
+      // Act
+      await eventBus.emitAsync('save-file-event', {
+        type: 'modified',
+        file,
+        chronicle,
+        isInitialScan: true,
+      });
+
+      // Assert
+      expect(itemDetection.analyzeChronicle).toHaveBeenCalledWith(file, chronicle, true);
+      expect(itemDetection.analyzeSaveFile.mock.invocationCallOrder[0]).toBeLessThan(
+        itemDetection.analyzeChronicle.mock.invocationCallOrder[0],
+      );
+      expect(grailProgress.recordSaveFile).toHaveBeenCalledWith(file, [itemFind, chronicleFind]);
     });
   });
 
@@ -199,6 +239,7 @@ describe('When the grail detection pipeline runs', () => {
 
       // Assert
       expect(itemDetection.analyzeSaveFile).not.toHaveBeenCalled();
+      expect(itemDetection.analyzeChronicle).not.toHaveBeenCalled();
       expect(grailProgress.recordSaveFile).toHaveBeenCalledWith(file, []);
     });
   });

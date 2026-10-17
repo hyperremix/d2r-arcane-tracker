@@ -2,7 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { items as catalogItems } from '../items/index';
-import type { D2SItem, Item, ItemDetectionEvent, ParsedInventoryItemWithRaw } from '../types/grail';
+import type {
+  ChronicleEntry,
+  D2SItem,
+  Item,
+  ItemDetectionEvent,
+  ParsedInventoryItemWithRaw,
+} from '../types/grail';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 import { normalizeItemsWithSocketedItems } from './itemNormalizer';
@@ -404,6 +410,139 @@ describe('When ItemDetectionService is used', () => {
       // Assert
       expect(secondFound).toHaveLength(1);
       expect(secondFound[0]).toMatchObject({ grailItem: { id: 'shako' } });
+    });
+  });
+
+  describe('If analyzeChronicle is called with the entries of a shared stash', () => {
+    const stash = D2SaveFileBuilder.new()
+      .withPath('/test/ModernSharedStashSoftCoreV2.d2i')
+      .withName('Modern Shared Stash Softcore')
+      .build();
+    const entries: ChronicleEntry[] = [
+      { category: 'unique', index: 154, foundAt: new Date('2026-02-12T19:57:00.000Z') },
+      { category: 'set', index: 0, foundAt: new Date('2026-02-17T19:50:00.000Z') },
+      { category: 'runeword', index: 155, foundAt: new Date('2026-10-17T06:56:00.000Z') },
+    ];
+
+    it('Then every grail item is found silently at the time the Chronicle recorded it', () => {
+      // Arrange
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(catalogItems);
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries, true);
+
+      // Assert
+      expect(found.map((event) => [event.grailItem.id, event.foundDate])).toEqual([
+        ['bloodletter', new Date('2026-02-12T19:57:00.000Z')],
+        ['civerbsward', new Date('2026-02-17T19:50:00.000Z')],
+        ['spirit', new Date('2026-10-17T06:56:00.000Z')],
+      ]);
+      expect(found[0]).toMatchObject({
+        silent: true,
+        isInitialScan: true,
+        d2sItemId: 'chronicle',
+        item: { ethereal: false, location: 'stash', characterName: 'Modern Shared Stash Softcore' },
+      });
+      expect(eventSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it('Then an item a save file showed before is not found again', async () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      const bloodletter = D2SItemBuilder.new().withId(1).withUniqueName('Bloodletter').build();
+      await service.analyzeSaveFile(stash, toParsedItems([bloodletter]));
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
+    });
+
+    it('Then an item a save file showed as ethereal before is not found again', async () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      const bloodletter = D2SItemBuilder.new()
+        .withId(1)
+        .withUniqueName('Bloodletter')
+        .withEthereal(1)
+        .build();
+      const seen = await service.analyzeSaveFile(stash, toParsedItems([bloodletter]));
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(seen[0].item.ethereal).toBe(true);
+      expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
+    });
+
+    it('Then an item found in the database as ethereal before is not found again', () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      service.initializeFromDatabase([
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'bloodletter',
+          foundDate: new Date('2024-01-01T00:00:00.000Z'),
+          manuallyAdded: false,
+          isEthereal: true,
+        },
+      ]);
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
+    });
+
+    it('Then an item found in the database before is not found again', () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      service.initializeFromDatabase([
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'spirit',
+          manuallyAdded: false,
+          isEthereal: false,
+        },
+      ]);
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(found.map((event) => event.grailItem.id)).toEqual(['bloodletter', 'civerbsward']);
+    });
+
+    it('Then a second analysis of the same Chronicle finds nothing', () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      service.analyzeChronicle(stash, entries);
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(found).toEqual([]);
+    });
+
+    it('Then an entry that is no grail item is skipped', () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+
+      // Act
+      const found = service.analyzeChronicle(stash, [
+        { category: 'unique', index: 126, foundAt: new Date(0) },
+      ]);
+
+      // Assert
+      expect(found).toEqual([]);
     });
   });
 

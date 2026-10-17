@@ -4,7 +4,7 @@ import type * as d2sTypes from '@dschu012/d2s';
 import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 import { _readMagicProperties, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { constants105Extended, parseModernStash } from './modernStashParser';
 import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
 
@@ -309,6 +309,41 @@ describe('When parseModernStash receives a sector that is not a readable JM item
     expect(result.items).toEqual([]);
     expect(result.partial).toBe(true);
   });
+});
+
+describe('When parseModernStash reads the Chronicle of a shared stash', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('Then the entries of the Chronicle sector are returned', async () => {
+    // Arrange
+    const buffer = readFileSync(FIXTURE_PATH);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.chronicle).toHaveLength(228);
+  }, 20000);
+
+  it('Then an unreadable Chronicle is left out without flagging the items as partial', async () => {
+    // Arrange
+    const buffer = Buffer.from(readFileSync(FIXTURE_PATH));
+    const sectors = readD2iMetadata(buffer).sectors;
+    const chronicleSector = sectors[sectors.length - 1];
+    // An unknown Chronicle version cannot be read
+    buffer.writeUInt16LE(99, chronicleSector.payloadOffset + 4);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.chronicle).toBeUndefined();
+    expect(parsed.partial).toBe(false);
+    expect(parsed.items).toHaveLength(130);
+  }, 20000);
 });
 
 describe('When parseModernStash reads a shared stash whose sector declares more items than it holds', () => {

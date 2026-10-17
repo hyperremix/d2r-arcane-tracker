@@ -61,7 +61,7 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent): G
     characterId: character.id,
     itemId: event.grailItem.id,
     isEthereal: Boolean(event.item.ethereal),
-    foundDate: new Date(),
+    foundDate: event.foundDate ?? new Date(),
     manuallyAdded: false,
     notes: `Auto-detected from ${event.item.location}`,
     fromInitialScan: event.isInitialScan ?? false,

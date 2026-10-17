@@ -2217,6 +2217,45 @@ describe('When SaveFileMonitor is used', () => {
       ).toBe(true);
     }, 20000);
 
+    it('Then parseSave returns the Chronicle of a stash of the configured game mode', async () => {
+      // Arrange
+      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
+
+      // Act
+      const { chronicle } = await parseSaveContent(
+        {
+          saveName: 'Modern Shared Stash Softcore',
+          filePath: MODERN_STASH_FIXTURE_PATH,
+          content: fixtureBuffer,
+          extension: '.d2i',
+        },
+        () => GameMode.Softcore,
+      );
+
+      // Assert
+      expect(chronicle).toHaveLength(228);
+    }, 20000);
+
+    it('Then parseSave returns no Chronicle for a stash of another game mode', async () => {
+      // Arrange
+      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
+
+      // Act
+      const { chronicle, status } = await parseSaveContent(
+        {
+          saveName: 'Modern Shared Stash Softcore',
+          filePath: MODERN_STASH_FIXTURE_PATH,
+          content: fixtureBuffer,
+          extension: '.d2i',
+        },
+        () => GameMode.Hardcore,
+      );
+
+      // Assert
+      expect(status).toBe('skipped');
+      expect(chronicle).toBeUndefined();
+    }, 20000);
+
     it('Then processSingleFile records the source file version of modern snapshots', async () => {
       // Arrange
       vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
@@ -2672,6 +2711,29 @@ describe('When SaveFileMonitor is used', () => {
           }),
         );
         expect(events[0].parsedItems?.length).toBeGreaterThan(0);
+        expect(events[0].chronicle).toHaveLength(228);
+      });
+    });
+
+    describe('If a character and a stash with a Chronicle are parsed together', () => {
+      it('Then the character is announced before the stash', async () => {
+        // Arrange
+        const stashPath = join(saveDir, 'ModernSharedStashSoftCoreV2.d2i');
+        writeFileSync(stashPath, readFileSync(MODERN_STASH_FIXTURE_PATH));
+        const characterPath = join(saveDir, 'Zed.d2s');
+        writeFileSync(characterPath, Buffer.alloc(800));
+        vi.mocked(d2s.read).mockResolvedValue({
+          header: { status: { hardcore: false } },
+          items: [],
+          merc_items: [],
+          corpse_items: [],
+        } as any);
+
+        // Act
+        await (monitor as any).parseFiles([stashPath, characterPath]);
+
+        // Assert
+        expect(events.map((event) => event.file.path)).toEqual([characterPath, stashPath]);
       });
     });
   });

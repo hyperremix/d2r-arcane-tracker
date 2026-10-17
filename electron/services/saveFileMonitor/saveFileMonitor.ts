@@ -533,6 +533,7 @@ class SaveFileMonitor {
         items: inventoryItems,
         status: parseStatus,
         stashHardcore,
+        chronicle,
       } = await parseSaveContent(
         { saveName, filePath, content: buffer, extension },
         this.createGameModeReader(),
@@ -574,6 +575,7 @@ class SaveFileMonitor {
           inventorySnapshot,
           saveFile,
           parsedItems,
+          chronicle,
         };
       }
 
@@ -587,6 +589,7 @@ class SaveFileMonitor {
         inventorySnapshot,
         saveFile,
         parsedItems,
+        chronicle,
       };
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
@@ -623,14 +626,20 @@ class SaveFileMonitor {
   }
 
   /**
-   * Emits a save file event for every successfully parsed file, carrying the items and header that
-   * were already parsed so listeners never read the file again.
+   * Emits a save file event for every successfully parsed file, carrying the items, header and
+   * Chronicle that were already parsed so listeners never read the file again. Files with a
+   * Chronicle come last: the game saves a new find to the character and to the Chronicle of the
+   * stash at once, and the find must be detected from the character before the Chronicle fills it in.
    * @private
    * @param {FileParseSuccess[]} parsedFiles - Successful parse results, in file order.
    */
   private async emitSaveFileEvents(parsedFiles: FileParseSuccess[]): Promise<void> {
     log.info('emitSaveFileEvents', `Emitting events for ${parsedFiles.length} files`);
-    for (const { saveFile, parsedItems } of parsedFiles) {
+    const orderedFiles = [
+      ...parsedFiles.filter((file) => !file.chronicle),
+      ...parsedFiles.filter((file) => file.chronicle),
+    ];
+    for (const { saveFile, parsedItems, chronicle } of orderedFiles) {
       try {
         // Suppress notifications during initial parsing so items that already exist on app startup
         // do not spam the user. A manual re-scan is not silent: the detection service already
@@ -651,6 +660,7 @@ class SaveFileMonitor {
           type: 'modified',
           file: saveFile,
           parsedItems,
+          chronicle,
           silent,
           isInitialScan,
         };
