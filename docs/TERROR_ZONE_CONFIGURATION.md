@@ -22,6 +22,7 @@ Open **Terror zone schedule** with the skull icon (**Terror zones**) next to the
 The app calculates the schedule itself, with the same algorithm as the game ([how it works](TERROR_ZONE_FINDINGS_2026.md)), so it needs no internet connection. It reads `desecratedzones.json` in your D2R folder, so the schedule follows the zones you turned off on the configuration page: it is recalculated every time you open the page, and the page reloads it when a zone's window ends.
 
 - If no D2R folder is set, or the game file can't be read, the page shows the retail schedule and says so. Set **Settings → D2R installation** to follow your own file.
+- If the game file is from an older version of D2R (before patch 3.x), D2R can't run a rotation from it. The page says so and shows the retail schedule. [Extract the game files](EXTRACTING_GAME_FILES.md) again, delete `desecratedzones.json.original` from the app's data folder and reopen the configuration page, so the app backs up the current file. **Restore original** puts back the backup, so an outdated backup brings the outdated file back.
 - If the game file has no zones, the page says that no terror zone is scheduled.
 - D2R only uses the game file when started with `-direct -txt`. Without the flags your game follows the retail schedule, which differs from the page whenever the file has been changed.
 - The game reads the file when it starts. A change you saved shows in the schedule at once, but a running game keeps its old zones until you restart it.

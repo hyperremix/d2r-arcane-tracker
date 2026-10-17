@@ -325,6 +325,25 @@ describe('TerrorZoneService', () => {
       expect(service.getSchedule(installPath, firstSlotMs, 20)).toEqual(before);
     });
 
+    it('If the game file is from before patch 3.x, Then it is reported unusable and the retail configuration is used', () => {
+      // Arrange: the old format names the duration `terror_duration_min` and numbers the zones
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2023-01-27 00:00:00",
+          "terror_duration_min": 60, "terror_break_min": 0, "seed": 16664395743969097666,
+          "zones": [ { "id": 1 }, { "id": 2 } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('unusableGameFile');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+    });
+
     it('If the game file has no zones, Then nothing is scheduled', () => {
       // Arrange
       writeGameFile([]);

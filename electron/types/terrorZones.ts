@@ -51,9 +51,10 @@ export interface TerrorZoneScheduleSlot {
 
 /**
  * Where a schedule was calculated from: the player's `desecratedzones.json`, or the retail
- * defaults when that file isn't available.
+ * defaults when that file isn't available (`retailDefault`) or is from a D2R version before 3.x
+ * and has no usable rotation (`unusableGameFile`).
  */
-export type TerrorZoneScheduleSource = 'gameFile' | 'retailDefault';
+export type TerrorZoneScheduleSource = 'gameFile' | 'retailDefault' | 'unusableGameFile';
 
 /**
  * The offline terror zone schedule, soonest window first. The first window may already be running.

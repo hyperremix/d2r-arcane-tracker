@@ -68,10 +68,16 @@ export function TerrorZoneSchedule() {
         </Alert>
       )}
 
-      {schedule?.source === 'retailDefault' && (
+      {schedule && schedule.source !== 'gameFile' && (
         <Alert variant="warning">
           <AlertTriangle aria-hidden="true" />
-          <AlertDescription>{t(translations.terrorZone.schedule.retailDefault)}</AlertDescription>
+          <AlertDescription>
+            {t(
+              schedule.source === 'retailDefault'
+                ? translations.terrorZone.schedule.retailDefault
+                : translations.terrorZone.schedule.unusableGameFile,
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

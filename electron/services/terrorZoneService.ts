@@ -334,8 +334,14 @@ export class TerrorZoneService {
     const gameFilePath = d2rInstallPath ? this.getGameDataPath(d2rInstallPath) : undefined;
     if (gameFilePath && existsSync(gameFilePath)) {
       try {
-        configs = parseTerrorZoneScheduleConfigs(readFileSync(gameFilePath, 'utf-8'));
-        source = 'gameFile';
+        const fileConfigs = parseTerrorZoneScheduleConfigs(readFileSync(gameFilePath, 'utf-8'));
+        // Files from before patch 3.x name the zone duration differently, so the game reads none
+        if (fileConfigs.some((config) => config.zoneDurationMinutes > 0)) {
+          configs = fileConfigs;
+          source = 'gameFile';
+        } else {
+          source = 'unusableGameFile';
+        }
       } catch (error) {
         log.error('getSchedule', error);
       }

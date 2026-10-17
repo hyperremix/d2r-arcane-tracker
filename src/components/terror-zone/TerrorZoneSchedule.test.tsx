@@ -175,6 +175,23 @@ describe('When the TerrorZoneSchedule page is shown', () => {
     });
   });
 
+  describe('If the game file is from an older D2R version', () => {
+    it('Then the player is told to extract the game files again, above the retail schedule', async () => {
+      // Arrange
+      setupApi(vi.fn().mockResolvedValue({ ...schedule, source: 'unusableGameFile' }));
+
+      // Act
+      renderSchedule();
+
+      // Assert
+      expect(await screen.findByText(/is from an older version of D2R/)).toBeInTheDocument();
+      expect(screen.queryByText(/Calculated from desecratedzones\.json/)).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('terror-zone-current')).getByText('Spider Forest'),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('If the game file schedules no terror zone', () => {
     it('Then an empty state is shown instead of the zones', async () => {
       // Arrange

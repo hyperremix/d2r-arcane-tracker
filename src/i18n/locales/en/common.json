@@ -1179,6 +1179,7 @@
       "zone": "Zone",
       "empty": "Your game file schedules no terror zone. Enable a zone on the configuration page.",
       "retailDefault": "Your D2R folder's terror zone file could not be used, so this is the retail schedule. Set your D2R installation folder in Settings to follow your own zone list.",
+      "unusableGameFile": "desecratedzones.json in your D2R folder is from an older version of D2R and can't be used, so this is the retail schedule. Extract the game files again, then reopen this page.",
       "gameFileNote": "Calculated from desecratedzones.json in your D2R folder. D2R only uses that file when started with {{flags}}; otherwise the retail schedule applies."
     },
     "feedback": {
