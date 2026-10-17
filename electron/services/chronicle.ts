@@ -5,7 +5,8 @@ import { getGrailItemId } from '../utils/grailItemUtils';
 /**
  * Reads the Chronicle, the record of discovered set items, uniques and runewords that Reign of the
  * Warlock keeps in the last sector of a v105+ shared stash (.d2i), and maps its entries to grail
- * items. Each stash file (softcore or hardcore) holds the Chronicle of its own game mode.
+ * items. It is read from each stash file the configured game mode includes; only a softcore stash
+ * has been verified.
  *
  * Layout of the sector payload (little endian):
  * - 20-byte header: magic `C0 ED EA C0`, u16 version (1), u16 set count, u16 unique count,
