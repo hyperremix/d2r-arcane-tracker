@@ -150,5 +150,37 @@ describe('When the widget shows the terror zones', () => {
         await screen.findByText('Failed to load the terror zone schedule'),
       ).toBeInTheDocument();
     });
+
+    it('Then a refresh that fails keeps the zones and shows the error until a refresh succeeds', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const getSchedule = vi
+        .fn()
+        .mockResolvedValueOnce(schedule)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValue(schedule);
+      setupApi(getSchedule);
+      render(<TerrorZoneDisplay />);
+      await screen.findByTestId('widget-terror-zone-current');
+
+      // Act
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MINUTE_MS);
+      });
+
+      // Assert
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Failed to load the terror zone schedule',
+      );
+      expect(screen.getByTestId('widget-terror-zone-current')).toHaveTextContent('Spider Forest');
+
+      // Act
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(MINUTE_MS);
+      });
+
+      // Assert
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });

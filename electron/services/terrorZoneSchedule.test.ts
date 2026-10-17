@@ -374,6 +374,36 @@ describe('parseTerrorZoneScheduleConfigs', () => {
     });
   });
 
+  describe('If a duration in the file is not a whole number of minutes', () => {
+    it('Then it is read as a whole number like the game does, and the schedule can be calculated', () => {
+      // Arrange
+      const content = `{ "desecrated_zones": [ { "start_time_utc": "2024-01-02 03:04:05",
+        "seed": 7, "zone_duration_minutes": 30.9, "break_duration_minutes": 0.5,
+        "zones": [{ "id": "Act1-Catacombs" }, { "id": "Act2-Sewers" }] } ] }`;
+
+      // Act
+      const [config] = parseTerrorZoneScheduleConfigs(content);
+
+      // Assert
+      expect(config.zoneDurationMinutes).toBe(30);
+      expect(config.breakDurationMinutes).toBe(0);
+      expect(() => getTerrorZoneWindows([config], config.startSeconds, 3)).not.toThrow();
+    });
+
+    it('Then a zone duration below one minute leaves the config without a zone duration', () => {
+      // Arrange
+      const content = `{ "desecrated_zones": [ { "start_time_utc": "2024-01-02 03:04:05",
+        "zone_duration_minutes": 0.01, "zones": [{ "id": "Act1-Catacombs" }] } ] }`;
+
+      // Act
+      const [config] = parseTerrorZoneScheduleConfigs(content);
+
+      // Assert
+      expect(config.zoneDurationMinutes).toBe(0);
+      expect(getTerrorZoneWindows([config], config.startSeconds, 3)).toEqual([]);
+    });
+  });
+
   describe('If the file has no desecrated_zones list', () => {
     it('Then it throws', () => {
       // Act & Assert

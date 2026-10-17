@@ -30,7 +30,9 @@ export function TerrorZoneDisplay() {
   }
 
   const current = schedule.slots.find((slot) => slot.startsAt <= now && now < slot.endsAt);
-  const upcoming = schedule.slots.filter((slot) => slot.startsAt > now).slice(0, 3);
+  const upcoming = schedule.slots
+    .filter((slot) => slot.startsAt > now)
+    .slice(0, WIDGET_SLOT_COUNT - 1);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-4">
@@ -73,6 +75,13 @@ export function TerrorZoneDisplay() {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* A failed refresh leaves the zones of the last load on screen */}
+      {error && (
+        <p role="alert" className="text-center text-white/70 text-xs">
+          {error}
+        </p>
       )}
 
       {/* The zones may not be the ones the player's game runs */}

@@ -344,6 +344,44 @@ describe('TerrorZoneService', () => {
       expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
     });
 
+    it('If the game file has a zone duration below one minute, Then it is reported unusable and the retail configuration is used', () => {
+      // Arrange
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2025-12-05 00:00:00", "end_time_utc": "",
+          "zone_duration_minutes": 0.01, "break_duration_minutes": 0, "seed": 1,
+          "zones": [ { "id": "Act1-ColdPlains" }, { "id": "Act2-Sewers" } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('unusableGameFile');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+    });
+
+    it('If the game file has a fractional zone duration, Then the game file is read with the whole minutes', () => {
+      // Arrange
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2025-12-05 00:00:00", "end_time_utc": "",
+          "zone_duration_minutes": 30.9, "break_duration_minutes": 0, "seed": 1,
+          "zones": [ { "id": "Act1-ColdPlains" }, { "id": "Act2-Sewers" } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 2);
+
+      // Assert
+      expect(schedule.source).toBe('gameFile');
+      expect(schedule.slots[0].endsAt - schedule.slots[0].startsAt).toBe(30 * 60 * 1000);
+    });
+
     it('If the game file has no zones, Then nothing is scheduled', () => {
       // Arrange
       writeGameFile([]);

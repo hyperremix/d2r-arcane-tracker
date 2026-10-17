@@ -284,8 +284,8 @@ export function parseTerrorZoneScheduleConfigs(fileContent: string): TerrorZoneS
       startSeconds,
       // An empty end time means the config never ends
       endSeconds: parseUtcSeconds(entry.end_time_utc) ?? Number.POSITIVE_INFINITY,
-      zoneDurationMinutes: Number(entry.zone_duration_minutes) || 0,
-      breakDurationMinutes: Number(entry.break_duration_minutes) || 0,
+      zoneDurationMinutes: parseWholeMinutes(entry.zone_duration_minutes),
+      breakDurationMinutes: parseWholeMinutes(entry.break_duration_minutes),
       seed: parseSeed(entry.seed),
       zoneIds: Array.isArray(entry.zones)
         ? entry.zones.flatMap((zone: { id?: unknown }) =>
@@ -295,6 +295,15 @@ export function parseTerrorZoneScheduleConfigs(fileContent: string): TerrorZoneS
     });
   }
   return configs;
+}
+
+/**
+ * Reads a duration in minutes. The game reads it as an integer, so a fraction is dropped;
+ * a missing or invalid duration is 0.
+ */
+function parseWholeMinutes(value: unknown): number {
+  const minutes = Math.trunc(Number(value));
+  return Number.isFinite(minutes) ? minutes : 0;
 }
 
 /**

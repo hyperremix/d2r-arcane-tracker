@@ -1,8 +1,5 @@
 # Offline terror zone schedule: findings (October 2026)
 
-Replaces the 2025 notes that used to be on this branch (removed), which tested a game config that is no longer current and modelled the
-rotation as a bag or as independent draws, which it is not.
-
 ## The current config (3.x, Reign of the Warlock)
 
 `hd/global/excel/desecratedzones.json` in retail D2R now has a single config:
