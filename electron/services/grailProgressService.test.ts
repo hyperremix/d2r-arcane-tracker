@@ -498,6 +498,24 @@ describe('When a parsed save file is recorded in the database', () => {
       // Assert
       expect(runItems.getRunItems(ctx, 'run-1')).toEqual([]);
     });
+
+    it('If the find is a silent Chronicle find, Then it is stored with its date and no run item is added', () => {
+      // Arrange
+      const saveFile = sorceressSaveFile('Sorc').build();
+      const foundDate = new Date('2026-02-12T19:57:00.000Z');
+      const chronicleFind = {
+        ...createFoundItem({ characterName: 'Modern Shared Stash Softcore', silent: true }),
+        d2sItemId: 'chronicle',
+        foundDate,
+      } as ItemDetectionEvent;
+
+      // Act
+      service.recordSaveFile(saveFile, [chronicleFind]);
+
+      // Assert
+      expect(progress.getAllProgress(ctx)).toEqual([expect.objectContaining({ foundDate })]);
+      expect(runItems.getRunItems(ctx, 'run-1')).toEqual([]);
+    });
   });
 });
 

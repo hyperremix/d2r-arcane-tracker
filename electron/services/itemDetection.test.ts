@@ -461,6 +461,45 @@ describe('When ItemDetectionService is used', () => {
       expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
     });
 
+    it('Then an item a save file showed as ethereal before is not found again', async () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      const bloodletter = D2SItemBuilder.new()
+        .withId(1)
+        .withUniqueName('Bloodletter')
+        .withEthereal(1)
+        .build();
+      const seen = await service.analyzeSaveFile(stash, toParsedItems([bloodletter]));
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(seen[0].item.ethereal).toBe(true);
+      expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
+    });
+
+    it('Then an item found in the database as ethereal before is not found again', () => {
+      // Arrange
+      service.setGrailItems(catalogItems);
+      service.initializeFromDatabase([
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'bloodletter',
+          foundDate: new Date('2024-01-01T00:00:00.000Z'),
+          manuallyAdded: false,
+          isEthereal: true,
+        },
+      ]);
+
+      // Act
+      const found = service.analyzeChronicle(stash, entries);
+
+      // Assert
+      expect(found.map((event) => event.grailItem.id)).toEqual(['civerbsward', 'spirit']);
+    });
+
     it('Then an item found in the database before is not found again', () => {
       // Arrange
       service.setGrailItems(catalogItems);

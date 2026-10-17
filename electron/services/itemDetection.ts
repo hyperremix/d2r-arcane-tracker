@@ -152,8 +152,11 @@ class ItemDetectionService {
         continue;
       }
 
-      const itemKey = `${grailItem.id}_false`;
-      if (this.previouslySeenItems.has(itemKey)) {
+      // The Chronicle doesn't say whether the item was ethereal, so a recorded version of either kind accounts for it
+      if (
+        this.previouslySeenItems.has(`${grailItem.id}_true`) ||
+        this.previouslySeenItems.has(`${grailItem.id}_false`)
+      ) {
         continue;
       }
 
@@ -169,7 +172,7 @@ class ItemDetectionService {
       };
       this.eventBus.emit('item-detection', foundItem);
       foundItems.push(foundItem);
-      this.previouslySeenItems.add(itemKey);
+      this.previouslySeenItems.add(`${grailItem.id}_false`);
     }
     return foundItems;
   }

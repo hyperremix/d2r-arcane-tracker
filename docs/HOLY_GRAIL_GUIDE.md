@@ -89,13 +89,13 @@ Things to know:
 
 ### The in-game Chronicle
 
-Reign of the Warlock records the set items, uniques and runewords you find in the **Chronicle**, which the game keeps in the v105+ shared stash. The app reads it whenever it scans the stash, so a find counts even if the item is in no save file anymore, for example because you sold it before the app saw it. A find that only the Chronicle knows:
+Reign of the Warlock records the set items, uniques and runewords you find in the **Chronicle**, which the game keeps in the v105+ shared stash. The app reads it whenever it scans the stash, so a find counts even if the item is in no save file anymore, for example because you sold it before the app saw it. A Chronicle entry only adds a find when the item isn't recorded yet, in either its normal or ethereal version. A find that only the Chronicle knows:
 
 - is attributed to the shared stash, with the date and time the Chronicle recorded it;
 - counts as a normal (non-ethereal) find, because the Chronicle doesn't record whether the item was ethereal;
 - shows no notification. A new find still notifies through the item itself, which is in your character's save file.
 
-An item that is already recorded keeps its found date. Softcore and hardcore have a Chronicle each, in their own shared stash, and the app reads the ones your [game mode](#game-mode-settings--tracking--game-mode) includes. The app only reads the Chronicle and never changes it. The Chronicle of online characters is stored on Battle.net, not in your save folder, so the app can't read it.
+An item that is already recorded keeps its found date. The app reads the Chronicle of each shared stash file that your [game mode](#game-mode-settings--tracking--game-mode) includes. The app only reads the Chronicle and never changes it. The Chronicle of online characters is stored on Battle.net, not in your save folder, so the app can't read it.
 
 ### Manual entry
 
