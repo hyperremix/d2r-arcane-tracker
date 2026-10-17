@@ -217,12 +217,12 @@ export const guides: Guide[] = [
   },
   {
     title: 'Terror Zone Configuration',
-    description: 'Changing which zones the game rotates through',
+    description: 'The offline schedule and which zones the game rotates through',
     file: 'TERROR_ZONE_CONFIGURATION.md',
     slug: 'terror-zone-configuration',
-    pageTitle: 'Terror Zone Configuration Guide',
+    pageTitle: 'Terror Zone Schedule and Configuration Guide',
     metaDescription:
-      'Choose which terror zones Diablo II: Resurrected rotates through: requirements, enabling and disabling zones, restoring the original file and troubleshooting.',
+      'See the offline D2R terror zone schedule and choose which zones the game rotates through: requirements, the schedule, toggling zones and troubleshooting.',
   },
   {
     title: 'Extracting Game Files',
