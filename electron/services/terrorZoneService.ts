@@ -3,9 +3,21 @@ import path from 'node:path';
 import { app } from 'electron';
 import { NUMERIC_TO_STRING_ZONE_ID, TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { stripJsonComments } from '../lib/jsonUtils';
-import type { TerrorZone, TerrorZoneValidationResult } from '../types/grail';
-
+import type {
+  TerrorZone,
+  TerrorZoneSchedule,
+  TerrorZoneScheduleSource,
+  TerrorZoneValidationResult,
+} from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
+import {
+  getTerrorZoneWindows,
+  parseTerrorZoneScheduleConfigs,
+  quoteSeeds,
+  RETAIL_TERROR_ZONE_CONFIG,
+  type TerrorZoneWindow,
+  unquoteSeeds,
+} from './terrorZoneSchedule';
 
 const log = createServiceLogger('TerrorZoneService');
 
@@ -158,7 +170,8 @@ export class TerrorZoneService {
       }
 
       const fileContent = readFileSync(filePath, 'utf-8');
-      const data = JSON.parse(stripJsonComments(fileContent));
+      // The seed is a 64-bit number that JSON.parse would round, which changes the rotation
+      const data = JSON.parse(quoteSeeds(stripJsonComments(fileContent)));
 
       if (
         !data.desecrated_zones ||
@@ -199,7 +212,7 @@ export class TerrorZoneService {
       });
 
       // Write back to file with proper formatting
-      writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf-8');
+      writeFileSync(filePath, unquoteSeeds(JSON.stringify(data, null, 4)), 'utf-8');
     } catch (error) {
       log.error('writeZonesToFile', error, undefined, {
         surfaceToUI: true,
@@ -300,6 +313,52 @@ export class TerrorZoneService {
         errorCode: 'unknown',
       };
     }
+  }
+
+  /**
+   * Calculates the offline terror zone schedule the game plays from the game's desecratedzones.json,
+   * so it follows the zones that were switched off on the configuration page. Falls back to the retail
+   * configuration when the installation or its game file isn't available or can't be read.
+   * @param d2rInstallPath - Path to D2R installation, if configured
+   * @param nowMs - The time to start from, in milliseconds since the Unix epoch
+   * @param slotCount - How many windows to return at most
+   * @returns The schedule, soonest window first
+   */
+  getSchedule(
+    d2rInstallPath: string | undefined,
+    nowMs: number,
+    slotCount: number,
+  ): TerrorZoneSchedule {
+    const fromSeconds = Math.floor(nowMs / 1000);
+    let windows: TerrorZoneWindow[] | undefined;
+    let source: TerrorZoneScheduleSource = 'retailDefault';
+
+    const gameFilePath = d2rInstallPath ? this.getGameDataPath(d2rInstallPath) : undefined;
+    if (gameFilePath && existsSync(gameFilePath)) {
+      try {
+        const fileConfigs = parseTerrorZoneScheduleConfigs(readFileSync(gameFilePath, 'utf-8'));
+        // Files from before patch 3.x name the zone duration differently, so the game reads none
+        if (fileConfigs.some((config) => config.zoneDurationMinutes > 0)) {
+          windows = getTerrorZoneWindows(fileConfigs, fromSeconds, slotCount);
+          source = 'gameFile';
+        } else {
+          source = 'unusableGameFile';
+        }
+      } catch (error) {
+        log.error('getSchedule', error);
+      }
+    }
+
+    windows ??= getTerrorZoneWindows([RETAIL_TERROR_ZONE_CONFIG], fromSeconds, slotCount);
+    return {
+      source,
+      slots: windows.map((window) => ({
+        startsAt: window.startSeconds * 1000,
+        endsAt: window.endSeconds * 1000,
+        zoneId: window.zoneId,
+        zoneName: TERROR_ZONE_NAMES[window.zoneId] || `Zone ${window.zoneId}`,
+      })),
+    };
   }
 
   /**

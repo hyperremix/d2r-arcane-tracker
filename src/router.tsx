@@ -8,6 +8,7 @@ import { Settings } from './components/settings/Settings';
 import { Statistics } from './components/statistics/Statistics';
 import { TitleBar } from './components/TitleBar';
 import { TerrorZoneConfiguration } from './components/terror-zone/TerrorZoneConfiguration';
+import { TerrorZoneSchedule } from './components/terror-zone/TerrorZoneSchedule';
 
 /**
  * Root layout component that wraps all routes with the TitleBar.
@@ -61,6 +62,10 @@ export const router = createHashRouter([
           },
           {
             path: '/terror-zones',
+            Component: TerrorZoneSchedule,
+          },
+          {
+            path: '/terror-zones/configuration',
             Component: TerrorZoneConfiguration,
           },
         ],

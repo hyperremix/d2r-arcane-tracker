@@ -110,6 +110,18 @@ describe('widget IPC handlers display mode validation', () => {
     expect(updateWidgetWindowSize).not.toHaveBeenCalled();
   });
 
+  it('When widget:update-display receives terror-zone, Then the widget window is resized for it', async () => {
+    // Arrange
+    const display = 'terror-zone';
+
+    // Act
+    const result = await invoke('widget:update-display', display, {});
+
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(updateWidgetWindowSize).toHaveBeenCalledWith('terror-zone', expect.any(Object));
+  });
+
   it('If the renderer sends stale custom sizes, Then the persisted sizes from the database are used', async () => {
     // Arrange
     const persistedSplit = { width: 400, height: 300 };
@@ -221,6 +233,29 @@ describe('widget IPC handlers lock (click-through)', () => {
     // Assert
     expect(result).toMatchObject({ success: false });
     expect(setWidgetWindowLocked).not.toHaveBeenCalled();
+  });
+
+  it('When the widget is toggled on in terror-zone mode, Then it is created with the persisted terror zone size', async () => {
+    // Arrange
+    const persistedTerrorZone = { width: 300, height: 280 };
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+      widgetSizeTerrorZone: persistedTerrorZone,
+    } as ReturnType<typeof grailDatabase.getAllSettings>);
+    const staleSettings = { widgetDisplay: 'terror-zone' as const };
+
+    // Act
+    await invoke('widget:toggle', true, staleSettings);
+
+    // Assert
+    expect(showWidgetWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        widgetDisplay: 'terror-zone',
+        widgetSizeTerrorZone: persistedTerrorZone,
+      }),
+      testPaths,
+      undefined,
+      undefined,
+    );
   });
 
   it('When the widget is toggled on, Then it is created with the persisted lock state and sizes', async () => {

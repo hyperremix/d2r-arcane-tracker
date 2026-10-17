@@ -267,6 +267,8 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       /** Restores the original desecratedzones.json from the backup. */
       restoreOriginal: () => invoke('terrorZone:restoreOriginal'),
       validatePath: () => invoke('terrorZone:validatePath'),
+      /** Gets the next `slotCount` terror zone windows of the offline schedule. */
+      getSchedule: (slotCount: number) => invoke('terrorZone:getSchedule', slotCount),
     },
   };
 }

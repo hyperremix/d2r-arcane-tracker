@@ -12,7 +12,7 @@ const moreFeatures: MoreFeature[] = [
     icon: AppWindow,
     title: 'Overlay widget',
     description:
-      'An always-on-top window with your grail progress or the current run timer. Lock it and clicks pass through to the game.',
+      'An always-on-top window with your grail progress, the current run timer or the current terror zone. Lock it and clicks pass through to the game.',
   },
   {
     icon: Bell,
@@ -22,7 +22,8 @@ const moreFeatures: MoreFeature[] = [
   {
     icon: MapPinned,
     title: 'Terror zones',
-    description: 'Choose which zones the terror zone rotation can pick.',
+    description:
+      'See the offline terror zone schedule with the current and next zone, and choose which zones the rotation can pick.',
   },
   {
     icon: Database,

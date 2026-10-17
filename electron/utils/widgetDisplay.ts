@@ -8,7 +8,7 @@ export type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
 /**
  * Every supported display mode, used to validate values received over IPC.
  */
-const WIDGET_DISPLAY_MODES = ['overall', 'split', 'all', 'run-only'] as const;
+const WIDGET_DISPLAY_MODES = ['overall', 'split', 'all', 'run-only', 'terror-zone'] as const;
 
 // Compile-time check that the list above covers the whole WidgetDisplayMode union
 type MissingDisplayModes = Exclude<WidgetDisplayMode, (typeof WIDGET_DISPLAY_MODES)[number]>;
@@ -58,13 +58,15 @@ export type WidgetSizeSettingKey =
   | 'widgetSizeOverall'
   | 'widgetSizeSplit'
   | 'widgetSizeAll'
-  | 'widgetSizeRunOnly';
+  | 'widgetSizeRunOnly'
+  | 'widgetSizeTerrorZone';
 
 const WIDGET_SIZE_SETTING_KEYS: Record<WidgetDisplayMode, WidgetSizeSettingKey> = {
   overall: 'widgetSizeOverall',
   split: 'widgetSizeSplit',
   all: 'widgetSizeAll',
   'run-only': 'widgetSizeRunOnly',
+  'terror-zone': 'widgetSizeTerrorZone',
 };
 
 /**
@@ -74,6 +76,7 @@ const DEFAULT_WIDGET_SIZES: Record<Exclude<WidgetDisplayMode, 'run-only'>, Widge
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
+  'terror-zone': { width: 280, height: 250 }, // Current zone with countdown and the next three
 };
 
 /**

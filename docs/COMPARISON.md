@@ -23,7 +23,7 @@ All of them are free. [maxroll.gg](https://maxroll.gg/d2/) is a good reference f
 
 ## Where each one fits
 
-- **D2R Arcane Tracker** is for offline, hands-off tracking on Windows. Items are recorded as soon as they're detected, so you can sell or drop them afterward and don't need mule characters. It also has a run tracker with exports and a terror zone editor. The trade-offs: it's Windows-only, classic D2 support is limited, and it has no OBS feed.
+- **D2R Arcane Tracker** is for offline, hands-off tracking on Windows. Items are recorded as soon as they're detected, so you can sell or drop them afterward and don't need mule characters. It also has a run tracker with exports, an offline terror zone schedule and a terror zone editor. The trade-offs: it's Windows-only, classic D2 support is limited, and it has no OBS feed.
 - **holygrail.link** supports more versions (D2R, LoD, PlugY), runs on more operating systems, and can feed OBS. It's the better pick for classic D2 players and for streamers who want an OBS overlay.
 - **d2grail.com** is an established web tracker with a good item database. You mark items by hand and can keep separate grails for ladder, non-ladder, softcore and hardcore.
 - **diablo2.io** fits players already using its trading community. You can upload `.d2s` and `.d2i` files to import items once, record drop details, and share your progress by URL.

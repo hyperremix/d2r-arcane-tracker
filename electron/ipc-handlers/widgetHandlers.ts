@@ -37,6 +37,7 @@ function getSettingsForWidgetWindow(
       widgetSizeSplit: persisted.widgetSizeSplit,
       widgetSizeAll: persisted.widgetSizeAll,
       widgetSizeRunOnly: persisted.widgetSizeRunOnly,
+      widgetSizeTerrorZone: persisted.widgetSizeTerrorZone,
       widgetRunOnlyShowItems: persisted.widgetRunOnlyShowItems,
       widgetLocked: persisted.widgetLocked,
       grailEthereal:

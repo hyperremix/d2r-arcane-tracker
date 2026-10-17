@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: handlers are retrieved from mocked ipcMain.handle calls */
 import { ipcMain } from 'electron';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GrailDatabase } from '../database/database';
 import { EventBus } from '../services/EventBus';
 import { SettingsService } from '../services/settingsService';
@@ -75,5 +75,51 @@ describe('When the terrorZone:validatePath handler is invoked', () => {
     // Assert
     expect(validateGameFile).toHaveBeenCalledWith('/d2r');
     expect(result).toEqual({ valid: false, errorCode: 'gameFileNotFound' });
+  });
+});
+
+describe('When the terrorZone:getSchedule handler is invoked', () => {
+  const getSchedule = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-17T14:30:00Z'));
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    initializeTerrorZoneHandlers({
+      terrorZoneService: { getSchedule } as unknown as TerrorZoneService,
+      settings: new SettingsService(grailDatabase as unknown as GrailDatabase, new EventBus()),
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('If a D2R install path is configured, Then the schedule is calculated from it at the current time', async () => {
+    // Arrange
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ d2rInstallPath: '/d2r' } as any);
+    const schedule = { source: 'gameFile', slots: [] };
+    getSchedule.mockReturnValue(schedule);
+    const handler = getHandler('terrorZone:getSchedule');
+
+    // Act
+    const result = await handler({}, 12);
+
+    // Assert
+    expect(getSchedule).toHaveBeenCalledWith('/d2r', Date.parse('2026-10-17T14:30:00Z'), 12);
+    expect(result).toBe(schedule);
+  });
+
+  it('If no D2R install path is configured, Then the schedule is calculated without one', async () => {
+    // Arrange
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({} as any);
+    const handler = getHandler('terrorZone:getSchedule');
+
+    // Act
+    await handler({}, 3);
+
+    // Assert
+    expect(getSchedule).toHaveBeenCalledWith(undefined, Date.parse('2026-10-17T14:30:00Z'), 3);
   });
 });

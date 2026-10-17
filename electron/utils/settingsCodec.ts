@@ -194,6 +194,7 @@ export const SETTINGS_CODECS: { readonly [K in keyof Settings]-?: SettingCodec<K
   widgetSizeSplit: json<WidgetSize>('widgetSizeSplit'),
   widgetSizeAll: json<WidgetSize>('widgetSizeAll'),
   widgetSizeRunOnly: json<WidgetSize>('widgetSizeRunOnly'),
+  widgetSizeTerrorZone: json<WidgetSize>('widgetSizeTerrorZone'),
   widgetLocked: flag(false),
   widgetRunOnlyShowItems: flag(true),
   mainWindowBounds: json<NonNullable<Settings['mainWindowBounds']>>('mainWindowBounds'),

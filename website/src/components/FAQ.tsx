@@ -50,6 +50,17 @@ export const faqs: FaqEntry[] = [
     ],
   },
   {
+    question: 'Does it show the offline terror zone schedule?',
+    answer: [
+      'Yes. The app calculates the offline (single-player) rotation itself, so it needs no internet connection. It shows the current zone with a countdown, the next zone and the upcoming zones in your local time, and it follows the zones you turned off. The widget can show the current zone and the next three. See ',
+      {
+        text: 'the terror zone schedule',
+        href: guideUrl('TERROR_ZONE_CONFIGURATION.md', 'schedule'),
+      },
+      ' in the Terror Zone Configuration guide.',
+    ],
+  },
+  {
     question: 'Is there a macOS or Linux version?',
     answer: [
       'No. The app is only released for Windows 10 or later (64-bit). The ',
@@ -88,7 +99,7 @@ export const faqs: FaqEntry[] = [
   {
     question: 'How does it compare to other grail trackers?',
     answer: [
-      "It's a Windows desktop app that keeps watching your save folder, works offline and needs no account. It also has a run tracker and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
+      "It's a Windows desktop app that keeps watching your save folder, works offline and needs no account. It also has a run tracker, an offline terror zone schedule and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
       { text: 'tracker comparison', href: guideUrl('COMPARISON.md') },
       '.',
     ],

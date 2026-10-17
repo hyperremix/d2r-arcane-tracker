@@ -1224,3 +1224,21 @@ describe('When TerrorZoneConfiguration shows the restart reminder', () => {
     expect(screen.getByText(restartReminder)).toBeInTheDocument();
   });
 });
+
+describe('When TerrorZoneConfiguration is shown', () => {
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+  });
+
+  it('Then the header links to the terror zone schedule', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+
+    // Assert
+    const link = await screen.findByRole('link', { name: 'View schedule' });
+    expect(link).toHaveAttribute('href', '/terror-zones');
+  });
+});

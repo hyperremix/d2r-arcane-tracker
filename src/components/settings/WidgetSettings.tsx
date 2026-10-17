@@ -175,6 +175,11 @@ export function WidgetSettings() {
         label: t(translations.settings.widget.runOnly),
         disabled: !widgetEnabled,
       },
+      {
+        value: 'terror-zone',
+        label: t(translations.settings.widget.terrorZone),
+        disabled: !widgetEnabled,
+      },
     ],
     [settings.grailEthereal, t, widgetEnabled],
   );

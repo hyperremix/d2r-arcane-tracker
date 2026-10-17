@@ -1,6 +1,6 @@
 # Terror Zone Configuration
 
-Terror zones are areas that rotate on a schedule, with monsters scaled up and better loot. This feature lets you choose which of the 36 zones the game rotates through. You could use it to farm only the zones you care about, or to make the schedule predictable for a stream.
+Terror zones are areas that rotate on a schedule, with monsters scaled up and better loot. This feature shows the schedule of your offline game, and lets you choose which of the 34 zones the game rotates through. You could use it to farm only the zones you care about, or to make the schedule predictable for a stream.
 
 > **Warning:** this modifies a file in your D2R installation. The app backs up the original first, but you're responsible for changes you make to game files.
 
@@ -11,9 +11,29 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 3. Write access to the D2R folder.
 4. D2R closed while you make changes.
 
+## Schedule
+
+Open **Terror zone schedule** with the skull icon (**Terror zones**) next to the settings icon on the right of the title bar. It shows the offline (single-player) rotation in your local time:
+
+- **Current terror zone**, with a countdown to the end of its window.
+- **Next terror zone**, with a countdown to its start.
+- **Upcoming terror zones** for roughly the next 12 hours.
+
+The app calculates the schedule itself, with the same algorithm as the game ([how it works](TERROR_ZONE_FINDINGS_2026.md)), so it needs no internet connection. It reads `desecratedzones.json` in your D2R folder, so the schedule follows the zones you turned off on the configuration page: it is recalculated every time you open the page, and the page reloads it when a zone's window ends.
+
+- If no D2R folder is set, or the game file can't be read, the page shows the retail schedule and says so. Set **Settings → D2R installation** to follow your own file.
+- If the game file is from an older version of D2R (before patch 3.x), D2R can't run a rotation from it. The page says so and shows the retail schedule. [Extract the game files](EXTRACTING_GAME_FILES.md) again, delete `desecratedzones.json.original` from the app's data folder and reopen the configuration page, so the app backs up the current file. **Restore original** puts back the backup, so an outdated backup brings the outdated file back.
+- If the game file has no zones, the page says that no terror zone is scheduled.
+- D2R only uses the game file when started with `-direct -txt`. Without the flags your game follows the retail schedule, which differs from the page whenever the file has been changed.
+- The game reads the file when it starts. A change you saved shows in the schedule at once, but a running game keeps its old zones until you restart it.
+
+To keep an eye on the terror zone while you play, set **Settings → Widget settings → Display mode** to **Terror zone**. The [widget](HOLY_GRAIL_GUIDE.md#widget) then shows the current zone with a countdown and the next three zones.
+
+Use **Configure zones** on the schedule page to open the configuration page, and **View schedule** there to come back.
+
 ## Usage
 
-Open **Terror Zone Configuration** with the skull icon (**Terror zones**) next to the settings icon on the right of the title bar. The page checks your installation path and the game file. When it can read the game file, it lists every zone with a switch, grouped by act. A warning at the top explains that the page edits your game files, lists the launch flags and links back to this guide.
+Open **Terror Zone Configuration** with **Configure zones** on the schedule page. The page checks your installation path and the game file. When it can read the game file, it lists every zone with a switch, grouped by act. A warning at the top explains that the page edits your game files, lists the launch flags and links back to this guide.
 
 Until the zones can be read, the page shows one of these instead of the zone list:
 
@@ -33,7 +53,7 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 
 ## How it works
 
-- The game file is `<D2R folder>/Data/hd/global/excel/desecratedzones.json`. The app writes only the zones you enabled to it.
+- The game file is `<D2R folder>/Data/hd/global/excel/desecratedzones.json`. The app writes only the zones you enabled to it. The rotation depends on the exact zone list, so every zone you turn off changes which zone runs when.
 - The first time it reads the file, the app copies the untouched original to `desecratedzones.json.original` in its data folder. This copy is never changed. Restore uses it.
 - Your selection is stored in the app's database and kept across restarts.
 
@@ -50,4 +70,5 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 | *Failed to update terror zone configuration*, *Failed to enable all zones*, *Failed to disable all zones* or *Failed to restore original file* | The change wasn't made, and any switches you changed go back to their previous state. Close D2R, check that the app has write access to the D2R folder (see [Requirements](#requirements)) and try again. |
 | Changes have no effect in game | Start D2R with `-direct -txt` and restart it after each change. |
 | D2R won't start after you changed zones | If the zone list is shown, click **Restore original**. If the page shows a problem with the game file instead, follow the fix for that message above. If it still fails, repair D2R through Battle.net and extract the files again. |
+| The schedule page doesn't match the zone shown in game | Check that D2R was started with `-direct -txt` and restarted after the last change. A game started without the flags follows the retail schedule. |
 | Zones are wrong after a D2R patch | The backup is from the old version. Extract the game files again, delete `desecratedzones.json.original` from the app's data folder, reopen the page so the app backs up the new file, then set your zones again. |

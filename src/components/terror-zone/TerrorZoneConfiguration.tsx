@@ -7,6 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   AlertCircle,
   AlertTriangle,
+  CalendarClock,
   ExternalLink,
   FolderCog,
   Loader2,
@@ -19,7 +20,7 @@ import {
 import type { MouseEvent, ReactNode } from 'react';
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -33,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -326,6 +327,12 @@ export function TerrorZoneConfiguration() {
     <PageHeader
       title={t(translations.terrorZone.title)}
       description={t(translations.terrorZone.description)}
+      actions={
+        <Link to="/terror-zones" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <CalendarClock aria-hidden="true" />
+          {t(translations.terrorZone.schedule.openSchedule)}
+        </Link>
+      }
     />
   );
 
