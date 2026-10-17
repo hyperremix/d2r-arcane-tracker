@@ -24,7 +24,10 @@ for (const pick of z) {
   order = [pick, ...order.filter((x) => x !== pick)];
 }
 console.log(`${seq.length} slots, ${K} zones`);
-console.log('pick rate by recency rank:', rankHits.map((c, r) => `${r}:${((c / ranked) * K).toFixed(2)}`).join(' '));
+console.log(
+  'pick rate by recency rank:',
+  rankHits.map((c, r) => `${r}:${((c / ranked) * K).toFixed(2)}`).join(' '),
+);
 
 const last = Array(K).fill(-1);
 const steps = [];
