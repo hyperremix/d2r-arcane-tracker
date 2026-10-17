@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { useWidgetControls } from '@/hooks/useWidgetControls';
 import { translations } from '@/i18n/translations';
+import type { WidgetDisplayMode } from '@/lib/widget';
 import { MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 
 /**
@@ -46,7 +47,7 @@ export function WidgetStep() {
   );
 
   const handleDisplayChange = useCallback(
-    async (display: 'overall' | 'split' | 'all' | 'run-only') => {
+    async (display: WidgetDisplayMode) => {
       const result = await saveSettings({ widgetDisplay: display });
       if (!result.success) {
         return;
@@ -126,6 +127,15 @@ export function WidgetStep() {
               className="flex-1"
             >
               {t(translations.settings.widget.runOnly)}
+            </Button>
+            <Button
+              variant={widgetDisplay === 'terror-zone' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleDisplayChange('terror-zone')}
+              disabled={!widgetEnabled}
+              className="flex-1"
+            >
+              {t(translations.settings.widget.terrorZone)}
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">

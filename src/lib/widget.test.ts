@@ -88,6 +88,17 @@ describe('When resolveWidgetDisplayMode is called', () => {
     expect(result).toBe('split');
   });
 
+  it('If ethereal tracking is off and mode is terror-zone, Then it keeps terror-zone', () => {
+    // Arrange
+    const grailEthereal = false;
+
+    // Act
+    const mode = resolveWidgetDisplayMode('terror-zone', grailEthereal);
+
+    // Assert
+    expect(mode).toBe('terror-zone');
+  });
+
   it('If ethereal tracking is off and mode is run-only, Then it keeps run-only', () => {
     // Arrange
     const grailEthereal = false;
@@ -117,6 +128,7 @@ describe('When getWidgetSizeSettingKey is called', () => {
     ['split', 'widgetSizeSplit'],
     ['all', 'widgetSizeAll'],
     ['run-only', 'widgetSizeRunOnly'],
+    ['terror-zone', 'widgetSizeTerrorZone'],
   ] as const)('If the display mode is %s, Then it returns %s', (displayMode, expectedKey) => {
     // Arrange: the display mode comes from the test table
 
@@ -140,6 +152,17 @@ describe('When getDefaultWidgetSize is called', () => {
     // Assert
     expect(withItems).toEqual({ width: 270, height: 320 });
     expect(statsOnly).toEqual({ width: 270, height: 190 });
+  });
+
+  it('If the display mode is terror-zone, Then the default fits the current zone and three more', () => {
+    // Arrange
+    const showItems = false;
+
+    // Act
+    const size = getDefaultWidgetSize('terror-zone', showItems);
+
+    // Assert
+    expect(size).toEqual({ width: 280, height: 250 });
   });
 
   it('If the item list flag is not stored, Then run-only defaults to the item list layout', () => {

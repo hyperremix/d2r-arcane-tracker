@@ -27,6 +27,8 @@ The app calculates the schedule itself, with the same algorithm as the game ([ho
 - D2R only uses the game file when started with `-direct -txt`. Without the flags your game follows the retail schedule, which differs from the page whenever the file has been changed.
 - The game reads the file when it starts. A change you saved shows in the schedule at once, but a running game keeps its old zones until you restart it.
 
+To keep an eye on the terror zone while you play, set **Settings → Widget settings → Display mode** to **Terror zone**. The [widget](HOLY_GRAIL_GUIDE.md#widget) then shows the current zone with a countdown and the next three zones.
+
 Use **Configure zones** on the schedule page to open the configuration page, and **View schedule** there to come back.
 
 ## Usage

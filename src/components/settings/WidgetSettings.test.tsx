@@ -416,6 +416,17 @@ describe('WidgetSettings', () => {
       expect(mockSetSettings).toHaveBeenCalledWith({ widgetDisplay: 'run-only' });
     });
 
+    it('Then the terror zone display mode can be selected', () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      fireEvent.click(screen.getByRole('radio', { name: 'Terror zone' }));
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith({ widgetDisplay: 'terror-zone' });
+    });
+
     it('If ethereal tracking is disabled, Then the split and all radios are disabled', () => {
       // Arrange
       useGrailStore.setState((state) => ({

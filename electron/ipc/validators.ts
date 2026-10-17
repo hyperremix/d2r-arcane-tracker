@@ -234,6 +234,7 @@ const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
   widgetSizeSplit: true,
   widgetSizeAll: true,
   widgetSizeRunOnly: true,
+  widgetSizeTerrorZone: true,
   widgetLocked: true,
   widgetRunOnlyShowItems: true,
   mainWindowBounds: false,

@@ -191,6 +191,7 @@ If a background task fails, for example a save file can't be read or a database 
 - **Split**: normal and ethereal progress. Requires ethereal tracking.
 - **All**: all three gauges. Requires ethereal tracking.
 - **Run only**: a large timer for the current run with its number and whether it's running, paused or idle, the session's fastest and average run, and optionally a list of items found in this session's runs. Turning the item list on or off switches the widget to the matching default height.
+- **Terror zone**: the offline terror zone running now with a countdown to the end of its window, and the next three zones with their start times in your local time. It doesn't need ethereal tracking. The widget reads the schedule again every minute, so a change saved on the terror zone configuration page shows up within a minute. It shows "Retail schedule" when the schedule doesn't come from your own game file. See the [Terror Zone guide](TERROR_ZONE_CONFIGURATION.md#schedule).
 
 The progress gauges show the same numbers as the progress ledger on the Holy Grail page. Only the versions you track count towards the totals: with **Include ethereal items** off there is no ethereal total, and with **Include normal items** off there is no normal total. The normal and ethereal split in the progress ledger is only shown while both versions are tracked.
 

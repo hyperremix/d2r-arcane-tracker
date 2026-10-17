@@ -246,7 +246,7 @@ export function closeWidgetWindow(): void {
  * Updates the widget window size based on new display mode.
  * Uses saved size for the mode if available, otherwise uses default SIZE_MAP.
  *
- * @param display - The new display mode ('overall', 'split', 'all', or 'run-only')
+ * @param display - The new display mode ('overall', 'split', 'all', 'run-only', or 'terror-zone')
  * @param settings - Application settings containing custom sizes
  */
 export function updateWidgetWindowSize(

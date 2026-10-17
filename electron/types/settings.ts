@@ -52,13 +52,14 @@ export type Settings = {
   fileChangeDebounceMs?: number; // Default: 2000
   // Widget settings
   widgetEnabled?: boolean; // Whether the widget is enabled
-  widgetDisplay?: 'overall' | 'split' | 'all' | 'run-only'; // Widget display mode (overall only, normal+ethereal, all three, or run counter only)
+  widgetDisplay?: 'overall' | 'split' | 'all' | 'run-only' | 'terror-zone'; // Widget display mode (overall only, normal+ethereal, all three, run counter only, or terror zones)
   widgetPosition?: { x: number; y: number }; // Widget position on screen
   widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
   widgetSizeOverall?: WidgetSize; // Custom size for overall mode
   widgetSizeSplit?: WidgetSize; // Custom size for split mode
   widgetSizeAll?: WidgetSize; // Custom size for all mode
   widgetSizeRunOnly?: WidgetSize; // Custom size for run-only mode
+  widgetSizeTerrorZone?: WidgetSize; // Custom size for terror-zone mode
   /**
    * When true, the widget is locked in place: clicks pass through it to the game, it cannot be
    * focused, dragged or resized. Unlock it again from the widget settings. Defaults to false.

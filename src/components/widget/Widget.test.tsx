@@ -711,6 +711,34 @@ describe('When the Widget is rendered', () => {
     });
   });
 
+  describe('If the display mode is terror-zone', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    afterEach(() => {
+      window.electronAPI = originalElectronAPI;
+    });
+
+    it('Then the terror zone schedule is shown without grail statistics, in a region named for it', async () => {
+      // Arrange
+      const startsAt = Date.now() - 60_000;
+      const getSchedule = vi.fn().mockResolvedValue({
+        source: 'gameFile',
+        slots: [
+          { startsAt, endsAt: startsAt + 30 * 60_000, zoneId: 'z-1', zoneName: 'Great Marsh' },
+        ],
+      });
+      window.electronAPI = { terrorZone: { getSchedule } } as unknown as typeof window.electronAPI;
+
+      // Act
+      render(<Widget statistics={null} settings={{ widgetDisplay: 'terror-zone' }} />);
+
+      // Assert
+      const region = screen.getByRole('region', { name: 'Terror zone widget' });
+      expect(await within(region).findByText('Great Marsh')).toBeInTheDocument();
+      expect(region).not.toHaveTextContent('Loading...');
+    });
+  });
+
   describe('If statistics are still loading', () => {
     it('Then a translated loading message is shown inside the region', () => {
       // Arrange & Act

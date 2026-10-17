@@ -20,9 +20,11 @@ import { translations } from '@/i18n/translations';
 import { formatClockDuration, formatDuration } from '@/lib/date';
 import { createRunItemLookup, resolveRunItem } from '@/lib/runItems';
 import { cn } from '@/lib/utils';
+import type { WidgetDisplayMode } from '@/lib/widget';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
+import { TerrorZoneDisplay } from './TerrorZoneDisplay';
 
 /**
  * Props for the Widget component.
@@ -159,6 +161,15 @@ const RUN_STATE_TIMER: Record<WidgetRunState, string> = {
   running: 'text-white',
   paused: 'text-warning',
   idle: 'text-white/70',
+};
+
+/** Accessible names of the widget region per display mode. */
+const WIDGET_LABEL_KEYS: Record<WidgetDisplayMode, string> = {
+  overall: translations.widget.ariaLabel,
+  split: translations.widget.ariaLabel,
+  all: translations.widget.ariaLabel,
+  'run-only': translations.widget.ariaLabel,
+  'terror-zone': translations.widget.terrorZoneAriaLabel,
 };
 
 const RUN_STATE_LABEL_KEYS: Record<WidgetRunState, string> = {
@@ -342,9 +353,9 @@ function RunOnlyDisplay({
  */
 export function Widget({ statistics, settings }: WidgetProps) {
   const { t } = useTranslation();
-  const widgetLabel = t(translations.widget.ariaLabel);
   // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
+  const widgetLabel = t(WIDGET_LABEL_KEYS[displayMode]);
   const opacity = clampWidgetOpacity(settings.widgetOpacity);
   // A locked widget is click-through, so it must not be a drag region (Windows would still catch
   // clicks on it) and must not advertise dragging with the cursor or grip
@@ -475,9 +486,20 @@ export function Widget({ statistics, settings }: WidgetProps) {
       split: 'gap-4',
       all: 'gap-6',
       'run-only': 'gap-2',
+      'terror-zone': 'gap-2',
     };
     return `${baseClasses} ${gapClasses[displayMode]}`;
   }, [displayMode]);
+
+  // The terror zone schedule doesn't need statistics either
+  if (displayMode === 'terror-zone') {
+    return (
+      <section aria-label={widgetLabel} className={containerClasses} style={rootStyle}>
+        {!locked && <WidgetDragGrip />}
+        <TerrorZoneDisplay />
+      </section>
+    );
+  }
 
   // Handle run-only mode separately (doesn't need statistics)
   if (displayMode === 'run-only') {
