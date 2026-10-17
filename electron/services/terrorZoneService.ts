@@ -13,7 +13,9 @@ import { createServiceLogger } from '../utils/serviceLogger';
 import {
   getTerrorZoneWindows,
   parseTerrorZoneScheduleConfigs,
+  quoteSeeds,
   RETAIL_TERROR_ZONE_CONFIG,
+  unquoteSeeds,
 } from './terrorZoneSchedule';
 
 const log = createServiceLogger('TerrorZoneService');
@@ -167,7 +169,8 @@ export class TerrorZoneService {
       }
 
       const fileContent = readFileSync(filePath, 'utf-8');
-      const data = JSON.parse(stripJsonComments(fileContent));
+      // The seed is a 64-bit number that JSON.parse would round, which changes the rotation
+      const data = JSON.parse(quoteSeeds(stripJsonComments(fileContent)));
 
       if (
         !data.desecrated_zones ||
@@ -208,7 +211,7 @@ export class TerrorZoneService {
       });
 
       // Write back to file with proper formatting
-      writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf-8');
+      writeFileSync(filePath, unquoteSeeds(JSON.stringify(data, null, 4)), 'utf-8');
     } catch (error) {
       log.error('writeZonesToFile', error, undefined, {
         surfaceToUI: true,

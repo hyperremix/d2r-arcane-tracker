@@ -248,9 +248,17 @@ function parseUtcSeconds(value: unknown): number | undefined {
 
 /**
  * Wraps the number of every `"seed"` property in quotes. `JSON.parse` would round a seed above 2^53.
+ * Undo it with {@link unquoteSeeds} after `JSON.stringify` to write the file back unchanged.
  */
-function quoteSeeds(json: string): string {
+export function quoteSeeds(json: string): string {
   return json.replace(/("seed"\s*:\s*)(\d+)/g, '$1"$2"');
+}
+
+/**
+ * Turns the quoted seeds of {@link quoteSeeds} back into numbers.
+ */
+export function unquoteSeeds(json: string): string {
+  return json.replace(/("seed"\s*:\s*)"(\d+)"/g, '$1$2');
 }
 
 /**

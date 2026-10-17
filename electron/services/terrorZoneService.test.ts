@@ -311,6 +311,20 @@ describe('TerrorZoneService', () => {
       );
     });
 
+    it('When zones are saved, Then the 64-bit seed of the file is kept and the schedule is unchanged', async () => {
+      // Arrange
+      writeGameFile(retailZoneIds);
+      const zones = await service.readZonesFromFile(installedGameFile, { preferBackup: true });
+      const before = service.getSchedule(installPath, firstSlotMs, 20);
+
+      // Act
+      await service.writeZonesToFile(installedGameFile, zones, new Set(retailZoneIds));
+
+      // Assert
+      expect(readFileSync(installedGameFile, 'utf-8')).toContain(`"seed": ${RETAIL_SEED},`);
+      expect(service.getSchedule(installPath, firstSlotMs, 20)).toEqual(before);
+    });
+
     it('If the game file has no zones, Then nothing is scheduled', () => {
       // Arrange
       writeGameFile([]);
