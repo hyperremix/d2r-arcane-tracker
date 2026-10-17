@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
+import { MAX_TERROR_ZONE_SCHEDULE_SLOTS } from '../types/terrorZones';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { WidgetDisplayMode } from '../utils/widgetDisplay';
@@ -106,6 +107,16 @@ const terrorZoneConfig: FieldValidator<Record<string, boolean>> = (value) => {
     'Invalid terror zone config: expected zone IDs mapped to booleans',
   );
   return value as Record<string, boolean>;
+};
+
+const terrorZoneScheduleSlotCount: FieldValidator<number> = (value) => {
+  ensure(
+    Number.isInteger(value) &&
+      (value as number) >= 1 &&
+      (value as number) <= MAX_TERROR_ZONE_SCHEDULE_SLOTS,
+    `Invalid terror zone slot count: expected an integer from 1 to ${MAX_TERROR_ZONE_SCHEDULE_SLOTS}`,
+  );
+  return value as number;
 };
 
 const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
@@ -475,6 +486,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'terrorZone:updateConfig': args(terrorZoneConfig),
   'terrorZone:restoreOriginal': noArgs,
   'terrorZone:validatePath': noArgs,
+  'terrorZone:getSchedule': args(terrorZoneScheduleSlotCount),
 };
 
 /** All invoke channels of the contract. */

@@ -1160,6 +1160,27 @@
       "restartAfterChanges": "Restart D2R after saving. A running game does not pick up changes.",
       "openGuide": "Read the terror zone guide"
     },
+    "schedule": {
+      "title": "Terror zone schedule",
+      "description": "The offline terror zone now and next, in your local time",
+      "openSchedule": "View schedule",
+      "openConfiguration": "Configure zones",
+      "loading": "Loading the terror zone schedule...",
+      "loadFailed": "Failed to load the terror zone schedule",
+      "current": "Current terror zone",
+      "next": "Next terror zone",
+      "upcoming": "Upcoming terror zones",
+      "none": "No terror zone right now",
+      "endsIn": "Ends in {{time}}",
+      "startsIn": "Starts in {{time}}",
+      "until": "Until {{time}}",
+      "from": "From {{time}}",
+      "time": "Time",
+      "zone": "Zone",
+      "empty": "Your game file schedules no terror zone. Enable a zone on the configuration page.",
+      "retailDefault": "Your D2R folder's terror zone file could not be used, so this is the retail schedule. Set your D2R installation folder in Settings to follow your own zone list.",
+      "gameFileNote": "Calculated from desecratedzones.json in your D2R folder. D2R only uses that file when started with {{flags}}; otherwise the retail schedule applies."
+    },
     "feedback": {
       "saved": "Terror zones saved",
       "restored": "Original terror zone file restored",

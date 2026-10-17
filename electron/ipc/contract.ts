@@ -44,6 +44,7 @@ import type {
   Session,
   Settings,
   TerrorZone,
+  TerrorZoneSchedule,
   TerrorZoneValidationResult,
   UpdateStatus,
   VaultItem,
@@ -374,6 +375,7 @@ export interface IpcInvokeContract {
   >;
   'terrorZone:restoreOriginal': Invoke<[], SuccessResult>;
   'terrorZone:validatePath': Invoke<[], TerrorZoneValidationResult>;
+  'terrorZone:getSchedule': Invoke<[slotCount: number], TerrorZoneSchedule>;
 }
 
 /**

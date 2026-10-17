@@ -158,6 +158,16 @@ export function initializeTerrorZoneHandlers({
     }
   });
 
+  /**
+   * IPC handler for the offline terror zone schedule, calculated from the game's desecratedzones.json.
+   * @param _ - IPC event (unused)
+   * @param slotCount - How many windows to return at most
+   * @returns Promise resolving to the schedule, soonest window first
+   */
+  handle('terrorZone:getSchedule', async (_, slotCount) =>
+    terrorZoneService.getSchedule(settingsService.getAll().d2rInstallPath, Date.now(), slotCount),
+  );
+
   console.log('[initializeTerrorZoneHandlers] Initialization complete');
 
   return dispose;

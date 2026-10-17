@@ -2,7 +2,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { setErrorForwarder } from '../utils/serviceLogger';
+import { RETAIL_TERROR_ZONE_CONFIG } from './terrorZoneSchedule';
 import { TerrorZoneService } from './terrorZoneService';
 
 let mockUserDataPath = '';
@@ -220,6 +222,134 @@ describe('TerrorZoneService', () => {
         // Reset forwarder
       });
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('getSchedule', () => {
+    const RETAIL_SEED = '16665365343970128666';
+    const retailZoneIds = RETAIL_TERROR_ZONE_CONFIG.zoneIds;
+    // 2026-07-15 00:00 UTC is a slot d2emu.com publishes: Cold Plains
+    const firstSlotMs = Date.parse('2026-07-15T00:00:00Z');
+    let installPath: string;
+    let installedGameFile: string;
+
+    const writeGameFile = (zoneIds: string[], seed: string = RETAIL_SEED) => {
+      const json = JSON.stringify({
+        desecrated_zones: [
+          {
+            start_time_utc: '2025-12-05 00:00:00',
+            end_time_utc: '',
+            seed: 0,
+            zone_duration_minutes: 30,
+            break_duration_minutes: 0,
+            zones: zoneIds.map((id) => ({ id, levels: [] })),
+          },
+        ],
+      }).replace('"seed":0', `"seed":${seed}`);
+      writeFileSync(installedGameFile, json, 'utf-8');
+    };
+
+    beforeEach(() => {
+      installPath = path.join(tempDir, 'd2r');
+      installedGameFile = service.getGameDataPath(installPath);
+      mkdirSync(path.dirname(installedGameFile), { recursive: true });
+    });
+
+    it('If no D2R installation is configured, Then it uses the retail configuration', () => {
+      // Act
+      const schedule = service.getSchedule(undefined, firstSlotMs, 2);
+
+      // Assert
+      expect(schedule.source).toBe('retailDefault');
+      expect(schedule.slots).toHaveLength(2);
+      expect(schedule.slots[0]).toEqual({
+        startsAt: firstSlotMs,
+        endsAt: firstSlotMs + 30 * 60 * 1000,
+        zoneId: 'Act1-ColdPlains',
+        zoneName: TERROR_ZONE_NAMES['Act1-ColdPlains'],
+      });
+      expect(schedule.slots[1].startsAt).toBe(firstSlotMs + 30 * 60 * 1000);
+    });
+
+    it('If the game file is not extracted, Then it uses the retail configuration', () => {
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('retailDefault');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+    });
+
+    it('When the game file is the retail file, Then it schedules the same zones as the retail configuration', () => {
+      // Arrange
+      writeGameFile(retailZoneIds);
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 20);
+
+      // Assert
+      expect(schedule.source).toBe('gameFile');
+      expect(schedule.slots).toEqual(service.getSchedule(undefined, firstSlotMs, 20).slots);
+    });
+
+    it('When the zone list was changed on the configuration page, Then the schedule is recalculated from the saved file', async () => {
+      // Arrange
+      writeGameFile(retailZoneIds);
+      const zones = await service.readZonesFromFile(installedGameFile, { preferBackup: true });
+      const enabledZoneIds = new Set(['Act1-ColdPlains', 'Act2-Sewers', 'Act5-Halls']);
+      const before = service.getSchedule(installPath, firstSlotMs, 12);
+
+      // Act
+      await service.writeZonesToFile(installedGameFile, zones, enabledZoneIds);
+      const after = service.getSchedule(installPath, firstSlotMs, 12);
+
+      // Assert
+      expect(after.source).toBe('gameFile');
+      expect(new Set(after.slots.map((slot) => slot.zoneId))).toEqual(enabledZoneIds);
+      expect(after.slots.map((slot) => slot.zoneId)).not.toEqual(
+        before.slots.map((slot) => slot.zoneId),
+      );
+    });
+
+    it('If the game file has no zones, Then nothing is scheduled', () => {
+      // Arrange
+      writeGameFile([]);
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 5);
+
+      // Assert
+      expect(schedule).toEqual({ source: 'gameFile', slots: [] });
+    });
+
+    it('If the game file is corrupted, Then it uses the retail configuration', () => {
+      // Arrange
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Silence expected error logs
+      });
+      writeFileSync(installedGameFile, '{ not json', 'utf-8');
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('retailDefault');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+      consoleSpy.mockRestore();
+    });
+
+    it('If a zone has no known name, Then the zone id is used in its name', () => {
+      // Arrange
+      writeGameFile(['Mod-OnlyZone']);
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.slots[0]).toMatchObject({
+        zoneId: 'Mod-OnlyZone',
+        zoneName: 'Zone Mod-OnlyZone',
+      });
     });
   });
 });

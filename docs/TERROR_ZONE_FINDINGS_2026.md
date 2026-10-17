@@ -57,19 +57,82 @@ generator can be checked against the data without knowing the initial state. 3,8
 - Weights: `age` and `age − 1`, scaled by 1, 30 or 1800.
 - Mapping: `% total`, multiply-shift, float.
 
-## What it would take
+## The algorithm (recovered from D2R 3.3.93847)
 
-The routine is in the game executable. [SirCabby/D2RCabbyCodes](https://github.com/SirCabby/D2RCabbyCodes/blob/main/src/sites.cpp)
-locates it in 3.3 as `DesecrateGetCurrentScheduledZone` (RVA `0x35B380`) and `DesecrateGetConfigForTime` (RVA `0x35DB10`), with byte
-patterns that survive patches. Decompiling those two functions in Ghidra would give the exact generator, seeding, weights and zone order.
-That needs a local `D2R.exe`.
+The routine was read from the game executable. On disk `.text` is encrypted (entropy ≈ 8 bits per byte) and the code is only readable while
+the game runs: about half of it stays `PAGE_NOACCESS` until the game executes it, so the module was dumped read-only (`ReadProcessMemory`
+only, offline, after entering a game) and analysed statically in Ghidra. The byte patterns from D2RCabbyCodes do not match this build; the
+config lookup sits at RVA `0x2BC800` and the current-zone function at `0x2BCB40`. This section describes the behaviour in words and
+pseudocode; no game code is reproduced.
 
-## Options for the app
+### Config selection
 
-1. **Use d2emu's file.** Fetch and cache `tz-2023-localized.json`, look up the current slot. It is accurate and localized, but depends on a
-   third party (ask d2emu before relying on it), and it is only right for an unmodified `desecratedzones.json`. The app's own Terror Zone
-   Configuration page changes the zone list, so it changes the schedule.
-2. **Port the game's routine** after decompiling it as above. This works for any config, including one edited by the app, with no network.
-3. **Let the app pick the schedule.** The app already writes `desecratedzones.json` for `-direct -txt` players, and the format allows a list of
-   configs with start and end times. It could write consecutive single-zone windows and know the schedule exactly. Untested: whether the game
-   honours many configs, and how it behaves with a single zone.
+`desecratedzones.json` holds a list of configs. Each one is read into a record: `start_time_utc` and `end_time_utc` become Unix seconds (an
+empty or missing `end_time_utc` means "never ends"), `zone_duration_minutes` and `break_duration_minutes` are 32-bit integers, `seed` is an
+unsigned 64-bit integer, and the zones are taken in file order. A zone entry that fails a check of the game's own while the file is loaded is skipped, so it takes no part in the rotation. Which check that is was not traced; the retail zones all pass it, and the app does not filter zones.
+
+For a time `t` (UTC seconds) the game walks the configs in file order and uses the first with `start <= t < end`. If none matches there is
+no terror zone.
+
+### Slot index
+
+```
+period = (zone_duration + break_duration) * 60            // seconds
+slot   = floor((t - start) / period)                      // negative slot: no zone
+if break_duration != 0 and t >= start + slot * period + zone_duration * 60: no zone (inside the break)
+```
+
+### Random roll
+
+For a time `x` (int64 seconds) the roll is
+
+```
+roll(x) = uint32_le(sha1(uint64_le(x XOR seed))[0..4]) / 2^32      // a fraction in [0, 1)
+```
+
+That is: XOR the 64-bit time with the 64-bit seed, serialise it as 8 little-endian bytes, SHA-1 it, read the first four bytes of the digest
+as a little-endian unsigned integer, and divide by 2^32. There is no stateful RNG: every roll is a pure function of one slot time.
+
+### Weights and the pick
+
+The game keeps one `double` weight per zone (`N` zones, summing to 1) and replays every slot from slot 0:
+
+```
+w[i]  = 1 / (N - 1) for all i
+w[floor(roll(start - period) * N)] = 0                     // a virtual "previous slot" pick
+
+for s = 0 .. slot:
+    r = roll(start + period * s)
+    cum = 0; pick = N - 1; share = 0                       // falling off the end picks the last zone
+    for i = 0 .. N-1:
+        cum += w[i]
+        if r < cum: pick = i; share = w[i] / (N - 1); break
+    for i = 0 .. N-1: w[i] += share                        // hand the picked weight to the other zones
+    w[pick] = 0
+```
+
+So the zone picked last has weight 0 and cannot repeat, and a zone that sits out gets a bigger share each slot. The game caches the last
+computed slot and extends it incrementally (resetting when asked for an earlier slot), which gives the same result as a replay from slot 0.
+The arithmetic is IEEE double; summing in file order with `r < cum` (strict) is what matches.
+
+### Other questions
+
+- **Thresholds.** `manual_deprioritize_threshold` and `manual_removal_threshold` are stored in the config record, but the slot and pick
+  code never reads them, and the schedule is correct without them. They may be used elsewhere in the game; that was not traced.
+- **One zone.** The initial weights are `1/0 = inf`, but the single weight is zeroed, so the loop falls through to the last (only) zone:
+  that zone every slot.
+- **No zones.** The game's code would index an empty vector. The app treats this as "no schedule".
+- **Multiple configs.** The rotation restarts at each config's own `start_time_utc` with its own seed: state is not carried across configs.
+
+### Verification
+
+The pseudocode reproduces d2emu's `tz-2023-localized.json` for all 5,761 slots (2026-07-15 to 2026-11-12), with the 34 zones mapping
+one-to-one to d2emu's zone names in file order. It also matched the zone shown in an offline game on 2026-10-17 (16:30–17:00 local: Stony
+Field, Tristram). The retail config is the one in the section above.
+
+### Practical consequences
+
+- The seed is a `uint64` above 2^53. `JSON.parse` / `JSON.stringify` round it (`…128666` becomes `…128000`), which changes the whole
+  schedule. Read it as text and keep it a `BigInt`. The app's Terror Zone Configuration page currently round-trips the file through
+  `JSON.parse` / `JSON.stringify`, so a saved file carries the rounded seed; the game uses whatever seed is in the file.
+- The schedule depends on the exact zone list and order, so editing the list in the app changes every slot.

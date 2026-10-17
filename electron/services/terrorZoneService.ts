@@ -3,9 +3,18 @@ import path from 'node:path';
 import { app } from 'electron';
 import { NUMERIC_TO_STRING_ZONE_ID, TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { stripJsonComments } from '../lib/jsonUtils';
-import type { TerrorZone, TerrorZoneValidationResult } from '../types/grail';
-
+import type {
+  TerrorZone,
+  TerrorZoneSchedule,
+  TerrorZoneScheduleSource,
+  TerrorZoneValidationResult,
+} from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
+import {
+  getTerrorZoneWindows,
+  parseTerrorZoneScheduleConfigs,
+  RETAIL_TERROR_ZONE_CONFIG,
+} from './terrorZoneSchedule';
 
 const log = createServiceLogger('TerrorZoneService');
 
@@ -300,6 +309,45 @@ export class TerrorZoneService {
         errorCode: 'unknown',
       };
     }
+  }
+
+  /**
+   * Calculates the offline terror zone schedule the game plays from the game's desecratedzones.json,
+   * so it follows the zones that were switched off on the configuration page. Falls back to the retail
+   * configuration when the installation or its game file isn't available or can't be read.
+   * @param d2rInstallPath - Path to D2R installation, if configured
+   * @param nowMs - The time to start from, in milliseconds since the Unix epoch
+   * @param slotCount - How many windows to return at most
+   * @returns The schedule, soonest window first
+   */
+  getSchedule(
+    d2rInstallPath: string | undefined,
+    nowMs: number,
+    slotCount: number,
+  ): TerrorZoneSchedule {
+    let configs = [RETAIL_TERROR_ZONE_CONFIG];
+    let source: TerrorZoneScheduleSource = 'retailDefault';
+
+    const gameFilePath = d2rInstallPath ? this.getGameDataPath(d2rInstallPath) : undefined;
+    if (gameFilePath && existsSync(gameFilePath)) {
+      try {
+        configs = parseTerrorZoneScheduleConfigs(readFileSync(gameFilePath, 'utf-8'));
+        source = 'gameFile';
+      } catch (error) {
+        log.error('getSchedule', error);
+      }
+    }
+
+    const windows = getTerrorZoneWindows(configs, Math.floor(nowMs / 1000), slotCount);
+    return {
+      source,
+      slots: windows.map((window) => ({
+        startsAt: window.startSeconds * 1000,
+        endsAt: window.endSeconds * 1000,
+        zoneId: window.zoneId,
+        zoneName: TERROR_ZONE_NAMES[window.zoneId] || `Zone ${window.zoneId}`,
+      })),
+    };
   }
 
   /**

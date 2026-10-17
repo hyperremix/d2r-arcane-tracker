@@ -31,3 +31,35 @@ export type TerrorZoneValidationErrorCode =
 export type TerrorZoneValidationResult =
   | { valid: true; path?: string; error?: undefined; errorCode?: undefined }
   | { valid: false; path?: string; error?: string; errorCode: TerrorZoneValidationErrorCode };
+
+/**
+ * The most windows one schedule request can ask for.
+ */
+export const MAX_TERROR_ZONE_SCHEDULE_SLOTS = 96;
+
+/**
+ * A time in which one zone is the terror zone.
+ */
+export interface TerrorZoneScheduleSlot {
+  /** Start of the window, in milliseconds since the Unix epoch */
+  startsAt: number;
+  /** End of the window, in milliseconds since the Unix epoch */
+  endsAt: number;
+  zoneId: string;
+  zoneName: string;
+}
+
+/**
+ * Where a schedule was calculated from: the player's `desecratedzones.json`, or the retail
+ * defaults when that file isn't available.
+ */
+export type TerrorZoneScheduleSource = 'gameFile' | 'retailDefault';
+
+/**
+ * The offline terror zone schedule, soonest window first. The first window may already be running.
+ * It is empty when the game file schedules no terror zone.
+ */
+export interface TerrorZoneSchedule {
+  source: TerrorZoneScheduleSource;
+  slots: TerrorZoneScheduleSlot[];
+}
