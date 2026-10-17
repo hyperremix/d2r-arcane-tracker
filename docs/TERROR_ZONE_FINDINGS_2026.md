@@ -1,6 +1,6 @@
 # Offline terror zone schedule: findings (October 2026)
 
-Supersedes the conclusions in the 2025 documents on this branch, which tested a game config that is no longer current, and modelled the
+Replaces the 2025 notes that used to be on this branch (removed), which tested a game config that is no longer current and modelled the
 rotation as a bag or as independent draws, which it is not.
 
 ## The current config (3.x, Reign of the Warlock)
@@ -15,8 +15,8 @@ rotation as a bag or as independent draws, which it is not.
 | `break_duration_minutes` | `0` |
 | `zones` | 34 (Act1-BurialGrounds … Act5-WorldstoneKeep) |
 
-The branch's `desecratedzones.json` (start 2023-01-27, seed `16664395743969097666`, 60 minutes, 36 zones) and `terrorzone-schedule.csv`
-are from before that patch. The CSV switches config on 2025-12-05.
+Before that patch the config was different (start 2023-01-27, seed `16664395743969097666`, 60 minutes, 36 zones), and the 2025 data was
+hourly. The config switched on 2025-12-05.
 
 Sources: a retail file mirrored in [ryan-reid/BT-BKDiff](https://github.com/ryan-reid/BT-BKDiff/blob/main/data/retail/hd/global/excel/desecratedzones.json)
 and the schema in [eezstreet/d2rdoc](https://github.com/eezstreet/d2rdoc/blob/master/contrib/guides/desecratedzones.md).
@@ -42,7 +42,7 @@ Measured on d2emu's 5,761 retail slots with `scripts/tz-recency-analysis.mjs`:
 - The 2025 hourly data (36 zones) shows the same curve, so the mechanism predates 3.x.
 
 So the rotation is stateful: each pick depends on every pick since `start_time_utc`. A stateless `rng(seed, slot) % zones` cannot reproduce
-it, which is why the 30+ generators tried on this branch never got above chance.
+it, which is why the 30+ generators tried earlier never got above chance.
 
 ## What was tried this time
 
@@ -133,6 +133,7 @@ Field, Tristram). The retail config is the one in the section above.
 ### Practical consequences
 
 - The seed is a `uint64` above 2^53. `JSON.parse` / `JSON.stringify` round it (`…128666` becomes `…128000`), which changes the whole
-  schedule. Read it as text and keep it a `BigInt`. The app's Terror Zone Configuration page currently round-trips the file through
-  `JSON.parse` / `JSON.stringify`, so a saved file carries the rounded seed; the game uses whatever seed is in the file.
+  schedule. Read it as text and keep it a `BigInt`. The game uses whatever seed is in the file. Until this was fixed, the Terror Zone
+  Configuration page rounded the seed on every save, so a file it saved earlier may still carry a rounded seed (`…128000`); **Restore
+  original** brings back the retail seed.
 - The schedule depends on the exact zone list and order, so editing the list in the app changes every slot.
