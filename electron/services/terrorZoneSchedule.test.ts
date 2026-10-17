@@ -87,7 +87,7 @@ const editedConfig: TerrorZoneScheduleConfig = {
   zoneIds: ['Act1-ColdPlains', 'Act2-Sewers', 'Act3-Travincal', 'Act4-RiverOfFlame', 'Act5-Halls'],
 };
 
-describe('getTerrorZoneWindows', () => {
+describe('When the terror zone windows are calculated', () => {
   describe('When the retail config is scheduled', () => {
     it.each(RETAIL_SLOTS)('Then %s is %s, like the game and d2emu', (utc, zoneId) => {
       // Arrange
@@ -303,7 +303,7 @@ describe('getTerrorZoneWindows', () => {
   });
 });
 
-describe('parseTerrorZoneScheduleConfigs', () => {
+describe('When the terror zone configs are read from desecratedzones.json', () => {
   describe('When the file is the retail desecratedzones.json', () => {
     it('Then the seed keeps all 64 bits and the schedule matches the game', () => {
       // Act
@@ -401,6 +401,58 @@ describe('parseTerrorZoneScheduleConfigs', () => {
       // Assert
       expect(config.zoneDurationMinutes).toBe(0);
       expect(getTerrorZoneWindows([config], config.startSeconds, 3)).toEqual([]);
+    });
+  });
+
+  describe('If a duration in the file is outside the 32-bit integer range', () => {
+    const readConfig = (zoneDuration: string, breakDuration: string) =>
+      parseTerrorZoneScheduleConfigs(`{ "desecrated_zones": [ { "start_time_utc": "2024-01-02 03:04:05",
+        "seed": 7, "zone_duration_minutes": ${zoneDuration}, "break_duration_minutes": ${breakDuration},
+        "zones": [{ "id": "Act1-Catacombs" }, { "id": "Act2-Sewers" }] } ] }`)[0];
+
+    it('Then a zone duration of 1e308 is read as 0 and the schedule can be calculated', () => {
+      // Act
+      const config = readConfig('1e308', '0');
+
+      // Assert
+      expect(config.zoneDurationMinutes).toBe(0);
+      expect(() => getTerrorZoneWindows([config], config.startSeconds, 3)).not.toThrow();
+    });
+
+    it('Then a break duration of 1e308 is read as 0 and the schedule can be calculated', () => {
+      // Act
+      const config = readConfig('30', '1e308');
+
+      // Assert
+      expect(config.breakDurationMinutes).toBe(0);
+      expect(() => getTerrorZoneWindows([config], config.startSeconds, 3)).not.toThrow();
+    });
+
+    it('Then a negative break duration is read as 0, so the zones follow each other', () => {
+      // Act
+      const config = readConfig('30', '-5');
+
+      // Assert
+      expect(config.breakDurationMinutes).toBe(0);
+      const windows = getTerrorZoneWindows([config], config.startSeconds, 2);
+      expect(windows).toHaveLength(2);
+      expect(windows[1].startSeconds).toBe(windows[0].endSeconds);
+    });
+
+    it('Then a negative zone duration, or one above the largest 32-bit integer, is read as 0', () => {
+      // Act & Assert
+      expect(readConfig('-30', '0').zoneDurationMinutes).toBe(0);
+      expect(readConfig('2147483648', '0').zoneDurationMinutes).toBe(0);
+    });
+
+    it('Then the largest 32-bit integer is kept and the schedule can be calculated', () => {
+      // Act
+      const config = readConfig('2147483647', '2147483647');
+
+      // Assert
+      expect(config.zoneDurationMinutes).toBe(2147483647);
+      expect(config.breakDurationMinutes).toBe(2147483647);
+      expect(() => getTerrorZoneWindows([config], config.startSeconds, 3)).not.toThrow();
     });
   });
 

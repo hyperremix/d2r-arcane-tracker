@@ -15,6 +15,7 @@ import {
   parseTerrorZoneScheduleConfigs,
   quoteSeeds,
   RETAIL_TERROR_ZONE_CONFIG,
+  type TerrorZoneWindow,
   unquoteSeeds,
 } from './terrorZoneSchedule';
 
@@ -328,7 +329,8 @@ export class TerrorZoneService {
     nowMs: number,
     slotCount: number,
   ): TerrorZoneSchedule {
-    let configs = [RETAIL_TERROR_ZONE_CONFIG];
+    const fromSeconds = Math.floor(nowMs / 1000);
+    let windows: TerrorZoneWindow[] | undefined;
     let source: TerrorZoneScheduleSource = 'retailDefault';
 
     const gameFilePath = d2rInstallPath ? this.getGameDataPath(d2rInstallPath) : undefined;
@@ -337,7 +339,7 @@ export class TerrorZoneService {
         const fileConfigs = parseTerrorZoneScheduleConfigs(readFileSync(gameFilePath, 'utf-8'));
         // Files from before patch 3.x name the zone duration differently, so the game reads none
         if (fileConfigs.some((config) => config.zoneDurationMinutes > 0)) {
-          configs = fileConfigs;
+          windows = getTerrorZoneWindows(fileConfigs, fromSeconds, slotCount);
           source = 'gameFile';
         } else {
           source = 'unusableGameFile';
@@ -347,7 +349,7 @@ export class TerrorZoneService {
       }
     }
 
-    const windows = getTerrorZoneWindows(configs, Math.floor(nowMs / 1000), slotCount);
+    windows ??= getTerrorZoneWindows([RETAIL_TERROR_ZONE_CONFIG], fromSeconds, slotCount);
     return {
       source,
       slots: windows.map((window) => ({

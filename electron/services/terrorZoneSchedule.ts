@@ -8,6 +8,7 @@ import { stripJsonComments } from '../lib/jsonUtils';
 
 const SECONDS_PER_MINUTE = 60;
 const TWO_POW_32 = 2 ** 32;
+const MAX_INT32 = 2 ** 31 - 1;
 
 /**
  * One entry of `desecrated_zones` in desecratedzones.json, reduced to what the rotation uses.
@@ -298,12 +299,12 @@ export function parseTerrorZoneScheduleConfigs(fileContent: string): TerrorZoneS
 }
 
 /**
- * Reads a duration in minutes. The game reads it as an integer, so a fraction is dropped;
- * a missing or invalid duration is 0.
+ * Reads a duration in minutes. The game reads it as a 32-bit integer, so a fraction is dropped;
+ * a missing, negative or out-of-range duration is 0.
  */
 function parseWholeMinutes(value: unknown): number {
   const minutes = Math.trunc(Number(value));
-  return Number.isFinite(minutes) ? minutes : 0;
+  return minutes > 0 && minutes <= MAX_INT32 ? minutes : 0;
 }
 
 /**

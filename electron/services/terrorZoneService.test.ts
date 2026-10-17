@@ -4,8 +4,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { setErrorForwarder } from '../utils/serviceLogger';
-import { RETAIL_TERROR_ZONE_CONFIG } from './terrorZoneSchedule';
+import { getTerrorZoneWindows, RETAIL_TERROR_ZONE_CONFIG } from './terrorZoneSchedule';
 import { TerrorZoneService } from './terrorZoneService';
+
+vi.mock('./terrorZoneSchedule', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./terrorZoneSchedule')>();
+  return { ...actual, getTerrorZoneWindows: vi.fn(actual.getTerrorZoneWindows) };
+});
 
 let mockUserDataPath = '';
 vi.mock('electron', () => ({
@@ -32,7 +37,7 @@ const createZonesJson = (ids: (string | number)[]): string =>
     2,
   );
 
-describe('TerrorZoneService', () => {
+describe('When the terror zone service manages the game file', () => {
   let service: TerrorZoneService;
   let tempDir: string;
   let gameFilePath: string;
@@ -225,7 +230,7 @@ describe('TerrorZoneService', () => {
     });
   });
 
-  describe('getSchedule', () => {
+  describe('When the offline terror zone schedule is requested', () => {
     const RETAIL_SEED = '16665365343970128666';
     const retailZoneIds = RETAIL_TERROR_ZONE_CONFIG.zoneIds;
     // 2026-07-15 00:00 UTC is a slot d2emu.com publishes: Cold Plains
@@ -380,6 +385,85 @@ describe('TerrorZoneService', () => {
       // Assert
       expect(schedule.source).toBe('gameFile');
       expect(schedule.slots[0].endsAt - schedule.slots[0].startsAt).toBe(30 * 60 * 1000);
+    });
+
+    it('If the game file has a zone duration of 1e308, Then it is reported unusable and the retail configuration is used', () => {
+      // Arrange
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2025-12-05 00:00:00", "end_time_utc": "",
+          "zone_duration_minutes": 1e308, "break_duration_minutes": 0, "seed": 1,
+          "zones": [ { "id": "Act1-ColdPlains" }, { "id": "Act2-Sewers" } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('unusableGameFile');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+    });
+
+    it('If the game file has a break duration of 1e308, Then the zones follow each other without a break', () => {
+      // Arrange
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2025-12-05 00:00:00", "end_time_utc": "",
+          "zone_duration_minutes": 30, "break_duration_minutes": 1e308, "seed": 1,
+          "zones": [ { "id": "Act1-ColdPlains" }, { "id": "Act2-Sewers" } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 2);
+
+      // Assert
+      expect(schedule.source).toBe('gameFile');
+      expect(schedule.slots).toHaveLength(2);
+      expect(schedule.slots[1].startsAt).toBe(schedule.slots[0].endsAt);
+    });
+
+    it('If the game file has a negative break duration, Then the zones follow each other without a break', () => {
+      // Arrange
+      writeFileSync(
+        installedGameFile,
+        `{ "desecrated_zones": [ {
+          "start_time_utc": "2025-12-05 00:00:00", "end_time_utc": "",
+          "zone_duration_minutes": 30, "break_duration_minutes": -5, "seed": 1,
+          "zones": [ { "id": "Act1-ColdPlains" }, { "id": "Act2-Sewers" } ] } ] }`,
+        'utf-8',
+      );
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 2);
+
+      // Assert
+      expect(schedule.source).toBe('gameFile');
+      expect(schedule.slots).toHaveLength(2);
+      expect(schedule.slots[1].startsAt).toBe(schedule.slots[0].endsAt);
+    });
+
+    it('If the schedule of the game file cannot be calculated, Then the error is logged and the retail configuration is used', () => {
+      // Arrange
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Silence expected error logs
+      });
+      writeGameFile(['Act1-ColdPlains', 'Act2-Sewers']);
+      vi.mocked(getTerrorZoneWindows).mockImplementationOnce(() => {
+        throw new RangeError('Not an integer');
+      });
+
+      // Act
+      const schedule = service.getSchedule(installPath, firstSlotMs, 1);
+
+      // Assert
+      expect(schedule.source).toBe('retailDefault');
+      expect(schedule.slots[0].zoneId).toBe('Act1-ColdPlains');
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
 
     it('If the game file has no zones, Then nothing is scheduled', () => {
