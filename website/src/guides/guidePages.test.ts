@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { faqs } from '../components/FAQ';
 import { features, guides, guideUrl } from '../content';
 import { renderGuideMarkdown } from './renderGuideMarkdown';
 import { RESERVED_IDS } from './reservedIds';
@@ -108,6 +109,21 @@ describe('When the guide pages are built from docs/', () => {
     // Act
     const broken = features
       .map((feature) => guideUrl(feature.guide.file, feature.guide.hash))
+      .filter((href) => !landsOnHeading(href, headingIds));
+
+    // Assert
+    expect(broken).toEqual([]);
+  });
+
+  it('Then the FAQ links to guide pages and headings that exist', () => {
+    // Arrange
+    const headingIds = headingIdsByPagePath();
+
+    // Act
+    const broken = faqs
+      .flatMap((entry) => entry.answer)
+      .flatMap((part) => (typeof part === 'object' && 'href' in part ? [part.href] : []))
+      .filter((href) => href.startsWith(`${base}guides/`))
       .filter((href) => !landsOnHeading(href, headingIds));
 
     // Assert

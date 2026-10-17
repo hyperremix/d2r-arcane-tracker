@@ -83,7 +83,7 @@ export const features: Feature[] = [
     description:
       'Every unique, set item, rune and runeword in Diablo 2 Resurrected on one wall. Found items light up in their item color; missing ones stay dim.',
     points: [
-      'Detects finds from characters and shared stashes, including the v105+ stash',
+      'Detects finds from characters and shared stashes, including the v105+ stash and its Chronicle',
       'Tracks normal and ethereal versions, for softcore, hardcore or both',
       'Search by name, base or set, filter by type and bookmark what you are hunting',
     ],

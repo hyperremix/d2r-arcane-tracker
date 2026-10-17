@@ -39,6 +39,17 @@ export const faqs: FaqEntry[] = [
     ],
   },
   {
+    question: 'Does it work with the Reign of the Warlock Chronicle?',
+    answer: [
+      'Yes. The app reads the Chronicle the game keeps in the v105+ shared stash, so the set items, uniques and runewords it lists count as found, with the date the Chronicle recorded them, even if the item is in no save file anymore. The app never changes the Chronicle. The Chronicle of online characters is stored on Battle.net, so the app can only read the offline one. See ',
+      {
+        text: 'the in-game Chronicle',
+        href: guideUrl('HOLY_GRAIL_GUIDE.md', 'the-in-game-chronicle'),
+      },
+      ' in the Holy Grail guide.',
+    ],
+  },
+  {
     question: 'Is there a macOS or Linux version?',
     answer: [
       'No. The app is only released for Windows 10 or later (64-bit). The ',
