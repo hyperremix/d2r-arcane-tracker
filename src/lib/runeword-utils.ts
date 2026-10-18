@@ -1,4 +1,5 @@
 import type { Item } from 'electron/types/grail';
+import type { RunewordReadiness } from './runeword-readiness';
 
 /**
  * Filters runewords by name using case-insensitive substring matching.
@@ -53,20 +54,46 @@ function countMissingRunes(
 
 /**
  * Availability tiers for the runeword calculator.
+ * - `ready`: every required rune is available and an owned base fits the runeword
  * - `craftable`: every required rune is available
+ * - `upgradable`: every required rune is available or can be cubed from owned runes and gems
+ *   (includes craftable runewords)
  * - `missingOne`: at most one required rune is missing (includes craftable runewords)
  * - `all`: no availability restriction
  */
-export type RunewordAvailabilityFilter = 'craftable' | 'missingOne' | 'all';
+export type RunewordAvailabilityFilter =
+  | 'ready'
+  | 'craftable'
+  | 'upgradable'
+  | 'missingOne'
+  | 'all';
 
 /**
  * Maximum number of missing runes allowed for each availability tier.
  */
 const maxMissingRunesByFilter: Record<RunewordAvailabilityFilter, number> = {
+  ready: 0,
   craftable: 0,
+  upgradable: Number.POSITIVE_INFINITY,
   missingOne: 1,
   all: Number.POSITIVE_INFINITY,
 };
+
+/**
+ * Whether a runeword meets the parts of an availability tier that go beyond counting missing runes.
+ */
+function meetsReadiness(
+  availability: RunewordAvailabilityFilter,
+  readiness: RunewordReadiness | undefined,
+): boolean {
+  if (availability === 'ready') {
+    return (readiness?.bases.length ?? 0) > 0;
+  }
+  if (availability === 'upgradable') {
+    return readiness?.upgradePlan !== undefined;
+  }
+  return true;
+}
 
 /**
  * Filters runewords by selected runes and rune availability.
@@ -74,6 +101,8 @@ const maxMissingRunesByFilter: Record<RunewordAvailabilityFilter, number> = {
  * @param selectedRunes - Selected rune IDs; a runeword must contain all of them to match
  * @param availability - Availability tier limiting how many runes may be missing
  * @param availableRunes - Record mapping rune IDs to their available counts
+ * @param readinessById - Upgrade plans and owned bases by runeword ID, for the `ready` and
+ *   `upgradable` tiers
  * @returns Filtered array of runewords based on selected and available runes
  */
 export function filterRunewordsByRunes(
@@ -81,6 +110,7 @@ export function filterRunewordsByRunes(
   selectedRunes: string[],
   availability: RunewordAvailabilityFilter,
   availableRunes: Record<string, number>,
+  readinessById: Record<string, RunewordReadiness> = {},
 ): Item[] {
   const maxMissing = maxMissingRunesByFilter[availability];
 
@@ -98,7 +128,10 @@ export function filterRunewordsByRunes(
       return false;
     }
 
-    return countMissingRunes(requiredRuneCounts, availableRunes) <= maxMissing;
+    return (
+      countMissingRunes(requiredRuneCounts, availableRunes) <= maxMissing &&
+      meetsReadiness(availability, readinessById[runeword.id])
+    );
   });
 }
 
