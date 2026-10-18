@@ -32,6 +32,9 @@ describe('When the D2RFolderPrompt is shown', () => {
         screen.getByRole('heading', { level: 2, name: 'Set your D2R installation folder' }),
       ).toBeInTheDocument();
       expect(screen.getByTestId('d2r-folder-prompt')).toHaveClass('text-center');
+      expect(screen.getByRole('button', { name: 'Open D2R installation settings' })).toHaveClass(
+        'bg-primary',
+      );
     });
   });
 

@@ -223,7 +223,7 @@ function ScheduleSourceNotice({ source }: { source: TerrorZoneScheduleSource | u
   if (retailReason === 'pathNotConfigured') {
     return (
       <D2RFolderPrompt layout="inline">
-        <p className="text-muted-foreground text-xs">
+        <p className="mt-2 text-muted-foreground text-xs">
           {t(translations.terrorZone.schedule.retailNote)}
         </p>
       </D2RFolderPrompt>
@@ -232,7 +232,7 @@ function ScheduleSourceNotice({ source }: { source: TerrorZoneScheduleSource | u
   return (
     <UnusableFolderWarning
       message={t(unusableFolderMessages[retailReason])}
-      showSettings={retailReason === 'directoryNotFound'}
+      showSettings={retailReason === 'directoryNotFound' || retailReason === 'gameFileNotFound'}
     />
   );
 }

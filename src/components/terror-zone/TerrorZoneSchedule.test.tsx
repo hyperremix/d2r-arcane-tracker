@@ -281,7 +281,7 @@ describe('When the TerrorZoneSchedule page is shown', () => {
       expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
     });
 
-    it('Then a missing game file is a warning that says to extract the game files', async () => {
+    it('Then a missing game file is a warning that says to extract the game files and links to the settings', async () => {
       // Arrange
       setupApi(vi.fn().mockResolvedValue({ ...schedule, source: 'retailDefault' }), {
         validation: { valid: false, errorCode: 'gameFileNotFound' },
@@ -294,6 +294,9 @@ describe('When the TerrorZoneSchedule page is shown', () => {
       const warning = await screen.findByRole('alert');
       expect(warning).toHaveTextContent(/isn't in your D2R folder/);
       expect(warning).toHaveTextContent(/Extract the game files/);
+      expect(
+        within(warning).getByRole('button', { name: 'Open D2R installation settings' }),
+      ).toBeInTheDocument();
       expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
     });
 
