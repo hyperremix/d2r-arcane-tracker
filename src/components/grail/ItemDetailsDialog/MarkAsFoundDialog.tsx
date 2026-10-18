@@ -24,9 +24,7 @@ import { translations } from '@/i18n/translations';
 import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/date';
 import {
   canItemBeNormal,
-  getProgressVersion,
-  isFind,
-  isVersionTracked,
+  getVersionFindStatuses,
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
@@ -51,20 +49,15 @@ function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
  * rather than marking the item as found. An item with no tracked version is never complete: a
  * find of its untracked version doesn't count as found (see ProgressStatusSection).
  */
-export function isFoundInEveryRecordableVersion(
+export function isFoundInEveryTrackedVersion(
   item: Item,
   itemProgress: GrailProgress[],
   settings: Settings,
 ): boolean {
-  const trackedVersions = (['normal', 'ethereal'] as const).filter((version) =>
-    isVersionTracked(item, version, settings),
+  const trackedStatuses = getVersionFindStatuses(item, itemProgress, settings).filter(
+    (status) => status.tracked,
   );
-  return (
-    trackedVersions.length > 0 &&
-    trackedVersions.every((version) =>
-      itemProgress.some((p) => isFind(p) && getProgressVersion(p) === version),
-    )
-  );
+  return trackedStatuses.length > 0 && trackedStatuses.every((status) => status.found);
 }
 
 /**

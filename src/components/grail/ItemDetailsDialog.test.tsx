@@ -1876,6 +1876,56 @@ describe('When the user marks an item as found', () => {
     });
   });
 
+  describe('If the item changes between findings while the prompt is closed', () => {
+    it('Then reopening the prompt takes the name of the current action', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const characters = [
+        CharacterBuilder.new().withId('char-1').withName('Sorc').build(),
+        CharacterBuilder.new().withId('char-2').withName('Pally').build(),
+      ];
+      const normalFind = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      const etherealFind = GrailProgressBuilder.new()
+        .withId('prog-2')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-02'))
+        .asEthereal()
+        .build();
+      const settings = { grailEthereal: true };
+      setupStoreMock({ items: [item], characters, progress: [normalFind], settings });
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />,
+      );
+      const firstPrompt = openMarkAsFoundPrompt('Mark as found');
+      fireEvent.click(within(firstPrompt).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog', { name: 'Mark as found' })).not.toBeInTheDocument();
+
+      // Act
+      setupStoreMock({
+        items: [item],
+        characters,
+        progress: [normalFind, etherealFind],
+        settings,
+      });
+      rerender(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const secondPrompt = openMarkAsFoundPrompt('Add another find');
+      fireEvent.click(within(secondPrompt).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog', { name: 'Add another find' })).not.toBeInTheDocument();
+      setupStoreMock({ items: [item], characters, progress: [normalFind], settings });
+      rerender(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(openMarkAsFoundPrompt('Mark as found')).toBeInTheDocument();
+    });
+  });
+
   describe('If the details dialog is closed and reopened or switched to another item', () => {
     it('Then the Mark as found prompt does not carry over', () => {
       // Arrange
