@@ -155,6 +155,32 @@ describe('When D2R folders are looked up in Wine and Proton prefixes', () => {
       expect(saves).toEqual([wine, lutris, heroic, heroicGame, bottles]);
     });
 
+    it('Then a Heroic Proton prefix, which keeps drive_c in its pfx folder, is found once', () => {
+      // Arrange
+      const proton = createSaveFolder(
+        path.join('Games', 'Heroic', 'Prefixes', 'Diablo II Resurrected', 'pfx'),
+        'steamuser',
+      );
+      const install = createFolder(
+        'Games',
+        'Heroic',
+        'Prefixes',
+        'Diablo II Resurrected',
+        'pfx',
+        'drive_c',
+        'Program Files (x86)',
+        'Diablo II Resurrected',
+      );
+
+      // Act
+      const saves = findWineSaveDirectories(home, {});
+      const installs = findWineD2RInstallations(home, {});
+
+      // Assert
+      expect(saves).toEqual([proton]);
+      expect(installs).toEqual([install]);
+    });
+
     it('Then the prefix in WINEPREFIX is searched first and the Public profile is skipped', () => {
       // Arrange
       const custom = createSaveFolder('custom-prefix', 'deck');

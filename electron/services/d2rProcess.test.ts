@@ -145,6 +145,19 @@ describe('When the D2R process is looked up on Linux', () => {
       // Assert
       expect(processId).toBe(88);
     });
+
+    it('Then it is found when the executable path in the command line is quoted', async () => {
+      // Arrange
+      addProcess('99', 'wine64-preloader', [
+        '"C:\\Program Files (x86)\\Diablo II Resurrected\\D2R.exe" -w',
+      ]);
+
+      // Act
+      const processId = await findD2RProcessOnLinux(procRoot);
+
+      // Assert
+      expect(processId).toBe(99);
+    });
   });
 
   describe('If only other processes run', () => {

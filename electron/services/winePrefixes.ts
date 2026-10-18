@@ -119,7 +119,8 @@ function listProtonPrefixes(library: string): string[] {
 
 /**
  * Lists the Wine prefixes (folders with a `drive_c`) in the home folder, in a fixed order:
- * `$WINEPREFIX`, Steam's Proton prefixes, Lutris, Heroic, Bottles, then `~/.wine`.
+ * `$WINEPREFIX`, Steam's Proton prefixes, Lutris, Heroic, Bottles, then `~/.wine`. A folder with
+ * no `drive_c` of its own counts as its `pfx` subfolder (where Heroic's Proton prefixes keep it).
  * @param home - The home folder
  * @param winePrefix - The `WINEPREFIX` environment variable, if set
  */
@@ -133,7 +134,10 @@ function findWinePrefixes(home: string, winePrefix: string | undefined): string[
     }),
     path.join(home, '.wine'),
   ];
-  return uniqueExistingFolders(candidates).filter((prefix) =>
+  const prefixes = uniqueExistingFolders(candidates).map((prefix) =>
+    existsSync(path.join(prefix, 'drive_c')) ? prefix : path.join(prefix, 'pfx'),
+  );
+  return uniqueExistingFolders(prefixes).filter((prefix) =>
     existsSync(path.join(prefix, 'drive_c')),
   );
 }

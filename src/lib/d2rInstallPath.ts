@@ -5,9 +5,9 @@
  * The Windows and macOS values are kept in sync with WINDOWS_DEFAULT_D2R_INSTALL_PATH /
  * MAC_DEFAULT_D2R_INSTALL_PATH in electron/services/iconService.ts; the renderer cannot import
  * main-process modules, and this value is needed synchronously even when the main process finds no
- * existing installation. The Linux value is only a hint with a literal `~` (the install folder is
- * found in the Steam libraries and Wine prefixes by the main process); a dialog is expected to
- * ignore a start folder that doesn't exist and open in its own default folder instead.
+ * existing installation. The Linux value is a display hint with a literal `~` (the install folder
+ * is found in the Steam libraries and Wine prefixes by the main process). It is assumed, not
+ * verified, that a dialog given it as a start folder opens in its own default folder.
  * @returns {string} Platform-specific default installation path
  */
 export function getDefaultD2RPath(): string {

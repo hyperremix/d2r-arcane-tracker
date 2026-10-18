@@ -17,8 +17,8 @@ function isD2RExecutable(executable: string): boolean {
   return name.toLowerCase() === D2R_PROCESS_NAME.toLowerCase();
 }
 
-/** The D2R executable at the start of a command line, with or without arguments after it. */
-const D2R_COMMAND_LINE = /(?:^|[\\/])D2R\.exe(?:\s|$)/i;
+/** The D2R executable at the start of a command line, quoted or not, with or without arguments. */
+const D2R_COMMAND_LINE = /(?:^|[\\/])D2R\.exe["']?(?:\s|$)/i;
 
 /**
  * Checks whether one `/proc/<pid>` entry is D2R. Wine and Proton name the process after the
