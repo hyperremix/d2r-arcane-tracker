@@ -497,6 +497,11 @@ const groupedGridRenders = vi.hoisted(() => ({
   mounts: 0,
 }));
 
+// Records the row size estimate the list view's virtualizer was created with
+const listVirtualizer = vi.hoisted(() => ({
+  estimateSize: undefined as ((index: number) => number) | undefined,
+}));
+
 function lastRenderedGroups(): ItemGridGroup[] {
   return groupedGridRenders.groupedItems[groupedGridRenders.groupedItems.length - 1];
 }
@@ -529,11 +534,14 @@ vi.mock('react-router', async (importOriginal) => ({
   useNavigate: () => mockNavigate,
 }));
 vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: () => ({
-    getVirtualItems: () => [],
-    getTotalSize: () => 0,
-    measureElement: vi.fn(),
-  }),
+  useVirtualizer: (options: { estimateSize: (index: number) => number }) => {
+    listVirtualizer.estimateSize = options.estimateSize;
+    return {
+      getVirtualItems: () => [],
+      getTotalSize: () => 0,
+      measureElement: vi.fn(),
+    };
+  },
 }));
 vi.mock('./ItemCard', () => ({
   ItemCard: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
@@ -859,6 +867,46 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert — list view uses its own div-based virtualized container (not the card grid)
       expect(screen.queryByTestId('virtual-item-grid')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If viewMode "list" and an icon size preset is chosen', () => {
+    it.each([
+      ['default', 80],
+      ['large', 96],
+      ['extraLarge', 112],
+    ] as const)('Then the %s preset estimates a list row of %ipx', (itemIconSize, rowHeight) => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({
+        filteredItems: items,
+        viewMode: 'list',
+        groupMode: 'none',
+        settings: { showItemIcons: true, itemIconSize },
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(listVirtualizer.estimateSize?.(0)).toBe(rowHeight);
+    });
+
+    it('Then the preset is ignored while item icons are hidden', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({
+        filteredItems: items,
+        viewMode: 'list',
+        groupMode: 'none',
+        settings: { showItemIcons: false, itemIconSize: 'extraLarge' },
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(listVirtualizer.estimateSize?.(0)).toBe(80);
     });
   });
 

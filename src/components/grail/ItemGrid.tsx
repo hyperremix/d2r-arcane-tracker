@@ -8,7 +8,7 @@ import { translations } from '@/i18n/translations';
 import { filterItemsByTrackedVersions } from '@/lib/ethereal';
 import { getEtherealGroupKey, getEtherealGroupRank } from '@/lib/etherealGroups';
 import { countActiveFilters, getItemCategoryRank, getItemTypeRank } from '@/lib/grailFilters';
-import { getGrailItemIconSize, ITEM_ICON_PIXELS } from '@/lib/itemIconSize';
+import { getGrailItemIconSize, getListRowHeightEstimate } from '@/lib/itemIconSize';
 import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
@@ -343,8 +343,7 @@ function ListVirtualizedContainer({
     estimateSize: (index) => {
       const row = virtualRows[index];
       if (row.type === 'header') return 56; // Header height
-      // List item height: the icon plus the row's padding, border and gap (80px by default)
-      return ITEM_ICON_PIXELS[iconSize].list + 32;
+      return getListRowHeightEstimate(iconSize); // List item height
     },
     overscan: 5, // Render 5 rows above and below viewport
   });

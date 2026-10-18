@@ -8,6 +8,7 @@ interface RenderedItemCardProps {
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
   onClick: () => void;
+  iconSize: string;
 }
 
 // Records the props of every ItemCard render
@@ -16,6 +17,7 @@ const itemCardRenders = { props: [] as RenderedItemCardProps[] };
 // Loaded per test: the suite shares one module cache across files (isolate: false), so a cached
 // VirtualItemGrid from another file would keep that file's ItemCard mock instead of this one
 let ItemCardCell: typeof import('./VirtualItemGrid').ItemCardCell;
+let useGrailStore: typeof import('@/stores/grailStore').useGrailStore;
 
 function createProgress(itemId: string): GrailProgress {
   return {
@@ -55,12 +57,42 @@ beforeEach(async () => {
     },
   }));
   ({ ItemCardCell } = await import('./VirtualItemGrid'));
+  ({ useGrailStore } = await import('@/stores/grailStore'));
 });
 
 afterEach(() => {
   // Do not leak this file's ItemCard mock or VirtualItemGrid instance into other test files
   vi.doUnmock('./ItemCard');
   vi.resetModules();
+});
+
+describe('When an ItemCardCell is rendered', () => {
+  describe.each([
+    [true, 'large', 'large'],
+    [true, undefined, 'default'],
+    [false, 'extraLarge', 'default'],
+  ] as const)('If item icons are shown is %s and the preset is %s', (showItemIcons, itemIconSize, expected) => {
+    it(`Then ItemCard receives the ${expected} icon size`, () => {
+      // Arrange
+      useGrailStore.setState((state) => ({
+        settings: { ...state.settings, showItemIcons, itemIconSize },
+      }));
+
+      // Act
+      render(
+        <ItemCardCell
+          item={item}
+          progressLookup={createLookup()}
+          characters={characters}
+          onItemClick={vi.fn()}
+          viewMode="grid"
+        />,
+      );
+
+      // Assert
+      expect(itemCardRenders.props[0].iconSize).toBe(expected);
+    });
+  });
 });
 
 describe('When an ItemCardCell is re-rendered by its parent', () => {

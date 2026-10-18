@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getGrailItemIconSize } from './itemIconSize';
+import { getGrailItemIconSize, getListRowHeightEstimate } from './itemIconSize';
 
 describe('When the icon size of the grail page is resolved', () => {
   it.each([
@@ -12,5 +12,19 @@ describe('When the icon size of the grail page is resolved', () => {
 
     // Assert
     expect(iconSize).toBe(expected);
+  });
+});
+
+describe('When the height of a list row is estimated', () => {
+  it.each([
+    ['default', 80],
+    ['large', 96],
+    ['extraLarge', 112],
+  ] as const)('If the preset is %s, Then the row is %ipx high', (iconSize, height) => {
+    // Act
+    const estimate = getListRowHeightEstimate(iconSize);
+
+    // Assert
+    expect(estimate).toBe(height);
   });
 });

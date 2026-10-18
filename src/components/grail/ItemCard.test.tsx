@@ -455,6 +455,25 @@ describe('When ItemCard is rendered', () => {
     });
   });
 
+  describe('If an icon size preset is passed and the tile has no artwork', () => {
+    it.each([
+      ['item icons are hidden', false, 'unique'],
+      ['the item is a runeword without runes', true, 'runeword'],
+    ] as const)('Then the empty artwork slot is as high as the icon if %s', (_name, showItemIcons, type) => {
+      // Arrange
+      setupStoreMock({ showItemIcons });
+      const item = HolyGrailItemBuilder.new().withType(type).build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} iconSize="large" />);
+
+      // Assert
+      const slot = container.querySelector('[data-slot="card-content"]')?.firstElementChild;
+      expect(slot).toHaveAttribute('aria-hidden', 'true');
+      expect(slot).toHaveStyle({ height: '56px' });
+    });
+  });
+
   describe('If showItemIcons disabled', () => {
     it('Then does not render img element for non-runeword item', () => {
       // Arrange
