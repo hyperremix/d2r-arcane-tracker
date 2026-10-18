@@ -10,12 +10,12 @@
   files: [
     "dist",
     "dist-electron",
-    // better-sqlite3 loads prebuilds/<platform>-<arch>.node at runtime. Ship only the Windows x64
-    // prebuild (the extglob below drops every other prebuild, including platforms a future version
-    // adds), not the SQLite sources (deps/, src/) or a local node-gyp build/ folder.
+    // better-sqlite3 loads prebuilds/<platform>-<arch>.node at runtime. Each platform ships only
+    // its own x64 prebuild (the extglob in the platform's `files` below drops every other
+    // prebuild, including platforms a future version adds), not the SQLite sources (deps/, src/)
+    // or a local node-gyp build/ folder.
     "!**/node_modules/better-sqlite3/{deps,src,build}/**",
     "!**/node_modules/better-sqlite3/binding.gyp",
-    "!**/node_modules/better-sqlite3/prebuilds/!(win32-x64).node",
   ],
   // Native deps ship Node-API prebuilds (better-sqlite3 >= 13, koffi) that load in any Electron
   // version, so skip @electron/rebuild: it would otherwise invoke node-gyp, which needs a C++
@@ -35,6 +35,7 @@
       },
     ],
     artifactName: "D2R-Arcane-Tracker-Windows-${version}-Setup.${ext}",
+    files: ["!**/node_modules/better-sqlite3/prebuilds/!(win32-x64).node"],
     asarUnpack: [
       "**/node_modules/better-sqlite3/**/*",
       "**/node_modules/@dschu012/**/*",
@@ -47,6 +48,26 @@
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
     allowElevation: true,
+  },
+  linux: {
+    icon: "build/logo.png",
+    // The default comes from the scoped package name (`@hyperremixd2r-arcane-tracker`)
+    executableName: "d2r-arcane-tracker",
+    // Names the .desktop file after `desktopName` in package.json, which Electron uses as the
+    // window's app ID, so desktop environments match the window to its launcher and icon
+    syncDesktopName: true,
+    category: "Game",
+    target: [
+      {
+        target: "AppImage",
+        arch: ["x64"],
+      },
+    ],
+    // No version in the file name: the AppImage updater then replaces the file in place, so a
+    // shortcut to it (such as a non-Steam game entry in Steam) keeps working after an update
+    artifactName: "D2R-Arcane-Tracker-Linux.${ext}",
+    files: ["!**/node_modules/better-sqlite3/prebuilds/!(linux-x64).node"],
+    asarUnpack: ["**/node_modules/better-sqlite3/**/*", "**/node_modules/@dschu012/**/*"],
   },
   compression: "maximum",
   removePackageScripts: true,

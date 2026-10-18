@@ -4,7 +4,7 @@ Bug reports, feature ideas, docs fixes and pull requests are welcome. For larger
 
 ## Setup
 
-You need [Bun](https://bun.sh) 1.3.8 (pinned in `package.json`), Node.js 22.12 or later (required by Electron 44, Vite 8 and Vitest 5), and Git. D2R is only needed to test game-related features. Auto mode and the installer are Windows-only. Everything else runs on macOS and Linux too.
+You need [Bun](https://bun.sh) 1.3.8 (pinned in `package.json`), Node.js 22.12 or later (required by Electron 44, Vite 8 and Vitest 5), and Git. D2R is only needed to test game-related features. Auto mode and the installer are Windows-only. Everything else runs on macOS and Linux too, and Linux releases ship as an AppImage.
 
 ```bash
 git clone https://github.com/<you>/d2r-arcane-tracker.git
@@ -62,7 +62,7 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 | `bun run check` / `check:fix` | Biome lint, format and import sorting |
 | `bun run test` / `test:run` | Vitest in watch mode, or a single run |
 | `bun run test:coverage` | Tests with coverage (what CI runs) |
-| `bun run build` | Typecheck and build the Windows installer ([RELEASE.md](docs/RELEASE.md)) |
+| `bun run build` / `build:linux` | Typecheck and build the Windows installer, or the Linux AppImage ([RELEASE.md](docs/RELEASE.md)) |
 | `bun run website:dev` / `website:build` | Run the website locally (home page only), or build and prerender it into `website/dist`, with a page for each guide listed in `website/src/content.ts` (rendered from `docs/`) and a `sitemap.xml`. A new guide needs an entry in `guides` with its `file` in `docs/`, a `title` that is the h1 of that file, a `description` for the link cards, a `slug` for the URL (`guides/<slug>/`), and a `pageTitle` and `metaDescription` (51 to 160 characters) for search results and link previews |
 | `bun run db:generate` | Generate a database migration from the drizzle schema ([Changing the database schema](#changing-the-database-schema)) |
 
