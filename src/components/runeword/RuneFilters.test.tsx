@@ -125,19 +125,29 @@ describe('When a rune toggle is clicked', () => {
     expect(onRuneSelectionChange).toHaveBeenCalledWith(['el', 'ber']);
   });
 
-  it('If the rune is selected, Then it is pressed and clicking it removes it from the selection', () => {
+  it('If the rune is selected, Then it is pressed with an outline and a check mark', () => {
     // Arrange
-    const onRuneSelectionChange = vi.fn();
-    renderRuneFilters(['el', 'ber'], {}, onRuneSelectionChange);
+    renderRuneFilters(['el', 'ber']);
+
+    // Act
     const ber = screen.getByRole('button', { name: /^Ber,/ });
+    const zod = screen.getByRole('button', { name: /^Zod,/ });
+
+    // Assert
     expect(ber).toHaveAttribute('aria-pressed', 'true');
     // Selected runes are outlined and checked, so the state is not shown by color alone
     expect(ber).toHaveClass('border-primary');
     expect(ber.querySelector('svg')).not.toBeNull();
-    expect(screen.getByRole('button', { name: /^Zod,/ }).querySelector('svg')).toBeNull();
+    expect(zod.querySelector('svg')).toBeNull();
+  });
+
+  it('If the rune is selected, Then clicking it removes it from the selection', () => {
+    // Arrange
+    const onRuneSelectionChange = vi.fn();
+    renderRuneFilters(['el', 'ber'], {}, onRuneSelectionChange);
 
     // Act
-    fireEvent.click(ber);
+    fireEvent.click(screen.getByRole('button', { name: /^Ber,/ }));
 
     // Assert
     expect(onRuneSelectionChange).toHaveBeenCalledWith(['el']);

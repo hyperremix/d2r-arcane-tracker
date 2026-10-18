@@ -204,9 +204,7 @@ describe('RunewordCalculator', () => {
       // Arrange
       stubElectronApi({ availableRunes: { jah: 1, ith: 1 } });
       await renderCalculator();
-      expect(
-        screen.getByText("You can't craft any runeword with your current runes"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("You don't have the runes for any runeword yet")).toBeInTheDocument();
 
       // Act
       fireEvent.click(
@@ -225,9 +223,7 @@ describe('RunewordCalculator', () => {
       // Arrange
       stubElectronApi({ availableRunes: {} });
       await renderCalculator();
-      expect(
-        screen.getByText("You can't craft any runeword with your current runes"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("You don't have the runes for any runeword yet")).toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: 'Show runewords missing at most 1 rune' }),
       ).not.toBeInTheDocument();
@@ -346,7 +342,7 @@ describe('RunewordCalculator', () => {
       // Assert
       expect(screen.getByText('No runewords found')).toBeInTheDocument();
       expect(
-        screen.queryByText("You can't craft any runeword with your current runes"),
+        screen.queryByText("You don't have the runes for any runeword yet"),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: 'Show runewords missing at most 1 rune' }),

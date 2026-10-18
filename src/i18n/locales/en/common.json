@@ -1533,7 +1533,7 @@
       "refreshRunes": "Refresh runes",
       "refreshFailed": "Failed to refresh runes from save files",
       "ownedItemsFailed": "Failed to load owned gems and bases",
-      "noCraftable": "You can't craft any runeword with your current runes",
+      "noCraftable": "You don't have the runes for any runeword yet",
       "showCraftable": "Show runewords you have the runes for",
       "showUpgradable": "Show runewords you can make with upgrades",
       "showMissingOne": "Show runewords missing at most 1 rune",
