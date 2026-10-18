@@ -6,7 +6,7 @@ import {
   ChartCard,
   ChartDataTable,
   ChartGrid,
-  EmptyChartCard,
+  EmptyChartNote,
   getPlotArea,
   InteractiveChart,
   linearScale,
@@ -62,7 +62,7 @@ export function GrailProgressChart({
 
   if (!hasProgressFinds(points)) {
     return (
-      <EmptyChartCard
+      <EmptyChartNote
         title={title}
         message={t(translations.statistics.dashboard.noItemsFoundYet)}
       />

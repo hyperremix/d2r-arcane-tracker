@@ -154,6 +154,21 @@ describe('When RunList is rendered', () => {
       expect(screen.getByText('Run history')).toBeInTheDocument();
     });
 
+    it('Then the run history is a section with a heading instead of a card', () => {
+      // Arrange
+      const runs = createRuns(2);
+
+      // Act
+      const { container } = render(<RunList runs={runs} />);
+
+      // Assert
+      expect(screen.getByRole('region', { name: 'Run history' })).toContainElement(
+        screen.getByRole('table'),
+      );
+      expect(screen.getByRole('heading', { level: 3, name: 'Run history' })).toBeInTheDocument();
+      expect(container.querySelector('[data-slot="card"]')).toBeNull();
+    });
+
     it('Then renders runs count badge', () => {
       // Arrange
       const runs = createRuns(3);

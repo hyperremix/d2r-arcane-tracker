@@ -8,6 +8,7 @@ import {
   ChartDataTable,
   ChartEmptyState,
   ChartGrid,
+  EmptyChartNote,
   getPlotArea,
   InteractiveChart,
   linearScale,
@@ -119,11 +120,7 @@ export function RunDurationCard() {
   }
 
   if (summaries.length === 0) {
-    return (
-      <ChartCard title={title} description={description}>
-        <ChartEmptyState>{t(chartT.runDurationsEmpty)}</ChartEmptyState>
-      </ChartCard>
-    );
+    return <EmptyChartNote title={title} message={t(chartT.runDurationsEmpty)} />;
   }
 
   return (

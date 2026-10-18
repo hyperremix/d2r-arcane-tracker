@@ -41,7 +41,7 @@ export function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunR
 
   return (
     <TableRow
-      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70"
+      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
       tabIndex={0}
       onClick={() => onViewDetails(run)}
       onKeyDown={(event) => {

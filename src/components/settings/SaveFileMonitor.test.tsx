@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { GameMode } from 'electron/types/grail';
+import { MemoryRouter } from 'react-router';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
@@ -76,7 +77,7 @@ function createSaveFiles(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     name: `Character ${index + 1}`,
     path: `${CURRENT_DIRECTORY}/Character${index + 1}.d2s`,
-    lastModified: new Date('2026-01-01T00:00:00Z'),
+    lastModified: new Date('2026-01-01T12:00:00Z'),
     characterClass: 'sorceress',
     level: 90,
     hardcore: false,
@@ -85,7 +86,7 @@ function createSaveFiles(count: number) {
 }
 
 async function renderWithLoadedDirectory() {
-  render(<SaveFileMonitor />);
+  render(<SaveFileMonitor />, { wrapper: MemoryRouter });
   await screen.findByText(CURRENT_DIRECTORY);
 }
 
@@ -148,7 +149,7 @@ describe('SaveFileMonitor', () => {
       mockGameMode(GameMode.Manual);
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
@@ -162,7 +163,7 @@ describe('SaveFileMonitor', () => {
       mockGameMode(GameMode.Both);
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
@@ -180,7 +181,7 @@ describe('SaveFileMonitor', () => {
       });
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
       await waitFor(() =>
@@ -192,7 +193,7 @@ describe('SaveFileMonitor', () => {
     it('When switching from manual to an automatic mode, Then monitoring is resumed', async () => {
       // Arrange
       mockGameMode(GameMode.Manual);
-      const { rerender } = render(<SaveFileMonitor />);
+      const { rerender } = render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(getElectronAPI().saveFile.getMonitoringStatus).toHaveBeenCalled());
 
       // Act
@@ -210,7 +211,7 @@ describe('SaveFileMonitor', () => {
       mockGameMode(GameMode.Both);
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
       await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalled());
@@ -227,10 +228,10 @@ describe('SaveFileMonitor', () => {
       getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
-      expect(await screen.findByText('Detected characters (3):')).toBeInTheDocument();
+      expect(await screen.findByText(/^3 characters detected/)).toBeInTheDocument();
       expect(screen.getByText('Active (3 files)')).toBeInTheDocument();
     });
 
@@ -241,7 +242,7 @@ describe('SaveFileMonitor', () => {
       getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(1));
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
       expect(await screen.findByText('Active (1 file)')).toBeInTheDocument();
@@ -276,7 +277,7 @@ describe('SaveFileMonitor', () => {
       getElectronAPI().saveFile.getSaveFiles.mockReturnValue(createPendingSaveFiles().promise);
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await screen.findByText(CURRENT_DIRECTORY);
 
       // Assert
@@ -290,7 +291,7 @@ describe('SaveFileMonitor', () => {
       arrangeMonitoredDirectory(false);
       const pending = createPendingSaveFiles();
       getElectronAPI().saveFile.getSaveFiles.mockReturnValue(pending.promise);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await screen.findByText(CURRENT_DIRECTORY);
 
       // Act
@@ -307,7 +308,7 @@ describe('SaveFileMonitor', () => {
       mockGameMode(GameMode.Both);
       arrangeMonitoredDirectory(false);
       getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await screen.findByText('Active (3 files)');
       getElectronAPI().saveFile.getSaveFiles.mockReturnValue(createPendingSaveFiles().promise);
 
@@ -326,7 +327,7 @@ describe('SaveFileMonitor', () => {
       const mountLoad = createPendingSaveFiles();
       const restartLoad = createPendingSaveFiles();
       getElectronAPI().saveFile.getSaveFiles.mockReturnValueOnce(mountLoad.promise);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await screen.findByText(CURRENT_DIRECTORY);
       getElectronAPI().saveFile.getSaveFiles.mockReturnValueOnce(restartLoad.promise);
       emitMonitoringStarted();
@@ -341,7 +342,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       expect(screen.getByText('Active (1 file)')).toBeInTheDocument();
-      expect(screen.getByText('Detected characters (1):')).toBeInTheDocument();
+      expect(screen.getByText(/^1 character detected/)).toBeInTheDocument();
     });
 
     it('If loading the save files fails, Then the error is logged and the badge shows the empty list', async () => {
@@ -353,7 +354,7 @@ describe('SaveFileMonitor', () => {
         getElectronAPI().saveFile.getSaveFiles.mockRejectedValue(new Error('ipc down'));
 
         // Act
-        render(<SaveFileMonitor />);
+        render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
         // Assert
         expect(await screen.findByText('Active (0 files)')).toBeInTheDocument();
@@ -366,7 +367,7 @@ describe('SaveFileMonitor', () => {
     it('When monitoring starts, Then the save files are reloaded and the badge follows the list', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(1));
       getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(2));
 
@@ -381,102 +382,77 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
-      expect(screen.getByText('Detected characters (2):')).toBeInTheDocument();
+      expect(screen.getByText(/^2 characters detected/)).toBeInTheDocument();
       expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('detected characters', () => {
-    it('If at most five characters are detected, Then all are listed and no toggle is shown', async () => {
+    it('If characters are detected, Then a one-line summary with the count and the latest save replaces the character list', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
       arrangeMonitoredDirectory(false);
-      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(5));
+      const saveFiles = createSaveFiles(15);
+      saveFiles[7] = { ...saveFiles[7], lastModified: new Date('2026-03-02T12:00:00Z') };
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(saveFiles);
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
-      expect(await screen.findByText('Character 5')).toBeInTheDocument();
-      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
+      expect(
+        await screen.findByText('15 characters detected, last saved Mar 2, 2026'),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+      expect(screen.queryByText('Character 1')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Show / })).not.toBeInTheDocument();
     });
 
-    it('If a Warlock and a character of an unknown class are detected, Then their classes are shown with translated labels', async () => {
+    it('If one character is detected, Then the summary uses the singular', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
       arrangeMonitoredDirectory(false);
-      const [warlock, unknown] = createSaveFiles(2);
-      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue([
-        { ...warlock, characterClass: 'warlock', level: 1 },
-        { ...unknown, characterClass: 'unknown', level: 7 },
-      ]);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(1));
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
-      const list = await screen.findByRole('list');
-      expect(await within(list).findByText('Level 1 Warlock')).toBeInTheDocument();
-      expect(within(list).getByText('Level 7 Unknown')).toBeInTheDocument();
+      expect(
+        await screen.findByText('1 character detected, last saved Jan 1, 2026'),
+      ).toBeInTheDocument();
     });
 
-    it('If more than five characters are detected, Then the first five are listed in the page without an inner scroll area', async () => {
+    it('If characters are detected, Then a link opens the inventory browser', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
       arrangeMonitoredDirectory(false);
-      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(2));
 
       // Act
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
 
       // Assert
-      const toggle = await screen.findByRole('button', { name: 'Show all 15 characters' });
-      expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      const list = screen.getByRole('list');
-      expect(toggle).toHaveAttribute('aria-controls', list.id);
-      expect(list).not.toHaveClass('overflow-y-auto');
-      expect(within(list).getAllByRole('listitem')).toHaveLength(5);
-      expect(screen.queryByText('Character 6')).not.toBeInTheDocument();
-    });
-
-    it('When "Show all" is clicked, Then every character is listed and the toggle offers to show fewer', async () => {
-      // Arrange
-      mockGameMode(GameMode.Both);
-      arrangeMonitoredDirectory(false);
-      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
-      render(<SaveFileMonitor />);
-      const toggle = await screen.findByRole('button', { name: 'Show all 15 characters' });
-
-      // Act
-      fireEvent.click(toggle);
-
-      // Assert
-      const list = screen.getByRole('list');
-      expect(within(list).getAllByRole('listitem')).toHaveLength(15);
-      expect(within(list).getByText('Character 15')).toBeInTheDocument();
-      const fewerToggle = screen.getByRole('button', { name: 'Show fewer characters' });
-      expect(fewerToggle).toHaveAttribute('aria-expanded', 'true');
-      expect(fewerToggle).toHaveAttribute('aria-controls', list.id);
-    });
-
-    it('When "Show fewer" is clicked, Then only the first five characters are listed again', async () => {
-      // Arrange
-      mockGameMode(GameMode.Both);
-      arrangeMonitoredDirectory(false);
-      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(15));
-      render(<SaveFileMonitor />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Show all 15 characters' }));
-
-      // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Show fewer characters' }));
-
-      // Assert
-      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
-      expect(screen.getByRole('button', { name: 'Show all 15 characters' })).toHaveAttribute(
-        'aria-expanded',
-        'false',
+      expect(await screen.findByRole('link', { name: 'Open inventory browser' })).toHaveAttribute(
+        'href',
+        '/inventory-browser',
       );
+    });
+
+    it('If no character is detected, Then neither the summary nor the link is shown', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+
+      // Act
+      await renderWithLoadedDirectory();
+
+      // Assert
+      await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalled());
+      expect(screen.queryByText(/detected, last saved/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: 'Open inventory browser' }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -497,7 +473,7 @@ describe('SaveFileMonitor', () => {
     ])('When a "%s" save file event arrives, then the event type is shown as "%s"', async (type, label) => {
       // Arrange
       mockGameMode(GameMode.Both);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
 
       // Act
@@ -511,7 +487,7 @@ describe('SaveFileMonitor', () => {
     it('If the event type is unrecognized, then a translated fallback is shown', async () => {
       // Arrange
       mockGameMode(GameMode.Both);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
 
       // Act
@@ -886,7 +862,7 @@ describe('SaveFileMonitor', () => {
       const api = getElectronAPI();
       api.grail.getSettings.mockResolvedValue({ saveDir: NEW_DIRECTORY });
       api.grail.getCharacters.mockResolvedValue([{ id: 'char-1' }]);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(api.saveFile.getMonitoringStatus).toHaveBeenCalled());
 
       // Act
@@ -903,7 +879,7 @@ describe('SaveFileMonitor', () => {
       const api = getElectronAPI();
       api.grail.getSettings.mockResolvedValue({ saveDir: CURRENT_DIRECTORY });
       api.grail.getCharacters.mockResolvedValue([{ id: 'char-1' }]);
-      render(<SaveFileMonitor />);
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
       await waitFor(() => expect(api.saveFile.getMonitoringStatus).toHaveBeenCalled());
 
       // Act

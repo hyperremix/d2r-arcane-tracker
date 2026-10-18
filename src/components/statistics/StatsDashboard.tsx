@@ -89,7 +89,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
     };
   }, [items, progress, grailNormal, grailEthereal]);
   const { lastTrackedFind, sets, runes } = highlights;
-  // An empty chart shrinks to a compact card, so the other one gets the whole row
+  // An empty chart shrinks to a one-line note, so the other one gets the whole row
   const chartsSideBySide =
     hasProgressFinds(chartData.cumulativeFinds.points) && hasWeeklyFinds(chartData.weeklyFinds);
 
@@ -217,9 +217,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
               </SectionTitle>
             </CardHeader>
             <CardContent>
-              <ol className="space-y-3">
+              <ol className="divide-y divide-border">
                 {characterStats.map((charStat, index) => (
-                  <li key={charStat.character.id} className="rounded-lg border border-border p-3">
+                  <li key={charStat.character.id} className="py-3 first:pt-0 last:pb-0">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span

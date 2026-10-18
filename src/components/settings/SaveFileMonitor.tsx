@@ -8,16 +8,18 @@ import {
   FileText,
   FolderOpen,
   MonitorOff,
+  PackageSearch,
   RotateCcw,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
 import type {
@@ -31,9 +33,6 @@ import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { characterClassLabelKey, saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
-
-/** Characters listed before the rest is hidden behind a "Show all" toggle. */
-const COLLAPSED_CHARACTER_COUNT = 5;
 
 /**
  * Decides whether save file monitoring must be stopped (Manual mode) or resumed (after leaving
@@ -56,7 +55,8 @@ function getMonitoringActionForGameMode(
 
 /**
  * SaveFileMonitor component that displays and manages save file monitoring status.
- * Shows monitoring status, monitored directory, detected characters, and provides controls
+ * Shows monitoring status, monitored directory, a summary of the detected characters (their
+ * count and the latest save, with a link to the inventory browser), and provides controls
  * for changing the monitored directory or restoring to the default platform location.
  * Selecting the directory that is already monitored does nothing; switching to a different
  * directory while characters or progress exist asks for confirmation first.
@@ -76,9 +76,6 @@ export function SaveFileMonitor() {
   const saveFilesRequestRef = useRef(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
-  // The character list flows with the page; long lists are collapsed instead of scrolling inside it
-  const [showAllCharacters, setShowAllCharacters] = useState(false);
-  const characterListId = useId();
   const { reloadData, settings } = useGrailStore(
     useShallow((state) => ({ reloadData: state.reloadData, settings: state.settings })),
   );
@@ -343,9 +340,11 @@ export function SaveFileMonitor() {
     void applyMonitoringAction();
   }, [settings.gameMode, monitoringStatus.isMonitoring, loadMonitoringStatus]);
 
-  const visibleSaveFiles = showAllCharacters
-    ? saveFiles
-    : saveFiles.slice(0, COLLAPSED_CHARACTER_COUNT);
+  // The latest save shows whether the monitored folder holds the saves currently being played
+  const lastSaved =
+    saveFiles.length > 0
+      ? Math.max(...saveFiles.map((file) => new Date(file.lastModified).getTime()))
+      : undefined;
 
   return (
     <Card>
@@ -445,50 +444,22 @@ export function SaveFileMonitor() {
           </div>
         )}
 
-        {/* Save Files List */}
+        {/* Detected characters summary; the characters themselves are in the inventory browser */}
         {saveFiles.length > 0 && (
-          <div className="border-t pt-3">
-            <h4 className="mb-2 font-medium text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+            <p className="text-sm">
               {t(translations.settings.saveFileMonitor.detectedCharacters, {
                 count: saveFiles.length,
+                date: formatShortDate(lastSaved),
               })}
-            </h4>
-            <ul id={characterListId} className="space-y-2">
-              {visibleSaveFiles.map((file, index) => (
-                <li
-                  key={`${file.path}-${index}`}
-                  className="flex items-center justify-between rounded bg-muted p-2 text-xs"
-                >
-                  <div>
-                    <div className="font-medium">{file.name}</div>
-                    <div className="text-muted-foreground">
-                      {t(translations.settings.saveFileMonitor.levelClass, {
-                        level: file.level,
-                        characterClass: t(characterClassLabelKey(file.characterClass)),
-                      })}
-                      {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
-                    </div>
-                  </div>
-                  <div className="text-muted-foreground">{formatShortDate(file.lastModified)}</div>
-                </li>
-              ))}
-            </ul>
-            {saveFiles.length > COLLAPSED_CHARACTER_COUNT && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2"
-                aria-expanded={showAllCharacters}
-                aria-controls={characterListId}
-                onClick={() => setShowAllCharacters((showAll) => !showAll)}
-              >
-                {showAllCharacters
-                  ? t(translations.settings.saveFileMonitor.showFewerCharacters)
-                  : t(translations.settings.saveFileMonitor.showAllCharacters, {
-                      count: saveFiles.length,
-                    })}
-              </Button>
-            )}
+            </p>
+            <Link
+              to="/inventory-browser"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              <PackageSearch aria-hidden="true" />
+              {t(translations.settings.saveFileMonitor.openInventoryBrowser)}
+            </Link>
           </div>
         )}
       </CardContent>

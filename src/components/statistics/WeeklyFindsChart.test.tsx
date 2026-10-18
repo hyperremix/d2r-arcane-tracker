@@ -19,17 +19,16 @@ function renderChart(counts: number[]) {
 }
 
 describe('When the finds per week chart is rendered', () => {
-  it('If no week has finds, Then a compact card with the heading and the empty text replaces the chart', () => {
+  it('If no week has finds, Then a one-line note with the heading and the empty text replaces the chart card', () => {
     // Arrange & Act
     render(<WeeklyFindsChart weeks={buildWeeks([0, 0, 0])} />);
 
     // Assert
-    expect(screen.getByRole('heading', { level: 2, name: 'Finds per week' })).toBeInTheDocument();
-    expect(
-      screen
-        .getByRole('heading', { level: 2, name: 'Finds per week' })
-        .closest('[data-slot="card"]'),
-    ).toHaveAttribute('data-chart-state', 'empty');
+    const heading = screen.getByRole('heading', { level: 2, name: 'Finds per week' });
+    expect(heading.closest('[data-chart-state="empty"]')).toBe(
+      screen.getByRole('region', { name: 'Finds per week' }),
+    );
+    expect(heading.closest('[data-slot="card"]')).toBeNull();
     expect(screen.getByText('No finds in the last 3 weeks')).toBeInTheDocument();
     expect(screen.queryByText(/the latest week ending today/)).not.toBeInTheDocument();
     expect(screen.queryByRole('img', { name: /^Finds per week/ })).not.toBeInTheDocument();

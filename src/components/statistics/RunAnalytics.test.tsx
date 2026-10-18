@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { RunStatistics, Session } from 'electron/types/grail';
 import i18n from 'i18next';
+import { MemoryRouter } from 'react-router';
 import { toast } from 'sonner';
 import {
   afterAll,
@@ -66,7 +67,7 @@ function buildSession(id: string, startTime: Date, runCount: number): Session {
 }
 
 async function renderAndClickExport() {
-  render(<RunAnalytics />);
+  render(<RunAnalytics />, { wrapper: MemoryRouter });
   const exportButton = await screen.findByRole('button', { name: /Export data/i });
   fireEvent.click(exportButton);
 }
@@ -202,7 +203,7 @@ describe('When run analytics are displayed', () => {
       new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(date);
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('1m 35s')).toBeInTheDocument();
@@ -223,7 +224,7 @@ describe('When displaying run analytics', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('If no runs have been tracked, Then the empty state is shown instead of zeroed statistics', async () => {
+  it('If no runs have been tracked, Then an empty state linking to the run tracker is shown instead of zeroed statistics', async () => {
     // Arrange
     mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue({
       totalSessions: 1,
@@ -234,13 +235,14 @@ describe('When displaying run analytics', () => {
     } satisfies RunStatistics);
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByRole('heading', { name: 'No data available' })).toBeInTheDocument();
     expect(
       screen.getByText('Start tracking runs to see analytics and statistics.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open run tracker' })).toHaveAttribute('href', '/runs');
     expect(screen.queryByText('Fastest run')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Export data/i })).not.toBeInTheDocument();
   });
@@ -256,7 +258,7 @@ describe('When displaying run analytics', () => {
     } satisfies RunStatistics);
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('Total sessions')).toBeInTheDocument();
@@ -269,7 +271,7 @@ describe('When displaying run analytics', () => {
     mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('Performance highlights')).toBeInTheDocument();
@@ -295,7 +297,7 @@ describe('When run analytics show their headline statistics', () => {
 
   it('If statistics are loaded, Then items per run is described as an average of items found', async () => {
     // Arrange & Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('Average items found per run')).toBeInTheDocument();
@@ -310,7 +312,7 @@ describe('When run analytics show their headline statistics', () => {
 
     try {
       // Act
-      render(<RunAnalytics />);
+      render(<RunAnalytics />, { wrapper: MemoryRouter });
 
       // Assert
       expect(await screen.findByText('1 Std. 5 Min.')).toBeInTheDocument();
@@ -352,7 +354,7 @@ describe('When run analytics show the run durations by session', () => {
     );
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(
@@ -371,10 +373,14 @@ describe('When run analytics show the run durations by session', () => {
     mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([]);
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('No completed runs yet')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Run durations by session' })).toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
@@ -383,7 +389,7 @@ describe('When run analytics show the run durations by session', () => {
     mockElectronAPI.runTracker.getAllSessions.mockRejectedValue(new Error('database locked'));
 
     // Act
-    render(<RunAnalytics />);
+    render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
     expect(await screen.findByText('Could not load the run durations')).toBeInTheDocument();

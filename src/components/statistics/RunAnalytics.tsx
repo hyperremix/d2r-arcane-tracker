@@ -1,17 +1,19 @@
 import type { RunStatistics } from 'electron/types/grail';
-import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
+import { Clock, Download, Target, Timer, TrendingUp, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { RunDurationCard } from '@/components/statistics/RunDurationChart';
 import { StatTile } from '@/components/statistics/StatTile';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { escapeCsvCell } from '@/lib/csv';
 import { formatDuration, formatLocalizedDate, HOUR_MS } from '@/lib/date';
 import { getFileName } from '@/lib/path';
+import { cn } from '@/lib/utils';
 
 /**
  * RunAnalytics component that displays overall run statistics and highlights.
@@ -140,21 +142,18 @@ export function RunAnalytics() {
     );
   }
 
+  // Run statistics come from the run tracker, so the empty state points there
   if (!overallStats || overallStats.totalRuns === 0) {
     return (
-      <div className="flex min-h-64 items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-            <div className="text-center text-muted-foreground">
-              <h2 className="mb-2 font-semibold">
-                {t(translations.statistics.runAnalytics.noDataAvailable)}
-              </h2>
-              <p className="mb-4 text-sm">
-                {t(translations.statistics.runAnalytics.startTrackingRuns)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 text-center">
+        <h2 className="font-semibold">{t(translations.statistics.runAnalytics.noDataAvailable)}</h2>
+        <p className="text-muted-foreground text-sm">
+          {t(translations.statistics.runAnalytics.startTrackingRuns)}
+        </p>
+        <Link to="/runs" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-2')}>
+          <Timer aria-hidden="true" />
+          {t(translations.statistics.runAnalytics.openRunTracker)}
+        </Link>
       </div>
     );
   }
