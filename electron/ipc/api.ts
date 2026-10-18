@@ -287,6 +287,15 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       /** Gets the next `slotCount` terror zone windows of the offline schedule. */
       getSchedule: (slotCount: number) => invoke('terrorZone:getSchedule', slotCount),
     },
+
+    farming: {
+      /** Which of the given items can drop where, from the extracted game files. */
+      getOverview: (...args: InvokeArgs<'farming:getOverview'>) =>
+        invoke('farming:getOverview', ...args),
+      /** Where one item drops and how many drops to expect per kill. */
+      getItemSources: (...args: InvokeArgs<'farming:getItemSources'>) =>
+        invoke('farming:getItemSources', ...args),
+    },
   };
 }
 

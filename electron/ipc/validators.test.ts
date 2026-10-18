@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_FARMING_ITEM_IDS } from '../types/farming';
 import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { InvokeChannel } from './contract';
 import { IpcValidationError } from './validation';
@@ -115,6 +116,34 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ['inventory:moveItem', [null], 'Move input is required'],
     ['inventory:splitStack', [{}], 'sourceFilePath is required'],
     ['inventory:openSnapshotWindow', [{ sourceFilePath: ' ' }], 'sourceFilePath is required'],
+    ['farming:getOverview', [null], 'Invalid farming request'],
+    ['farming:getOverview', [{ itemIds: [''], characterLevel: 90 }], 'Invalid item IDs'],
+    [
+      'farming:getOverview',
+      [{ itemIds: new Array(MAX_FARMING_ITEM_IDS + 1).fill('shako'), characterLevel: 90 }],
+      'Invalid item IDs',
+    ],
+    ['farming:getOverview', [{ itemIds: [], characterLevel: 100 }], 'Invalid character level'],
+    [
+      'farming:getItemSources',
+      [{ itemId: 'shako', players: 9, magicFind: 0, characterLevel: 90 }],
+      'Invalid players setting',
+    ],
+    [
+      'farming:getItemSources',
+      [{ itemId: 'shako', players: 1, magicFind: -1, characterLevel: 90 }],
+      'Invalid magic find',
+    ],
+    [
+      'farming:getItemSources',
+      [{ itemId: 'shako', players: 1, magicFind: 1.5, characterLevel: 90 }],
+      'Invalid magic find',
+    ],
+    [
+      'farming:getItemSources',
+      [{ itemId: '', players: 1, magicFind: 0, characterLevel: 90 }],
+      'Invalid item ID',
+    ],
   ])('If %s receives %j, Then it is rejected with "%s"', (channel, rawArgs, message) => {
     // Arrange
     const run = () => validate(channel, ...rawArgs);
@@ -125,6 +154,24 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     // Assert
     expect(error).toBeInstanceOf(IpcValidationError);
     expect((error as IpcValidationError).message).toContain(message);
+  });
+
+  it('If a farming request is valid, Then only its known fields are kept', () => {
+    // Arrange
+    const overview = { itemIds: ['shako', 'ber'], characterLevel: 99, extra: true };
+    const sources = { itemId: 'shako', players: 8, magicFind: 0, characterLevel: 1, extra: 1 };
+
+    // Act
+    const results = [
+      validate('farming:getOverview', overview),
+      validate('farming:getItemSources', sources),
+    ];
+
+    // Assert
+    expect(results).toEqual([
+      [{ itemIds: ['shako', 'ber'], characterLevel: 99 }],
+      [{ itemId: 'shako', players: 8, magicFind: 0, characterLevel: 1 }],
+    ]);
   });
 
   it('If the session notes have exactly the maximum length, Then they are accepted', () => {
