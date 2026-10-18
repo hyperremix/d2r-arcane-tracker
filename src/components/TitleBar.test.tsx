@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createBrowserRouter, createMemoryRouter, RouterProvider, useLocation } from 'react-router';
+import type { Mock } from 'vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TitleBar } from './TitleBar';
 
@@ -79,6 +80,9 @@ const MORE_WIDTH = 60;
 const NAME_WIDTH = 150;
 const LOGO_WIDTH = 20;
 
+/** The ResizeObservers created while {@link stubTitleBarLayout} is active. */
+const resizeObservers: { observe: Mock; disconnect: Mock }[] = [];
+
 /**
  * jsdom has no layout, so stub the widths the title bar measures (each destination 100px, the
  * More trigger 60px, the app name 150px, the logo 20px; gaps are 0) and capture the
@@ -93,6 +97,7 @@ function stubTitleBarLayout(initialRegionWidth: number) {
     class {
       constructor(callback: ResizeObserverCallback) {
         resizeCallbacks.push(callback);
+        resizeObservers.push(this);
       }
       observe = vi.fn();
       disconnect = vi.fn();
@@ -143,6 +148,7 @@ describe('When TitleBar is rendered', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    resizeObservers.length = 0;
     for (const router of browserRouters.splice(0)) {
       router.dispose();
     }
@@ -244,7 +250,7 @@ describe('When TitleBar is rendered', () => {
     expect(queryVisibleAppName()).toHaveClass('font-display');
   });
 
-  it('If the window fits every destination and the app name, then nothing moves into a More menu', () => {
+  it('If the window fits every destination and the app name, Then nothing moves into a More menu', () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH);
 
@@ -257,7 +263,7 @@ describe('When TitleBar is rendered', () => {
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('If the window fits every destination but not the app name, then only the logo is shown', () => {
+  it('If the window fits every destination but not the app name, Then only the logo is shown', () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH - 1);
 
@@ -270,7 +276,7 @@ describe('When TitleBar is rendered', () => {
     expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('If the window is too narrow for every destination, then the last ones move into the More menu', async () => {
+  it('If the window is too narrow for every destination, Then the last ones move into the More menu', async () => {
     // Arrange - four destinations and the More trigger fit
     stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
     renderTitleBar();
@@ -288,7 +294,7 @@ describe('When TitleBar is rendered', () => {
     ).toEqual(['Inventory', 'Farming advisor', 'Terror zones']);
   });
 
-  it('If the current page is in the More menu, then the trigger shows the active state and the menu marks the page as current', async () => {
+  it('If the current page is in the More menu, Then the trigger shows and exposes the active state and the menu marks the page as current', async () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
     renderTitleBar('/terror-zones');
@@ -299,6 +305,7 @@ describe('When TitleBar is rendered', () => {
 
     // Assert
     expect(trigger).toHaveClass('bg-accent');
+    expect(trigger).toHaveAttribute('aria-current', 'page');
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: 'Terror zones' })).toHaveAttribute(
       'aria-current',
@@ -312,7 +319,7 @@ describe('When TitleBar is rendered', () => {
     }
   });
 
-  it('If the current page is not in the More menu, then the trigger is not shown as active', () => {
+  it('If the current page is not in the More menu, Then the trigger is not shown as active nor marked as current', () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
 
@@ -320,10 +327,12 @@ describe('When TitleBar is rendered', () => {
     renderTitleBar('/runs');
 
     // Assert
-    expect(screen.getByRole('button', { name: 'More' })).not.toHaveClass('bg-accent');
+    const trigger = screen.getByRole('button', { name: 'More' });
+    expect(trigger).not.toHaveClass('bg-accent');
+    expect(trigger).not.toHaveAttribute('aria-current');
   });
 
-  it('If a destination in the More menu is chosen, then it navigates there', async () => {
+  it('If a destination in the More menu is chosen, Then it navigates there', async () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
     renderTitleBar('/');
@@ -337,7 +346,58 @@ describe('When TitleBar is rendered', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/farming'));
   });
 
-  it('If the window grows again, then destinations move back out of the More menu', () => {
+  it('If every destination is in the More menu, Then only More, Settings and the notifications remain in the bar', async () => {
+    // Arrange - not even one destination fits next to the More trigger
+    stubTitleBarLayout(LOGO_WIDTH + ITEM_WIDTH);
+    renderTitleBar('/');
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+
+    // Assert
+    expect(getLinkNames()).toEqual(['Settings']);
+    expect(screen.getByRole('button', { name: 'notifications' })).toBeInTheDocument();
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'Grail',
+      'Statistics',
+      'Runs',
+      'Runewords',
+      'Inventory',
+      'Farming advisor',
+      'Terror zones',
+    ]);
+  });
+
+  it('If the title bar is measured, Then both the navigation region and the measuring copy are observed until it unmounts', () => {
+    // Arrange
+    stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH);
+
+    // Act
+    const { unmount } = renderTitleBar();
+
+    // Assert
+    const region = screen
+      .getByRole('banner')
+      .querySelector('[data-overflow-part="logo"]')?.parentElement;
+    const measuredCopy = document.querySelector(
+      '[aria-hidden="true"] [data-overflow-part="name"]',
+    )?.parentElement;
+    expect(resizeObservers).toHaveLength(1);
+    expect(resizeObservers[0].observe).toHaveBeenCalledWith(region);
+    expect(resizeObservers[0].observe).toHaveBeenCalledWith(measuredCopy);
+    expect(resizeObservers[0].observe).toHaveBeenCalledTimes(2);
+    expect(resizeObservers[0].disconnect).not.toHaveBeenCalled();
+
+    unmount();
+    expect(resizeObservers[0].disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('If the window grows again, Then destinations move back out of the More menu', () => {
     // Arrange
     const resize = stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
     renderTitleBar();

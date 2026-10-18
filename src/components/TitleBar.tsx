@@ -157,12 +157,16 @@ function MoreMenu({ items, pathname }: { items: NavigationItem[]; pathname: stri
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-current={hasActiveItem ? 'page' : undefined}
         className={cn(NAV_ITEM_CLASS, LABELED_NAV_ITEM_CLASS, navItemStateClass(hasActiveItem))}
       >
         {t(translations.titleBar.more)}
         <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-auto">
+      <DropdownMenuContent
+        align="end"
+        className="[-webkit-app-region:no-drag] [app-region:no-drag]"
+      >
         {items.map((item) => {
           const isActive = isRouteActive(pathname, item.to);
           const Icon = item.icon;

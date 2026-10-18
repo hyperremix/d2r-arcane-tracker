@@ -62,8 +62,8 @@ export function getTitleBarOverflow({
 /** Marks the title bar elements that {@link useTitleBarOverflow} measures. */
 type TitleBarOverflowPart = 'logo' | 'nav' | 'list' | 'item' | 'more' | 'name';
 
-function getGap(element: Element | null): number {
-  return element ? Number.parseFloat(getComputedStyle(element).columnGap) || 0 : 0;
+function getGap(element: Element): number {
+  return Number.parseFloat(getComputedStyle(element).columnGap) || 0;
 }
 
 /**
@@ -85,13 +85,12 @@ export function useTitleBarOverflow(itemCount: number) {
   });
 
   const measure = useCallback(() => {
-    const region = regionRef.current;
-    const replica = measureRef.current;
-    if (!region || !replica) return;
+    const region = regionRef.current as HTMLDivElement;
+    const replica = measureRef.current as HTMLDivElement;
 
     const find = (root: Element, part: TitleBarOverflowPart) =>
-      root.querySelector(`[data-overflow-part="${part}"]`);
-    const width = (element: Element | null) => element?.getBoundingClientRect().width ?? 0;
+      root.querySelector(`[data-overflow-part="${part}"]`) as Element;
+    const width = (element: Element) => element.getBoundingClientRect().width;
 
     const regionGap = getGap(region);
     const nav = find(region, 'nav');
@@ -114,12 +113,10 @@ export function useTitleBarOverflow(itemCount: number) {
 
   useLayoutEffect(() => {
     measure();
-    if (typeof ResizeObserver === 'undefined' || !regionRef.current || !measureRef.current) {
-      return;
-    }
+    if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
-    observer.observe(regionRef.current);
-    observer.observe(measureRef.current);
+    observer.observe(regionRef.current as HTMLDivElement);
+    observer.observe(measureRef.current as HTMLDivElement);
     return () => observer.disconnect();
   }, [measure]);
 
