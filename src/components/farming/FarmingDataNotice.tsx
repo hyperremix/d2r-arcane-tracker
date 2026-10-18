@@ -1,5 +1,5 @@
 import type { FarmingDataUnavailable } from 'electron/types/grail';
-import { AlertCircle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -17,14 +17,14 @@ export function FarmingDataNotice({ unavailable }: { unavailable: FarmingDataUna
   }
 
   return (
-    <Alert className="border-destructive/30 bg-destructive/10">
-      <AlertCircle className="h-4 w-4 text-destructive" aria-hidden="true" />
-      <AlertTitle className="font-bold text-destructive">
+    <Alert variant="warning">
+      <AlertTriangle aria-hidden="true" />
+      <AlertTitle>
         {unavailable.errorCode === 'gameFilesMissing'
           ? t(translations.farming.gameFilesMissing.title)
           : t(translations.common.error)}
       </AlertTitle>
-      <AlertDescription className="space-y-2 text-destructive">
+      <AlertDescription className="space-y-2">
         <p>
           {unavailable.errorCode === 'gameFilesMissing'
             ? t(translations.farming.gameFilesMissing.description, {

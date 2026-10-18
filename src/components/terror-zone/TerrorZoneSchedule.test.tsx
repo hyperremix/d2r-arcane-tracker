@@ -251,7 +251,8 @@ describe('When the TerrorZoneSchedule page is shown', () => {
       renderSchedule();
 
       // Assert
-      expect(await screen.findByText(/^This is the retail schedule\./)).toBeInTheDocument();
+      const note = await screen.findByText(/^This is the retail schedule\./);
+      expect(screen.getByTestId('d2r-folder-prompt')).toContainElement(note);
       expect(screen.getByText('Set your D2R installation folder')).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.queryByText(/Calculated from desecratedzones\.json/)).not.toBeInTheDocument();
@@ -307,6 +308,78 @@ describe('When the TerrorZoneSchedule page is shown', () => {
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(/can't be read/);
+    });
+
+    it('Then an invalid game file structure is also a warning that the file can not be read', async () => {
+      // Arrange
+      setupApi(vi.fn().mockResolvedValue({ ...schedule, source: 'retailDefault' }), {
+        validation: { valid: false, errorCode: 'invalidStructure' },
+      });
+
+      // Act
+      renderSchedule();
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(/can't be read/);
+    });
+  });
+
+  describe('If the D2R folder check gives no usable reason', () => {
+    it.each<{ scenario: string; validation: TerrorZoneValidationResult | Error }>([
+      { scenario: 'an unknown error', validation: { valid: false, errorCode: 'unknown' } },
+      { scenario: 'a folder that now validates', validation: { valid: true } },
+      { scenario: 'a failed check', validation: new Error('boom') },
+    ])('Then $scenario shows the retail schedule without advice to extract the game files', async ({
+      validation,
+    }) => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { validatePath } = setupApi(
+        vi.fn().mockResolvedValue({ ...schedule, source: 'retailDefault' }),
+      );
+      if (validation instanceof Error) validatePath.mockRejectedValue(validation);
+      else validatePath.mockResolvedValue(validation);
+
+      // Act
+      renderSchedule();
+      await screen.findByTestId('terror-zone-current');
+      await waitFor(() => expect(validatePath).toHaveBeenCalled());
+
+      // Assert
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Extract the game files/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the schedule stops being the retail default and becomes it again', () => {
+    it('Then the earlier reason is not shown while the folder is checked again', async () => {
+      // Arrange
+      const retail = { ...schedule, source: 'retailDefault' as const };
+      const getSchedule = vi
+        .fn()
+        .mockResolvedValueOnce(retail)
+        .mockResolvedValueOnce({ source: 'gameFile', slots: schedule.slots.slice(1) })
+        .mockResolvedValue({ ...retail, slots: schedule.slots.slice(2) });
+      const { validatePath } = setupApi(getSchedule, {
+        validation: { valid: false, errorCode: 'directoryNotFound' },
+      });
+      renderSchedule();
+      expect(await screen.findByRole('alert')).toHaveTextContent(/doesn't exist/);
+      validatePath.mockReturnValue(new Promise(() => undefined));
+
+      // Act: the first window ends and the game file is used, then its window ends and it is not
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(13 * MINUTE_MS);
+      });
+      await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30 * MINUTE_MS);
+      });
+
+      // Assert
+      await waitFor(() => expect(validatePath).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

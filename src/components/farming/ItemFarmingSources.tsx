@@ -1,7 +1,8 @@
 import type { Character, FarmingItemSource, FarmingItemSources, Item } from 'electron/types/grail';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Settings } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -133,6 +134,7 @@ function SourcesTable({ sources }: { sources: FarmingItemSource[] }) {
 
 function SourcesBody({ itemId, characters }: { itemId: string; characters: Character[] }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { result, failed } = useItemSources(itemId, characters);
 
   if (failed)
@@ -147,12 +149,18 @@ function SourcesBody({ itemId, characters }: { itemId: string; characters: Chara
     return (
       <Alert variant="warning" live="polite">
         <AlertTriangle aria-hidden="true" />
-        <AlertDescription>
-          {result.errorCode === 'gameFilesMissing'
-            ? t(translations.farming.itemSources.gameFilesMissing, {
-                files: (result.missingFiles ?? []).join(', '),
-              })
-            : t(translations.farming.itemSources.readFailed)}
+        <AlertDescription className="gap-2">
+          <p>
+            {result.errorCode === 'gameFilesMissing'
+              ? t(translations.farming.itemSources.gameFilesMissing, {
+                  files: (result.missingFiles ?? []).join(', '),
+                })
+              : t(translations.farming.itemSources.readFailed)}
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={() => navigate('/settings')}>
+            <Settings aria-hidden="true" />
+            {t(translations.terrorZone.openInstallationSettings)}
+          </Button>
         </AlertDescription>
       </Alert>
     );

@@ -1,4 +1,5 @@
 import { FolderCog, Settings } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,8 @@ interface D2RFolderPromptProps {
    * content that is still shown without the folder, such as the retail terror zone schedule.
    */
   layout: 'page' | 'inline';
+  /** Shown inside the prompt, between the description and the button */
+  children?: ReactNode;
 }
 
 /**
@@ -18,7 +21,7 @@ interface D2RFolderPromptProps {
  * something is read from the game files and no folder is set yet. It is a calm prompt, not an
  * error: problems with a folder that is set are shown as warnings by the features themselves.
  */
-export function D2RFolderPrompt({ layout }: D2RFolderPromptProps) {
+export function D2RFolderPrompt({ layout, children }: D2RFolderPromptProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const isPage = layout === 'page';
@@ -27,11 +30,11 @@ export function D2RFolderPrompt({ layout }: D2RFolderPromptProps) {
   return (
     <div
       data-testid="d2r-folder-prompt"
-      className={cn(
+      className={
         isPage
           ? 'flex flex-col items-center justify-center gap-3 px-6 py-12 text-center'
-          : 'flex items-start gap-3 rounded-lg border bg-muted/30 p-4',
-      )}
+          : 'flex items-start gap-3 rounded-lg border bg-muted/30 p-4'
+      }
     >
       <FolderCog
         aria-hidden="true"
@@ -44,6 +47,7 @@ export function D2RFolderPrompt({ layout }: D2RFolderPromptProps) {
         <p className="max-w-md text-muted-foreground text-sm">
           {t(translations.terrorZone.notConfigured.description)}
         </p>
+        {children}
         <Button
           type="button"
           variant={isPage ? 'default' : 'outline'}

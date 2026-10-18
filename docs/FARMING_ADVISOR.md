@@ -38,7 +38,7 @@ The details of a unique, set item or rune have a **Where to farm** section. It l
 
 The drop rate is the average number of kills per drop, for example "1 in 1,779". Where a source groups several monster types (the regular monsters of an area), the range from the best to the worst type is shown. Set **Players** (your `/players` setting) and **Magic find** above the list; both are kept until you close the app.
 
-Without a D2R folder the section shows the same prompt to set one, with an **Open D2R installation settings** button. When a folder is set but game files are missing or can't be read, a warning names the missing files, or says the files can't be read, and tells you to extract the game files again.
+Without a D2R folder the section shows the same prompt to set one, with an **Open D2R installation settings** button. When a folder is set but game files are missing or can't be read, a warning names the missing files, or says the files can't be read, and tells you to extract the game files again, with an **Open D2R installation settings** button in case the folder is wrong.
 
 ## How the numbers are calculated
 

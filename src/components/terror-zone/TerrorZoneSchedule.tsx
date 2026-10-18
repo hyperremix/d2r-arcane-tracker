@@ -1,4 +1,8 @@
-import type { TerrorZoneScheduleSlot, TerrorZoneScheduleSource } from 'electron/types/grail';
+import type {
+  TerrorZoneScheduleSlot,
+  TerrorZoneScheduleSource,
+  TerrorZoneValidationResult,
+} from 'electron/types/grail';
 import { AlertTriangle, Crosshair, RefreshCw, Settings, Settings2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +33,29 @@ type RetailScheduleReason =
   | 'gameFileUnreadable';
 
 /**
+ * The reason a failed validation of the D2R folder gives for the retail schedule. `unknown` and a
+ * folder that now validates have no reason to show, because no advice for them would be right.
+ */
+function getRetailScheduleReason(
+  validation: TerrorZoneValidationResult,
+): RetailScheduleReason | undefined {
+  if (validation.valid) return undefined;
+  switch (validation.errorCode) {
+    case 'pathNotConfigured':
+    case 'directoryNotFound':
+    case 'gameFileNotFound':
+      return validation.errorCode;
+    case 'invalidStructure':
+    case 'corruptedFile':
+      return 'gameFileUnreadable';
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Finds out why the schedule fell back to the retail defaults, by validating the D2R folder. Only
- * checked when the schedule is the retail default.
+ * checked when the schedule is the retail default, and again each time it becomes the default.
  * @param source - Where the schedule was calculated from
  * @returns The reason once known, otherwise undefined
  */
@@ -41,25 +66,17 @@ function useRetailScheduleReason(
   const isRetailDefault = source === 'retailDefault';
 
   useEffect(() => {
+    setReason(undefined);
     if (!isRetailDefault) return;
     let cancelled = false;
     window.electronAPI.terrorZone
       .validatePath()
       .then((validation) => {
-        if (cancelled) return;
-        const code = validation.valid ? undefined : validation.errorCode;
-        setReason(
-          code === 'pathNotConfigured' ||
-            code === 'directoryNotFound' ||
-            code === 'gameFileNotFound'
-            ? code
-            : 'gameFileUnreadable',
-        );
+        if (!cancelled) setReason(getRetailScheduleReason(validation));
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         console.error('Failed to check the D2R installation folder:', error);
-        setReason('gameFileUnreadable');
       });
     return () => {
       cancelled = true;
@@ -205,12 +222,11 @@ function ScheduleSourceNotice({ source }: { source: TerrorZoneScheduleSource | u
   if (retailReason === undefined) return null;
   if (retailReason === 'pathNotConfigured') {
     return (
-      <div className="space-y-2">
-        <D2RFolderPrompt layout="inline" />
+      <D2RFolderPrompt layout="inline">
         <p className="text-muted-foreground text-xs">
           {t(translations.terrorZone.schedule.retailNote)}
         </p>
-      </div>
+      </D2RFolderPrompt>
     );
   }
   return (

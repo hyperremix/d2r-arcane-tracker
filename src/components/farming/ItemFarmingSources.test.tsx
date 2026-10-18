@@ -194,6 +194,20 @@ describe('When the farming sources of an item are shown', () => {
     expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
   });
 
+  it('If game files are missing, Then the warning links to the D2R installation settings', async () => {
+    // Arrange
+    setup({ status: 'unavailable', errorCode: 'gameFilesMissing', missingFiles: ['levels.txt'] });
+    const warning = await screen.findByRole('status');
+
+    // Act
+    fireEvent.click(
+      within(warning).getByRole('button', { name: 'Open D2R installation settings' }),
+    );
+
+    // Assert
+    expect(await screen.findByText('Settings page')).toBeInTheDocument();
+  });
+
   it('If the game files cannot be read, Then a warning says to extract them again', async () => {
     // Arrange & Act
     setup({ status: 'unavailable', errorCode: 'readFailed' });

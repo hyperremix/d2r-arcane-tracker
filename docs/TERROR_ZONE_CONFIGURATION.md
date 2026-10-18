@@ -23,8 +23,11 @@ When the [farming advisor](FARMING_ADVISOR.md) can read your game files, each zo
 
 The app calculates the schedule itself, with the same algorithm as the game ([how it works](TERROR_ZONE_FINDINGS_2026.md)), so it needs no internet connection. It reads `desecratedzones.json` in your D2R folder, so the schedule follows the zones you turned off on the configuration page: it is recalculated every time you open the page, and the page reloads it when a zone's window ends.
 
+When the schedule falls back to the retail default, the page checks your D2R folder with the same validation as the configuration page, which backs up `desecratedzones.json` the first time it finds the file.
+
 - If no D2R folder is set, the page shows the retail schedule with a prompt to set the folder and an **Open D2R installation settings** button. The farming advisor, the **Where to farm** section of the item details and the configuration page show the same prompt.
 - If a D2R folder is set but the page can't use its game file, it shows the retail schedule with a warning that says why: the folder doesn't exist (with a button to the D2R installation setting), `desecratedzones.json` isn't in it, or the file can't be read. [Extract the game files](EXTRACTING_GAME_FILES.md) to fix the last two, then reopen the page.
+- If the check of the folder fails or gives no reason, the retail schedule is shown without an explanation.
 - If the game file is from an older version of D2R (before patch 3.x), D2R can't run a rotation from it. The page says so and shows the retail schedule. [Extract the game files](EXTRACTING_GAME_FILES.md) again, delete `desecratedzones.json.original` from the app's data folder and reopen the configuration page, so the app backs up the current file. **Restore original** puts back the backup, so an outdated backup brings the outdated file back.
 - If the game file has no zones, the page says that no terror zone is scheduled.
 - D2R only uses the game file when started with `-direct -txt`. Without the flags your game follows the retail schedule, which differs from the page whenever the file has been changed.
