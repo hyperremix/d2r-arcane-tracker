@@ -149,7 +149,7 @@ describe('RunewordCalculator', () => {
   });
 
   describe('availability filter', () => {
-    it('When the page loads, then Craftable now is pressed and only craftable runewords show, sorted by name', async () => {
+    it('When the page loads, then Runes only is pressed and only craftable runewords show, sorted by name', async () => {
       // Arrange
       stubElectronApi();
 
@@ -157,7 +157,7 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Craftable now' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Runes only' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
@@ -165,16 +165,16 @@ describe('RunewordCalculator', () => {
       expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
     });
 
-    it('When Missing ≤ 1 is selected, then runewords missing one rune are added after craftable ones', async () => {
+    it('When Up to 1 missing is selected, then runewords missing one rune are added after craftable ones', async () => {
       // Arrange
       stubElectronApi();
       await renderCalculator();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Up to 1 missing' }));
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Missing ≤ 1' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Up to 1 missing' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
@@ -214,7 +214,7 @@ describe('RunewordCalculator', () => {
       );
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Missing ≤ 1' })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Up to 1 missing' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
@@ -242,13 +242,13 @@ describe('RunewordCalculator', () => {
   });
 
   describe('readiness', () => {
-    it('When Ready now is selected, then only craftable runewords with an owned base show', async () => {
+    it('When Runes and base is selected, then only craftable runewords with an owned base show', async () => {
       // Arrange
       stubElectronApi({ inventoryItems: [crystalSword] });
       await renderCalculator();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Ready now' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Runes and base' }));
 
       // Assert
       expect(getCardTitles()).toEqual(['Filter by runes', 'Steel']);
@@ -374,7 +374,7 @@ describe('RunewordCalculator', () => {
       // Arrange
       stubElectronApi();
       await renderCalculator();
-      fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Up to 1 missing' }));
       const search = screen.getByPlaceholderText('Search runewords...');
 
       // Act
@@ -399,8 +399,8 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
 
       // Act
-      fireEvent.click(screen.getByLabelText(/^Ber/));
-      fireEvent.click(screen.getByLabelText(/^Jah/));
+      fireEvent.click(screen.getByRole('button', { name: /^Ber,/ }));
+      fireEvent.click(screen.getByRole('button', { name: /^Jah,/ }));
 
       // Assert
       expect(screen.getByText('Shows runewords that use all selected runes')).toBeInTheDocument();
@@ -414,14 +414,17 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
       const clearButton = screen.getByRole('button', { name: 'Clear selection' });
       expect(clearButton).toBeDisabled();
-      fireEvent.click(screen.getByLabelText(/^Ber/));
+      fireEvent.click(screen.getByRole('button', { name: /^Ber,/ }));
       expect(getCardTitles()).toEqual(['Filter by runes', 'Enigma', 'Infinity']);
 
       // Act
       fireEvent.click(clearButton);
 
       // Assert
-      expect(screen.getByLabelText(/^Ber/)).not.toBeChecked();
+      expect(screen.getByRole('button', { name: /^Ber,/ })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
       expect(clearButton).toBeDisabled();
       expect(getCardTitles()).toEqual([
         'Filter by runes',
@@ -434,7 +437,7 @@ describe('RunewordCalculator', () => {
   });
 
   describe('runeword cards', () => {
-    it('When runewords are shown, then each card displays an owned/total runes badge', async () => {
+    it('When All is selected, then cards missing runes name them and craftable cards show no rune count', async () => {
       // Arrange
       stubElectronApi({ availableRunes: { ber: 1, mal: 1, tir: 1, el: 1 } });
       await renderCalculator();
@@ -443,24 +446,23 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
 
       // Assert
-      const infinityCard = getCard('Infinity');
+      expect(within(getCard('Infinity')).getByText('Missing 2 runes: Ber, Ist')).toBeVisible();
       const steelCard = getCard('Steel');
-      expect(within(infinityCard).getByText('2/4 runes')).toBeInTheDocument();
-      expect(within(infinityCard).getByText('2 of 4 runes available')).toBeInTheDocument();
-      expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
+      expect(within(steelCard).queryByText(/^Missing \d/)).not.toBeInTheDocument();
+      expect(within(steelCard).queryByText(/\d+\/\d+ runes/)).not.toBeInTheDocument();
     });
 
-    it('If a runeword is craftable, Then the badge is the only completion signal on its card', async () => {
+    it('If a runeword is craftable, Then its card leads with the base status instead of a rune count', async () => {
       // Arrange
-      stubElectronApi();
+      stubElectronApi({ inventoryItems: [crystalSword] });
 
       // Act
       await renderCalculator();
 
       // Assert
-      const steelCard = getCard('Steel');
-      expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
-      expect(within(steelCard).queryByText(/All runes available/)).not.toBeInTheDocument();
+      const steelHeading = screen.getByRole('heading', { name: 'Steel' });
+      expect(steelHeading.nextElementSibling).toHaveTextContent('1 owned base');
+      expect(within(getCard('Steel')).queryByText(/\d+\/\d+ runes/)).not.toBeInTheDocument();
     });
 
     it('When runewords are shown, Then each card footer shows one socket per rune', async () => {
@@ -536,7 +538,7 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Up to 1 missing' }));
 
       // Assert
       const enigmaCard = getCard('Enigma');
@@ -654,9 +656,56 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      for (const name of ['Ready now', 'Craftable now', 'With upgrades', 'Missing ≤ 1', 'All']) {
+      for (const name of [
+        'Runes and base',
+        'Runes only',
+        'With upgrades',
+        'Up to 1 missing',
+        'All',
+      ]) {
         expect(screen.getByRole('button', { name })).toHaveClass('whitespace-nowrap');
       }
+    });
+
+    it('When the page loads, Then each view option describes the rule it applies', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const view = within(screen.getByRole('group', { name: 'Show runewords' }));
+      expect(view.getByRole('button', { name: 'Runes and base' })).toHaveAccessibleDescription(
+        'You have every rune and an empty base the runeword fits',
+      );
+      expect(view.getByRole('button', { name: 'Runes only' })).toHaveAccessibleDescription(
+        'You have every rune, with or without a base',
+      );
+      expect(view.getByRole('button', { name: 'With upgrades' })).toHaveAccessibleDescription(
+        'You have every rune or can cube the missing ones from your runes and gems',
+      );
+      expect(view.getByRole('button', { name: 'Up to 1 missing' })).toHaveAccessibleDescription(
+        'You need at most one more rune',
+      );
+      expect(view.getByRole('button', { name: 'All' })).toHaveAccessibleDescription(
+        'Every runeword, whatever you own',
+      );
+    });
+
+    it('When the page loads, Then the rune sidebar is narrow and only widens in wide windows', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const page = screen.getByTestId('runeword-sidebar').parentElement?.parentElement;
+      expect(page).toHaveClass(
+        'grid-cols-[14rem_minmax(0,1fr)]',
+        'xl:grid-cols-[18rem_minmax(0,1fr)]',
+      );
     });
   });
 
@@ -701,7 +750,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       const grid = screen.getByTestId('runeword-grid');
-      expect(grid).toHaveClass('grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]');
+      expect(grid).toHaveClass('grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]');
       expect(grid.className).not.toMatch(/\b(md|lg):grid-cols-/);
     });
   });

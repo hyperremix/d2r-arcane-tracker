@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import {
   collectOwnedRunewordBases,
@@ -118,6 +119,18 @@ const availabilityLabelKeys: Record<RunewordAvailabilityFilter, string> = {
 };
 
 /**
+ * Keys of the rule each availability filter applies, offered as its tooltip and accessible
+ * description.
+ */
+const availabilityDescriptionKeys: Record<RunewordAvailabilityFilter, string> = {
+  ready: translations.runeword.calculator.availabilityDescription.ready,
+  craftable: translations.runeword.calculator.availabilityDescription.craftable,
+  upgradable: translations.runeword.calculator.availabilityDescription.upgradable,
+  missingOne: translations.runeword.calculator.availabilityDescription.missingOne,
+  all: translations.runeword.calculator.availabilityDescription.all,
+};
+
+/**
  * Label keys for the empty-state button that switches to a broader availability tier.
  */
 const showAvailabilityLabelKeys: Record<BroaderAvailability, string> = {
@@ -136,32 +149,44 @@ interface AvailabilityFilterProps {
 }
 
 /**
- * Segmented control choosing between ready, craftable, makeable with upgrades, missing-at-most-one
- * and all runewords.
- * Rendered as a labeled fieldset of toggle buttons exposing their state via aria-pressed.
+ * Segmented control choosing between runewords you have the runes and a base for, the runes for,
+ * the runes for with cube upgrades, all but at most one rune for, and all runewords.
+ * Rendered as a labeled fieldset of toggle buttons exposing their state via aria-pressed. Each
+ * label names its rule in short; the full rule is the button's tooltip and accessible description.
  */
 function AvailabilityFilter({ value, onChange }: AvailabilityFilterProps) {
   const { t } = useTranslation();
+  const descriptionIdPrefix = useId();
 
   return (
     <fieldset className="flex items-stretch rounded-md border border-border bg-muted p-0.5">
       <legend className="sr-only">{t(translations.runeword.calculator.availabilityLegend)}</legend>
       {availabilityFilters.map((filter) => {
         const pressed = value === filter;
+        const description = t(availabilityDescriptionKeys[filter]);
+        const descriptionId = `${descriptionIdPrefix}-${filter}`;
         return (
-          <button
-            key={filter}
-            type="button"
-            aria-pressed={pressed}
-            onClick={() => onChange(filter)}
-            className={cn(
-              'inline-flex min-h-7 flex-1 items-center justify-center whitespace-nowrap rounded-[5px] px-3 py-1 text-center font-medium text-muted-foreground text-xs outline-none transition-colors',
-              'hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
-              pressed && 'bg-background text-foreground shadow-xs',
-            )}
-          >
-            {t(availabilityLabelKeys[filter])}
-          </button>
+          <Tooltip key={filter}>
+            <TooltipTrigger
+              type="button"
+              aria-pressed={pressed}
+              aria-describedby={descriptionId}
+              onClick={() => onChange(filter)}
+              className={cn(
+                'inline-flex min-h-7 flex-1 items-center justify-center whitespace-nowrap rounded-[5px] px-3 py-1 text-center font-medium text-muted-foreground text-xs outline-none transition-colors',
+                'hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                pressed && 'bg-background text-foreground shadow-xs',
+              )}
+            >
+              {t(availabilityLabelKeys[filter])}
+              {/* The tooltip only renders while open, so the rule is also kept, hidden, in the
+                  button as its accessible description */}
+              <span id={descriptionId} hidden>
+                {description}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{description}</TooltipContent>
+          </Tooltip>
         );
       })}
     </fieldset>
@@ -279,8 +304,10 @@ export function RunewordCalculator() {
     // Padding is split on purpose: the root pads the top and left, while the header, toolbar and
     // scroll area pad their own right side and the sidebar and scroll area their own bottom. That
     // way the grid's scroll container itself reaches the right and bottom window edges and its
-    // scrollbar reads as the page scrollbar.
-    <div className="grid min-h-0 flex-1 grid-cols-[22rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6">
+    // scrollbar reads as the page scrollbar. The sidebar is narrow (a four-column rune grid) below
+    // the xl breakpoint so the runeword grid keeps most of a small window, and widens to five
+    // columns above it.
+    <div className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
       <PageHeader
         className="col-span-2 pr-6"
         title={t(translations.runeword.calculator.title)}
@@ -289,8 +316,8 @@ export function RunewordCalculator() {
 
       {/* Left Sidebar - Rune filters, as tall as its content but never taller than the window */}
       <div className="flex min-h-0 flex-col pb-6">
-        <Card data-testid="runeword-sidebar" className="flex min-h-0 flex-col overflow-hidden">
-          <CardContent className="flex min-h-0 flex-1 flex-col">
+        <Card data-testid="runeword-sidebar" className="flex min-h-0 flex-col overflow-hidden py-4">
+          <CardContent className="flex min-h-0 flex-1 flex-col px-4">
             <RuneFilters
               selectedRunes={selectedRunes}
               onRuneSelectionChange={setSelectedRunes}
@@ -312,7 +339,7 @@ export function RunewordCalculator() {
           <Input
             id={searchInputId}
             type="text"
-            className="w-64"
+            className="max-w-56 grow basis-40"
             placeholder={t(translations.runeword.calculator.searchPlaceholder)}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -366,12 +393,12 @@ export function RunewordCalculator() {
           )}
 
           {/* Runeword Grid: columns follow the available width, not the viewport. Each card spans
-            four rows (header, runes, readiness, footer) via subgrid and takes its row gap from
+            four rows (header, runes, missing runes, footer) via subgrid and takes its row gap from
             this grid. */}
           {!isLoading && filteredRunewords.length > 0 && (
             <div
               data-testid="runeword-grid"
-              className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4"
+              className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-4"
             >
               {filteredRunewords.map((runeword) => (
                 <RunewordCard

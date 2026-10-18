@@ -121,26 +121,67 @@ describe('RunewordCard', () => {
     expect(screen.queryByText(/socket/)).not.toBeInTheDocument();
   });
 
-  it('When the card is rendered, Then it is a positioned container for the badge sr-only text', () => {
+  it('When the card is rendered, Then it is a positioned container for the missing rune sr-only text', () => {
     // Arrange & Act
     renderCard(['tir', 'el']);
 
     // Assert
-    // The badge's sr-only span is position: absolute. Without a positioned card it would be
-    // contained by the page and stretch the document's scrollable height.
+    // The missing rune markers' sr-only spans are position: absolute. Without a positioned card
+    // they would be contained by the page and stretch the document's scrollable height.
     const card = screen.getByRole('heading', { name: 'Steel' }).closest('[data-slot="card"]');
     expect(card).toHaveClass('relative');
   });
 
-  it('When the card is rendered, Then the completion badge sits on its own line below the name', () => {
-    // Arrange & Act
-    renderCard(['tir', 'el']);
+  it.each([
+    ['an owned base fits', [createVaultBase()], '1 owned base'],
+    ['no owned base fits', [], 'No owned base'],
+  ])('If %s, Then the base status sits on its own line directly below the name', (_label, bases, status) => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(
+      <RunewordCard
+        runeword={createRuneword(['tir', 'el'])}
+        availableRunes={{ tir: 1, el: 1 }}
+        readiness={{ upgradePlan: [], bases }}
+      />,
+    );
 
     // Assert
     const heading = screen.getByRole('heading', { name: 'Steel' });
-    const header = heading.parentElement;
-    expect(header).toHaveClass('flex-col');
-    expect(heading.nextElementSibling).toHaveTextContent('0 of 2 runes available');
+    expect(heading.parentElement).toHaveClass('flex-col');
+    expect(heading.nextElementSibling).toHaveTextContent(status);
+  });
+
+  it('If every rune is owned, Then the card shows no rune count', () => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(
+      <RunewordCard runeword={createRuneword(['tir', 'el'])} availableRunes={{ tir: 1, el: 1 }} />,
+    );
+
+    // Assert
+    expect(screen.queryByText(/^Missing \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+\/\d+ runes/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['one rune is', { tir: 1 }, 'Missing 1 rune: El'],
+    ['several runes are', {}, 'Missing 2 runes: Tir, El'],
+  ])('If %s missing, Then a line names the missing runes', (_label, availableRunes, text) => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(
+      <RunewordCard runeword={createRuneword(['tir', 'el'])} availableRunes={availableRunes} />,
+    );
+
+    // Assert
+    expect(screen.getByText(text)).toBeInTheDocument();
   });
 
   it.each([
