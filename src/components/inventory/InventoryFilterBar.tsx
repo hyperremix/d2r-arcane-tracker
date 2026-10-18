@@ -1,6 +1,6 @@
 import type { VaultLocationContext } from 'electron/types/grail';
 import { Plus, X } from 'lucide-react';
-import { type ChangeEvent, useId } from 'react';
+import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TypeFilter } from '@/components/inventory/inventoryItems';
 import type {
@@ -180,6 +180,8 @@ function ItemPropertyFilterFields({
   const etherealId = useId();
   const minRollId = useId();
   const sortId = useId();
+  const addStatButtonRef = useRef<HTMLElement>(null);
+  const [newConditionId, setNewConditionId] = useState<number>();
   const labels = translations.inventoryBrowser.filters;
 
   const socketItems: FilterOption[] = [
@@ -194,7 +196,7 @@ function ItemPropertyFilterFields({
     value: option,
     label: t(labels.etherealOptions[option]),
   }));
-  const sortItems: FilterOption[] = SORT_OPTIONS.map((option) => ({
+  const sortOptionItems: FilterOption[] = SORT_OPTIONS.map((option) => ({
     value: option,
     label: t(labels.sortOptions[option]),
   }));
@@ -209,6 +211,7 @@ function ItemPropertyFilterFields({
   };
   const addStatCondition = () => {
     const nextId = Math.max(0, ...filters.statConditions.map((condition) => condition.id)) + 1;
+    setNewConditionId(nextId);
     onChange({
       ...filters,
       statConditions: [...filters.statConditions, { id: nextId, stat: ITEM_STAT_FILTER_KEYS[0] }],
@@ -219,11 +222,13 @@ function ItemPropertyFilterFields({
       ...filters,
       statConditions: filters.statConditions.filter((condition) => condition.id !== id),
     });
+    // The removed row's button is gone, so keyboard focus moves to the button that adds a row
+    addStatButtonRef.current?.focus();
   };
 
   return (
-    <div className="mt-3 space-y-3 border-border/60 border-t pt-3">
-      <p className="font-medium text-sm">{t(labels.itemProperties)}</p>
+    <fieldset className="mt-3 min-w-0 space-y-3 border-border/60 border-t pt-3">
+      <legend className="px-1 font-medium text-sm">{t(labels.itemProperties)}</legend>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div className="grid gap-2 md:col-span-2">
           <Label htmlFor={baseItemId}>{t(labels.baseItem)}</Label>
@@ -278,7 +283,7 @@ function ItemPropertyFilterFields({
         <FilterSelect
           id={sortId}
           label={t(labels.sortBy)}
-          items={sortItems}
+          items={sortOptionItems}
           value={sortOrder}
           onValueChange={(value) =>
             onSortOrderChange(isOneOf(SORT_OPTIONS, value) ? value : 'default')
@@ -287,35 +292,58 @@ function ItemPropertyFilterFields({
       </div>
       <fieldset className="space-y-2">
         <legend className="mb-2 font-medium text-sm">{t(labels.stats)}</legend>
-        {filters.statConditions.map((condition) => (
+        {filters.statConditions.map((condition, index) => (
           <StatConditionFields
             key={condition.id}
             condition={condition}
+            number={index + 1}
+            focusOnMount={condition.id === newConditionId}
             onChange={(update) => updateStatCondition(condition.id, update)}
             onRemove={() => removeStatCondition(condition.id)}
           />
         ))}
-        <Button type="button" variant="outline" size="sm" onClick={addStatCondition}>
+        <Button
+          ref={addStatButtonRef}
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addStatCondition}
+        >
           <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
           {t(labels.addStat)}
         </Button>
       </fieldset>
-    </div>
+    </fieldset>
   );
 }
 
 interface StatConditionFieldsProps {
   condition: StatCondition;
+  /** Position of the row among the stat rows, starting at 1. */
+  number: number;
+  /** Moves keyboard focus to the stat dropdown when the row is added. */
+  focusOnMount: boolean;
   onChange: (update: Partial<StatCondition>) => void;
   onRemove: () => void;
 }
 
 /** One "has stat X at least N" row: the stat, the minimum value and a remove button. */
-function StatConditionFields({ condition, onChange, onRemove }: StatConditionFieldsProps) {
+function StatConditionFields({
+  condition,
+  number,
+  focusOnMount,
+  onChange,
+  onRemove,
+}: StatConditionFieldsProps) {
   const { t } = useTranslation();
   const statId = useId();
   const minValueId = useId();
   const labels = translations.inventoryBrowser.filters;
+  useEffect(() => {
+    if (focusOnMount) {
+      document.getElementById(statId)?.focus();
+    }
+  }, [focusOnMount, statId]);
   const statLabel = t(labels.statOptions[condition.stat]);
   const statItems: FilterOption[] = ITEM_STAT_FILTER_KEYS.map((stat) => ({
     value: stat,
@@ -323,7 +351,10 @@ function StatConditionFields({ condition, onChange, onRemove }: StatConditionFie
   }));
 
   return (
-    <div className="grid grid-cols-[1fr_8rem_auto] items-end gap-2 md:max-w-xl">
+    <fieldset
+      aria-label={t(labels.statRow, { number })}
+      className="grid min-w-0 grid-cols-[1fr_8rem_auto] items-end gap-2 md:max-w-xl"
+    >
       <FilterSelect
         id={statId}
         label={t(labels.stat)}
@@ -355,7 +386,7 @@ function StatConditionFields({ condition, onChange, onRemove }: StatConditionFie
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </Button>
-    </div>
+    </fieldset>
   );
 }
 
@@ -368,7 +399,7 @@ interface FilterSelectProps {
   disabled?: boolean;
 }
 
-/** A labelled filter dropdown; clearing the selection falls back to `all`. */
+/** A labelled filter dropdown; clearing the selection falls back to its first option. */
 function FilterSelect({ id, label, items, value, onValueChange, disabled }: FilterSelectProps) {
   return (
     <div className="grid gap-2">
@@ -377,7 +408,7 @@ function FilterSelect({ id, label, items, value, onValueChange, disabled }: Filt
         items={items}
         value={value}
         disabled={disabled}
-        onValueChange={(next) => onValueChange((next as string | null) ?? 'all')}
+        onValueChange={(next) => onValueChange((next as string | null) ?? items[0]?.value ?? value)}
       >
         <SelectTrigger id={id} className="w-full">
           <SelectValue />

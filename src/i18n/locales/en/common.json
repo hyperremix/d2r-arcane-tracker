@@ -1018,6 +1018,7 @@
       "statMinValueLabel": "{{stat}} at least",
       "addStat": "Add stat",
       "removeStat": "Remove {{stat}} filter",
+      "statRow": "Stat filter {{number}}",
       "statOptions": {
         "life": "Life",
         "mana": "Mana",

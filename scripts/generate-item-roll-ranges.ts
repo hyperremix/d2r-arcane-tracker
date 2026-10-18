@@ -45,6 +45,25 @@ const FUNCTION_STATS: Record<number, string[]> = {
   7: ['item_maxdamage_percent'],
 };
 
+/**
+ * Elemental damage stats the save stores as one attribute per element (for example `coldmindam`
+ * holds minimum, maximum and length), so their min, max and length properties can't be read apart.
+ */
+const MERGED_DAMAGE_STATS = new Set([
+  'firemindam',
+  'firemaxdam',
+  'lightmindam',
+  'lightmaxdam',
+  'magicmindam',
+  'magicmaxdam',
+  'coldmindam',
+  'coldmaxdam',
+  'coldlength',
+  'poisonmindam',
+  'poisonmaxdam',
+  'poisonlength',
+]);
+
 type JsonRow = Record<string, unknown>;
 type RollPropertyKind = 'value' | 'param' | 'other';
 
@@ -112,7 +131,10 @@ function buildPropertyDefinitions(rows: JsonRow[]): Map<string, PropertyDefiniti
 
     const { functions, stats } = readPropertyFunctions(row);
     const firstFunction = functions[0];
-    const isValue = functions.length > 0 && functions.every((func) => VALUE_FUNCTIONS.has(func));
+    const isValue =
+      functions.length > 0 &&
+      functions.every((func) => VALUE_FUNCTIONS.has(func)) &&
+      !stats.some((stat) => MERGED_DAMAGE_STATS.has(stat));
     const isParam =
       functions.length === 1 && firstFunction !== undefined && PARAM_FUNCTIONS.has(firstFunction);
     const kind: RollPropertyKind = isValue ? 'value' : isParam ? 'param' : 'other';

@@ -1278,6 +1278,45 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(within(matches).getByText('Small Charm of Life')).toBeInTheDocument();
     });
 
+    it('Then each stat row is a labelled group inside the Item properties group', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+
+      // Assert
+      const properties = screen.getByRole('group', { name: 'Item properties' });
+      expect(within(properties).getByRole('group', { name: 'Stat filter 1' })).toBeInTheDocument();
+      expect(within(properties).getByRole('group', { name: 'Stat filter 2' })).toBeInTheDocument();
+    });
+
+    it('Then a new stat row gets the focus and removing a row moves the focus to Add stat', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      const newRow = screen.getByRole('group', { name: 'Stat filter 1' });
+
+      // Assert
+      await waitFor(() => {
+        expect(within(newRow).getByRole('combobox', { name: 'Stat' })).toHaveFocus();
+      });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Life filter' }));
+
+      // Assert
+      expect(screen.queryByRole('group', { name: 'Stat filter 1' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add stat' })).toHaveFocus();
+    });
+
     it('Then sorting by roll quality puts the best vaulted roll first', async () => {
       // Arrange: two Annihilus (unique 381), one perfect and one with the lowest rolls
       const rawAnnihilus = (statValue: number, experience: number) =>

@@ -61,17 +61,20 @@ function readAttributes(magicAttributes: unknown, displayed: unknown): ReadAttri
     return [];
   }
 
-  const displayedAttributes = Array.isArray(displayed) ? displayed : [];
-  return magicAttributes.flatMap((attribute: RollItemAttribute, index): ReadAttribute[] => {
+  const displayedAttributes: RollItemAttribute[] = Array.isArray(displayed) ? displayed : [];
+  return magicAttributes.flatMap((attribute: RollItemAttribute): ReadAttribute[] => {
     if (!attribute || typeof attribute.name !== 'string' || !Array.isArray(attribute.values)) {
       return [];
     }
     const values = attribute.values.filter((value): value is number => typeof value === 'number');
-    const shown = displayedAttributes[index] as RollItemAttribute | undefined;
-    const description =
-      shown?.name === attribute.name && typeof shown.description === 'string'
-        ? shown.description
-        : undefined;
+    // The displayed attributes can be in another order, so they are matched by stat and values
+    const shown = displayedAttributes.find(
+      (candidate) =>
+        candidate?.name === attribute.name &&
+        Array.isArray(candidate.values) &&
+        candidate.values.join() === values.join(),
+    );
+    const description = typeof shown?.description === 'string' ? shown.description : undefined;
     return values.length > 0 ? [{ name: attribute.name, values, description }] : [];
   });
 }
@@ -156,10 +159,11 @@ function rateProperty(
     return { propertyCode, min, max };
   }
 
-  const ratio = (rolled.value - min) / (max - min);
   // A value outside the range means the item doesn't match this game data (for example a patch
   // changed the range), so it is shown but not rated.
-  const percent = ratio >= 0 && ratio <= 1 ? ratio * 100 : undefined;
+  const isInRange = rolled.value >= Math.min(min, max) && rolled.value <= Math.max(min, max);
+  // Integer math: dividing first would round values like 229 in 200 to 300 down to 28.99...
+  const percent = isInRange ? ((rolled.value - min) * 100) / (max - min) : undefined;
   return { propertyCode, min, max, value: rolled.value, percent, description: rolled.description };
 }
 

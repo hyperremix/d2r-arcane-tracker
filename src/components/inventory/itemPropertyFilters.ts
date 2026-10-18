@@ -118,7 +118,7 @@ export function matchesItemPropertyFilters(
 }
 
 /** Overall roll quality of an item, or -1 when it has none (sorts after every rated item). */
-function getRollSortValue(item: ItemPropertiesSource): number {
+export function getRollSortValue(item: ItemPropertiesSource): number {
   return getItemProperties(item).rollQuality?.percent ?? -1;
 }
 
