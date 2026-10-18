@@ -1142,6 +1142,7 @@
     "quests": {
       "title": "Quest rewards",
       "description": "Rewards that are earned but not taken yet are highlighted.",
+      "unconfirmedNote": "Radament's skill point, Larzuk's socket and Akara's reset are read from flags that weren't confirmed in game.",
       "noData": "The quest data of this save couldn't be read.",
       "rewardColumn": "Reward",
       "states": {
@@ -1241,7 +1242,7 @@
       "fasterHitRecovery": "Faster hit recovery",
       "fasterBlockRate": "Faster block rate",
       "increasedAttackSpeed": "Increased attack speed",
-      "notCounted": "Not counted: set bonuses, auras, skills, shrines and the mercenary. Breakpoints use the standard table of the class; some skills, weapons and wereforms have their own."
+      "notCounted": "Not counted: set bonuses, auras, skills, shrines and the mercenary. Item requirements aren't checked and charms only count in the inventory grid. Breakpoints use the standard table of the class; some skills, weapons and shapeshifted forms have their own."
     }
   },
   "gameItemTooltip": {

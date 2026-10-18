@@ -20,15 +20,15 @@ const BASE_RESISTANCE_CAP = 75;
 const MAX_RESISTANCE_CAP = 95;
 
 /**
- * Resistance penalty of each difficulty, from D2R's `difficultylevels.txt` (`ResistPenalty` for
- * expansion characters, `ResistPenaltyNonExpansion` for classic ones).
+ * Resistance penalty of each difficulty, as listed for D2R's `difficultylevels.txt` (expansion and
+ * classic characters have separate values).
  */
 const RESISTANCE_PENALTY: Record<'expansion' | 'classic', Record<Difficulty, number>> = {
   expansion: { normal: 0, nightmare: -40, hell: -100 },
   classic: { normal: 0, nightmare: -20, hell: -50 },
 };
 const DIFFICULTIES: readonly Difficulty[] = ['normal', 'nightmare', 'hell'];
-/** All resistances bonus of one Scroll of Resistance. */
+/** All resistances bonus of one Scroll of Resistance, assumed to apply in every difficulty. */
 const ANYA_SCROLL_RESISTANCE = 10;
 
 const RESISTANCE_STATS: Record<ResistanceKind, { value: string; max: string }> = {

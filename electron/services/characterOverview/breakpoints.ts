@@ -1,16 +1,5 @@
 import type { BreakpointPosition, CharacterClass } from '../../types/grail';
 
-/**
- * Faster cast rate, faster hit recovery and faster block rate breakpoints per class, in percent.
- *
- * The rows are the michaelangel007 D2 cheat sheet rows that bengous/d2-lab
- * (tools/d2r-data/check-breakpoints.py, MIT) rebuilds from the `animdata.d2` of D2R 3.3.93847.
- * Each class has its standard row: the Druid and Necromancer in human form, the Druid's hit
- * recovery for weapons other than one-handed swinging ones, the Paladin's hit recovery for
- * weapons other than spears and staves, and the Amazon's block for weapons other than one-handed
- * swinging ones. Skill-specific rows (Lightning and Chain Lightning, Holy Shield) and wereforms
- * are not included.
- */
 interface ClassBreakpoints {
   fasterCastRate: readonly number[];
   fasterHitRecovery: readonly number[];
@@ -19,6 +8,17 @@ interface ClassBreakpoints {
 
 type PlayableClass = Exclude<CharacterClass, 'shared_stash'>;
 
+/**
+ * Faster cast rate, faster hit recovery and faster block rate breakpoints per class, in percent.
+ *
+ * The rows are the michaelangel007 D2 cheat sheet rows that bengous/d2-lab
+ * (tools/d2r-data/check-breakpoints.py, MIT) rebuilds from the `animdata.d2` of D2R 3.3.93847.
+ * Each class has its standard row: the Druid and Necromancer in human form, the Druid's hit
+ * recovery for weapons other than one-handed swinging ones, the Paladin's hit recovery for
+ * weapons other than spears and staves, and the Amazon's block for weapons other than one-handed
+ * swinging ones. Skill-specific rows (Lightning and Chain Lightning, Holy Shield) and shapeshifted
+ * forms (werewolf, werebear, vampire) are not included.
+ */
 const CLASS_BREAKPOINTS: Record<PlayableClass, ClassBreakpoints> = {
   amazon: {
     fasterCastRate: [0, 7, 14, 22, 32, 48, 68, 99, 152],

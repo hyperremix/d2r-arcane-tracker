@@ -139,42 +139,47 @@ function QuestRewardsCard({ overview }: { overview: CharacterOverview }) {
       </CardHeader>
       <CardContent>
         {overview.questDataAvailable ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t(overviewKeys.quests.rewardColumn)}</TableHead>
-                {overview.difficulties.map((progress) => (
-                  <TableHead key={progress.difficulty}>
-                    {t(DIFFICULTY_LABEL_KEYS[progress.difficulty])}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rewardIds.map((reward) => (
-                <TableRow key={reward}>
-                  <TableHead scope="row" className="whitespace-normal font-normal">
-                    {t(overviewKeys.quests.rewards[reward])}
-                  </TableHead>
-                  {overview.difficulties.map((progress) => {
-                    const state =
-                      progress.rewards.find((status) => status.reward === reward)?.state ??
-                      'notEarned';
-                    return (
-                      <TableCell
-                        key={progress.difficulty}
-                        className={cn(state === 'unclaimed' && 'bg-primary/10')}
-                      >
-                        <Badge variant={REWARD_STATE_BADGE[state]}>
-                          {t(rewardStateLabelKey(reward, state))}
-                        </Badge>
-                      </TableCell>
-                    );
-                  })}
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t(overviewKeys.quests.rewardColumn)}</TableHead>
+                  {overview.difficulties.map((progress) => (
+                    <TableHead key={progress.difficulty}>
+                      {t(DIFFICULTY_LABEL_KEYS[progress.difficulty])}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rewardIds.map((reward) => (
+                  <TableRow key={reward}>
+                    <TableHead scope="row" className="whitespace-normal font-normal">
+                      {t(overviewKeys.quests.rewards[reward])}
+                    </TableHead>
+                    {overview.difficulties.map((progress) => {
+                      const state =
+                        progress.rewards.find((status) => status.reward === reward)?.state ??
+                        'notEarned';
+                      return (
+                        <TableCell
+                          key={progress.difficulty}
+                          className={cn(state === 'unclaimed' && 'bg-primary/10')}
+                        >
+                          <Badge variant={REWARD_STATE_BADGE[state]}>
+                            {t(rewardStateLabelKey(reward, state))}
+                          </Badge>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <p className="mt-3 text-muted-foreground text-xs">
+              {t(overviewKeys.quests.unconfirmedNote)}
+            </p>
+          </>
         ) : (
           <p className="text-muted-foreground text-sm">{t(overviewKeys.quests.noData)}</p>
         )}

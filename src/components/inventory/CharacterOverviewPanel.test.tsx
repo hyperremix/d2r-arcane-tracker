@@ -166,6 +166,21 @@ describe('When CharacterOverviewPanel shows the overview of a character save', (
       ]);
     });
 
+    it("Then a note says that Radament, Larzuk and Akara's reset are read from unconfirmed flags", async () => {
+      // Arrange
+      getCharacterOverview.mockResolvedValue(buildOverview());
+
+      // Act
+      render(<CharacterOverviewPanel filePath={FILE_PATH} />);
+
+      // Assert
+      expect(
+        await screen.findByText(
+          "Radament's skill point, Larzuk's socket and Akara's reset are read from flags that weren't confirmed in game.",
+        ),
+      ).toBeInTheDocument();
+    });
+
     it('Then missing waypoints are listed by act, and unreached difficulties are marked', async () => {
       // Arrange
       getCharacterOverview.mockResolvedValue(buildOverview());
@@ -224,6 +239,7 @@ describe('When CharacterOverviewPanel shows the overview of a character save', (
         await screen.findByText("The quest data of this save couldn't be read."),
       ).toBeInTheDocument();
       expect(screen.queryByText('Den of Evil: skill point')).not.toBeInTheDocument();
+      expect(screen.queryByText(/weren't confirmed in game/)).not.toBeInTheDocument();
     });
   });
 

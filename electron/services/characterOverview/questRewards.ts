@@ -9,7 +9,8 @@ import type { QuestRewardId, QuestRewardState, QuestRewardStatus } from '../../t
  * reward granted, bit 1: requirements met and the reward waits, Golden Bird bit 5 and Prison of
  * Ice bit 7), D2SSharp's `QuestFlags` and `ActVQuests` (slot 41 holds Akara's respec, bit 0 when
  * used, bit 1 when available) and D2CE's `ActsInfo` (same slot, reads a set low byte as "Akara has
- * reset stat/skill points").
+ * reset stat/skill points"). The Potion of Life (bit 5) and Scroll of Resistance (bit 7) bits follow
+ * Trevin's notes and the real v105 fixture; D2CE's table numbers them differently (6 and 8).
  */
 
 /** "Woo!", version 6 and size 298, the header in front of the quest words. */
