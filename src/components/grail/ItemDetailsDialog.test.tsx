@@ -55,6 +55,7 @@ const mockRemoveProgress = vi.fn();
 const mockVaultSearch = vi.fn();
 const mockVaultAddItem = vi.fn();
 const mockVaultRemoveItem = vi.fn();
+const mockInventorySearchAll = vi.fn();
 
 function setupStoreMock(
   overrides: {
@@ -94,10 +95,34 @@ describe('When ItemDetailsDialog is rendered', () => {
           addItem: mockVaultAddItem,
           removeItem: mockVaultRemoveItem,
         },
+        inventory: { searchAll: mockInventorySearchAll },
       },
     });
     mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+    mockInventorySearchAll.mockResolvedValue({
+      inventory: { snapshots: [], totalSnapshots: 0, totalItems: 0 },
+      vault: { items: [], total: 0, page: 1, pageSize: 200 },
+    });
     setupStoreMock();
+  });
+
+  describe('If the dialog is open', () => {
+    it('Then it lists the copies of the item in the saves and vault', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const copies = await screen.findByRole('region', { name: 'Your copies' });
+      expect(
+        await within(copies).findByText(
+          'No copy of this item is in your characters, stashes or vault right now.',
+        ),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('If itemId is null', () => {
