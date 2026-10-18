@@ -63,9 +63,9 @@ export const faqs: FaqEntry[] = [
   {
     question: 'Is there a macOS or Linux version?',
     answer: [
-      'No. The app is only released for Windows 10 or later (64-bit). The ',
+      "There's a Linux version, an AppImage that also runs on the Steam Deck, for D2R running through Proton or Wine. Run Tracker auto mode is Windows-only there. There's no macOS version. The ",
       { text: 'tracker comparison', href: guideUrl('COMPARISON.md') },
-      ' lists other trackers, including ones that run on macOS and Linux.',
+      ' lists other trackers, including ones that run on macOS.',
     ],
   },
   {
@@ -81,7 +81,7 @@ export const faqs: FaqEntry[] = [
       { code: '%USERPROFILE%\\Saved Games\\Diablo II Resurrected' },
       ', the folder with your ',
       { code: '.d2s' },
-      ' character files. The app uses that folder by default. If you pick its parent folder or one of its subfolders in the setup wizard, the wizard suggests the right one.',
+      ' character files. The app uses that folder by default. If you pick its parent folder or one of its subfolders in the setup wizard, the wizard suggests the right one. On Linux and Steam Deck the folder is inside the Proton or Wine prefix the game runs in, and the app looks for it there.',
     ],
   },
   {
@@ -99,7 +99,7 @@ export const faqs: FaqEntry[] = [
   {
     question: 'How does it compare to other grail trackers?',
     answer: [
-      "It's a Windows desktop app that keeps watching your save folder, works offline and needs no account. It also has a run tracker, an offline terror zone schedule and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
+      "It's a desktop app for Windows and Linux that keeps watching your save folder, works offline and needs no account. It also has a run tracker, an offline terror zone schedule and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
       { text: 'tracker comparison', href: guideUrl('COMPARISON.md') },
       '.',
     ],

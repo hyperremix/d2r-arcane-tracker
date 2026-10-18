@@ -35,7 +35,9 @@ describe('When the client picks the page to hydrate', () => {
 
     // Assert
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Download for Windows' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Download for Windows and Linux' }),
+    ).toBeInTheDocument();
   });
 
   it('If the guide in the page is unknown, then the home page is rendered', () => {

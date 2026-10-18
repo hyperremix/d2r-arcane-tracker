@@ -29,13 +29,31 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 
 ## Install
 
+### Windows
+
 Requires Windows 10 or later (64-bit) and Diablo II: Resurrected.
 
 1. Download `D2R-Arcane-Tracker-Windows-<version>-Setup.exe` from the [latest release](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest).
 2. Run the installer. The app isn't code-signed, so Windows may show "Windows protected your PC". Click **More info → Run anyway**.
 3. Start the app and follow the setup wizard. Your save folder is usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`.
 
-The app checks for updates on startup and installs them when you confirm.
+### Linux and Steam Deck
+
+For D2R running through Proton or Wine: the Steam release, Battle.net added to Steam as a non-Steam game, Lutris, Heroic, Bottles or plain Wine. Requires a 64-bit (x64) Linux.
+
+1. On a Steam Deck, switch to **Desktop Mode** first.
+2. Download `D2R-Arcane-Tracker-Linux.AppImage` from the [latest release](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest).
+3. Make it executable: right-click it, open **Properties → Permissions** and tick **Is executable**, or run `chmod +x D2R-Arcane-Tracker-Linux.AppImage`.
+4. Start it and follow the setup wizard. The app looks for your save folder inside the game's Wine or Proton prefix and fills it in, for example `~/.local/share/Steam/steamapps/compatdata/<ID>/pfx/drive_c/users/steamuser/Saved Games/Diablo II Resurrected`. It checks Steam (including libraries on an SD card), Lutris (`~/Games`), Heroic (`~/Games/Heroic/Prefixes`), Bottles and `~/.wine`. If it finds nothing, or picks the wrong prefix, click **Browse**. The folders start with a dot, so they're hidden in the file dialog; press `Ctrl+H` to show them.
+
+Good to know:
+
+- If the AppImage doesn't start and mentions FUSE, install your distribution's `libfuse2` package, or start it with `--appimage-extract-and-run`.
+- In Game Mode, Steam shows one game at a time. Play in Desktop Mode to keep the tracker open next to D2R. You can add the AppImage to Steam with **Add a Non-Steam Game** to start it from Game Mode.
+- Run Tracker [auto mode](docs/RUN_TRACKER.md#auto-mode-windows-only) is Windows-only. Use the manual controls and shortcuts instead.
+- Linux support is new and hasn't been tested on a Steam Deck yet. If something doesn't work, please [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues).
+
+The app checks for updates on startup and installs them when you confirm. On Linux this updates the AppImage file in place, so keep it in a folder you can write to.
 
 ## Documentation
 

@@ -4,7 +4,7 @@ This compares D2R Arcane Tracker with other popular Holy Grail trackers. The oth
 
 | | D2R Arcane Tracker | [d2grail.com](https://d2grail.com/) | [diablo2.io](https://diablo2.io/holygrailtracker.php) | [holygrail.link](https://holygrail.link/) | [Nasicus/d2-holy-grail](https://github.com/Nasicus/d2-holy-grail) |
 | --- | --- | --- | --- | --- | --- |
-| Type | Desktop (Windows) | Web | Web | Desktop (Windows, macOS, Linux) | Web, self-hostable |
+| Type | Desktop (Windows, Linux and Steam Deck) | Web | Web | Desktop (Windows, macOS, Linux) | Web, self-hostable |
 | Automatic save import | ✅ Continuous | ❌ | ⚠️ Manual upload | ✅ Continuous | ❌ |
 | Works offline | ✅ | ❌ | ❌ | ✅ | ⚠️ Self-hosted |
 | Open source | ✅ MIT | ❌ | ❌ | ✅ | ✅ |
@@ -23,7 +23,7 @@ All of them are free. [maxroll.gg](https://maxroll.gg/d2/) is a good reference f
 
 ## Where each one fits
 
-- **D2R Arcane Tracker** is for offline, hands-off tracking on Windows. Items are recorded as soon as they're detected, so you can sell or drop them afterward and don't need mule characters. It also has a run tracker with exports, an offline terror zone schedule and a terror zone editor. The trade-offs: it's Windows-only, classic D2 support is limited, and it has no OBS feed.
+- **D2R Arcane Tracker** is for offline, hands-off tracking on Windows, and on Linux and Steam Deck when D2R runs through Proton or Wine. Items are recorded as soon as they're detected, so you can sell or drop them afterward and don't need mule characters. It also has a run tracker with exports, an offline terror zone schedule and a terror zone editor. The trade-offs: there's no macOS version, Run Tracker auto mode is Windows-only, classic D2 support is limited, and it has no OBS feed.
 - **holygrail.link** supports more versions (D2R, LoD, PlugY), runs on more operating systems, and can feed OBS. It's the better pick for classic D2 players and for streamers who want an OBS overlay.
 - **d2grail.com** is an established web tracker with a good item database. You mark items by hand and can keep separate grails for ladder, non-ladder, softcore and hardcore.
 - **diablo2.io** fits players already using its trading community. You can upload `.d2s` and `.d2i` files to import items once, record drop details, and share your progress by URL.
@@ -34,6 +34,6 @@ All of them are free. [maxroll.gg](https://maxroll.gg/d2/) is a good reference f
 | If you want… | Use |
 | --- | --- |
 | Automatic offline tracking, no mules, run tracking or terror zones | D2R Arcane Tracker |
-| Classic D2 or PlugY, macOS or Linux, or an OBS feed | holygrail.link |
+| Classic D2 or PlugY, macOS, or an OBS feed | holygrail.link |
 | A web tracker you can use on any device | d2grail.com or diablo2.io |
 | Full control over a self-hosted web app | Nasicus/d2-holy-grail |
