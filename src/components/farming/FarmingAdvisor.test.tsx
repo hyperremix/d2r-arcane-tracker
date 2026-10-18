@@ -145,7 +145,7 @@ describe('When the farming advisor page is shown', () => {
     expect(screen.getByText(/treasureclassex\.txt, levels\.txt/)).toBeInTheDocument();
   });
 
-  it('Then the missing items are requested for the highest character level', async () => {
+  it('If the page is shown, Then the missing items are requested for the highest character level', async () => {
     // Arrange
     const getOverview = vi.fn().mockResolvedValue(readyOverview);
 
@@ -163,7 +163,7 @@ describe('When the farming advisor page is shown', () => {
     ).toBeInTheDocument();
   });
 
-  it('Then the current terror zone shows how many missing items drop there when terrorized', async () => {
+  it('If the overview is ready, Then the current terror zone shows how many missing items drop there when terrorized', async () => {
     // Arrange
     const getOverview = vi.fn().mockResolvedValue(readyOverview);
 
@@ -199,7 +199,7 @@ describe('When the farming advisor page is shown', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('Then the terror zones section points to the assumed monster level rules', async () => {
+  it('If the overview is ready, Then the terror zones section points to the assumed monster level rules', async () => {
     // Arrange
     const getOverview = vi.fn().mockResolvedValue(readyOverview);
 
@@ -212,6 +212,34 @@ describe('When the farming advisor page is shown', () => {
         'Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('If a terror zone has no missing items that can drop, Then it shows its counts instead of the missing data message', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue({
+      ...readyOverview,
+      terrorZones: [
+        {
+          zoneId: 'Act1-Tower',
+          difficulty: 'hell',
+          monsterLevel: { min: 92, max: 95 },
+          itemIndexes: [],
+        },
+      ],
+    });
+
+    // Act
+    setup(getOverview);
+
+    // Assert
+    const current = await screen.findByTestId('farming-terror-zone-current');
+    expect(within(current).getByText('Forgotten Tower')).toBeInTheDocument();
+    expect(
+      within(current).getByRole('button', { name: /Hell: 0 items, monster level 92–95/ }),
+    ).toBeDisabled();
+    expect(
+      within(current).queryByText('The game files have no drop data for this terror zone.'),
+    ).not.toBeInTheDocument();
   });
 
   it('If a location is expanded and an item selected, Then the item details open', async () => {

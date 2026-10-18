@@ -138,7 +138,7 @@ describe('When the terrorized locations are built', () => {
   };
   const terrorized = buildTerrorZoneLocations(dataset, terrorZones, 90);
 
-  it('Then monsters are terrorized from the character level and super uniques use their terror zone treasure class', () => {
+  it('If locations are terrorized at a character level, Then monsters are terrorized from it and super uniques use their terror zone treasure class', () => {
     // Arrange & Act
     const area = find('terrorZone:Act1-Tower:area:hell', terrorized);
     const countess = find('terrorZone:Act1-Tower:superUnique:The Countess:hell', terrorized);
@@ -183,7 +183,7 @@ describe('When it is checked which items can drop where', () => {
     unique: highRing,
   };
 
-  it('Then an item drops only where a monster reaches its treasure class and item level', () => {
+  it('If an item is looked for, Then it drops only where a monster reaches its treasure class and item level', () => {
     // Arrange
     const targets = [rune, ring, undefined];
 
@@ -198,7 +198,7 @@ describe('When it is checked which items can drop where', () => {
     expect(byId.get('boss:andariel:hell')).toEqual([]);
   });
 
-  it('Then the item sources list the drops per kill of each monster kind, most first', () => {
+  it('If the sources of an item are listed, Then they list the drops per kill of each monster kind, most first', () => {
     // Arrange & Act
     const sources = findItemSources(dataset, rune, locations, { players: 1, magicFind: 0 });
 

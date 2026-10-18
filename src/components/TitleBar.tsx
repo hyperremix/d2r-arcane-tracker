@@ -233,7 +233,7 @@ export function TitleBar() {
             ))}
           </ul>
           <div aria-hidden="true" className="mx-2 h-5 w-px bg-border" />
-          <ul className="flex items-center gap-1">
+          <ul className="flex items-center gap-0.5">
             {SECONDARY_NAVIGATION_ITEMS.map((item) => (
               <li key={item.to}>
                 <NavigationLink

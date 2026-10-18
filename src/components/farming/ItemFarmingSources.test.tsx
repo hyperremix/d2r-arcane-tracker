@@ -45,11 +45,12 @@ describe('When the farming sources of an item are shown', () => {
   });
 
   afterEach(() => {
+    useFarmingSessionStore.getState().reset();
     vi.useRealTimers();
     window.electronAPI = originalElectronAPI;
   });
 
-  it('Then each source shows its location, monster kind, level and drop rate', async () => {
+  it('If the sources are loaded, Then each source shows its location, monster kind, level and drop rate', async () => {
     // Arrange
     const result: FarmingItemSources = {
       status: 'ready',

@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: handlers are retrieved from mocked ipcMain.handle calls */
 import { ipcMain } from 'electron';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GrailDatabase } from '../database/database';
 import { EventBus } from '../services/EventBus';
 import type { FarmingService } from '../services/farming/farmingService';
@@ -27,18 +27,25 @@ const itemSourcesRequest = { itemId: 'ber', players: 3, magicFind: 200, characte
 
 describe('When the farming handlers are initialized', () => {
   let dispose: () => void;
+  const consoleSpies: Array<{ mockRestore: () => void }> = [];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleSpies.push(
+      vi.spyOn(console, 'log').mockImplementation(() => undefined),
+      vi.spyOn(console, 'error').mockImplementation(() => undefined),
+    );
     dispose = initializeFarmingHandlers({
       farmingService: { getOverview, getItemSources } as unknown as FarmingService,
       settings: new SettingsService(grailDatabase as unknown as GrailDatabase, new EventBus()),
     });
   });
 
-  it('Then both farming channels are handled and disposing removes them', () => {
+  afterEach(() => {
+    for (const spy of consoleSpies.splice(0)) spy.mockRestore();
+  });
+
+  it('If the handlers are initialized and then disposed, Then both farming channels are handled and removed', () => {
     // Arrange
     const channels = vi.mocked(ipcMain.handle).mock.calls.map((call) => call[0]);
 

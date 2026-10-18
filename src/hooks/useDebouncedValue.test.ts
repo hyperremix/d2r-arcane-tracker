@@ -13,7 +13,7 @@ describe('When useDebouncedValue is used', () => {
     vi.useRealTimers();
   });
 
-  it('Then the first value is returned immediately', () => {
+  it('If it is rendered for the first time, Then the first value is returned immediately', () => {
     // Arrange & Act
     const { result } = renderHook(() => useDebouncedValue(5, DELAY_MS));
 
