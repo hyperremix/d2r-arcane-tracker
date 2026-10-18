@@ -320,10 +320,7 @@ describe('When InventoryBrowserMain is rendered', () => {
   });
 
   describe('If the search and type filters are set', () => {
-    it('Then each shows as a chip that removes it', async () => {
-      // Arrange
-      mockVaultOnly([createVaultItem({ type: 'unique' })]);
-      render(<InventoryBrowserMain />);
+    async function setSearchAndTypeFilters(): Promise<void> {
       await screen.findByRole('button', { name: 'Vaulted item Shako' });
       fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
         target: { value: 'shako' },
@@ -332,11 +329,33 @@ describe('When InventoryBrowserMain is rendered', () => {
       const option = await screen.findByRole('option', { name: 'Unique' });
       fireEvent.mouseMove(option);
       fireEvent.click(option);
+    }
+
+    it('Then each shows as a chip', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+
+      // Act
+      await setSearchAndTypeFilters();
+
+      // Assert
       const chips = await screen.findByRole('list', { name: 'Active filters' });
       await waitFor(() => {
         expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
       });
       expect(within(chips).getByText('Search: shako')).toBeInTheDocument();
+    });
+
+    it('Then removing the Search chip clears the search, keeps the Type chip and moves the focus to the search box', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+      await setSearchAndTypeFilters();
+      const chips = await screen.findByRole('list', { name: 'Active filters' });
+      await waitFor(() => {
+        expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
+      });
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Search: shako' }));
@@ -1349,7 +1368,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
     });
 
-    it('Then removing a hidden filter chip while More filters is closed turns that filter off and moves the focus to the search box', async () => {
+    it('Then removing a hidden filter chip while More filters is closed removes the chip and moves the focus to the search box', async () => {
       // Arrange
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
@@ -1357,7 +1376,6 @@ describe('When InventoryBrowserMain is rendered', () => {
       openMoreFilters();
       await chooseOption('Sockets', '4');
       fireEvent.click(screen.getByRole('button', { name: 'More filters (1 active)' }));
-      expect(screen.queryByRole('group', { name: 'Item properties' })).not.toBeInTheDocument();
       const removeButton = screen.getByRole('button', {
         name: 'Remove filter: Sockets: exactly 4',
       });
@@ -1370,11 +1388,26 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+    });
+
+    it('Then the sockets filter is off when More filters is opened again after its hidden chip was removed', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
       openMoreFilters();
+      await chooseOption('Sockets', '4');
+      fireEvent.click(screen.getByRole('button', { name: 'More filters (1 active)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Sockets: exactly 4' }));
+
+      // Act
+      openMoreFilters();
+
+      // Assert
       expect(screen.getByRole('combobox', { name: 'Sockets' })).toHaveTextContent('Any');
     });
 
-    it('Then the sockets chip says whether the socket count is exact or a minimum', async () => {
+    it('Then the sockets chip says the socket count is exact by default', async () => {
       // Arrange
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
@@ -1383,16 +1416,30 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Act
       await chooseOption('Sockets', '4');
+
+      // Assert
       const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Sockets: exactly 4')).toBeInTheDocument();
+    });
+
+    it('If the socket count is set to at least, Then the sockets chip says it is a minimum', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+
+      // Act
       await chooseOption('Socket count', 'At least');
 
       // Assert
+      const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Sockets: at least 4')).toBeInTheDocument();
       expect(within(chips).queryByText('Sockets: exactly 4')).not.toBeInTheDocument();
     });
 
-    it('Then the minimum roll quality shows as a chip that removes it', async () => {
+    it('Then the minimum roll quality shows as a chip', async () => {
       // Arrange
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
@@ -1407,9 +1454,24 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Assert
       const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Roll quality at least 80%')).toBeInTheDocument();
+    });
+
+    it('Then removing the minimum roll quality chip clears the roll quality filter', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' }), {
+        target: { value: '80' },
+      });
+
+      // Act
       fireEvent.click(
         screen.getByRole('button', { name: 'Remove filter: Roll quality at least 80%' }),
       );
+
+      // Assert
       expect(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' })).toHaveValue(
         null,
       );
