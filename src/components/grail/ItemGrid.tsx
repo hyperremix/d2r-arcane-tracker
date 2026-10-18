@@ -11,6 +11,7 @@ import { countActiveFilters, getItemCategoryRank, getItemTypeRank } from '@/lib/
 import { getGrailItemIconSize, getListRowHeightEstimate } from '@/lib/itemIconSize';
 import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
+import { FarmingHintsContext, useFarmingHints } from './farmingHints';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
 import type { ItemGridGroup } from './VirtualItemGrid';
@@ -69,11 +70,14 @@ export const ItemGrid = memo(function ItemGrid() {
   const viewMode = useGrailStore((state) => state.viewMode);
   const groupMode = useGrailStore((state) => state.groupMode);
   const setGroupMode = useGrailStore((state) => state.setGroupMode);
-  const totalItemCount = useGrailStore((state) => state.items.length);
+  const items = useGrailStore((state) => state.items);
+  const totalItemCount = items.length;
   const loading = useGrailStore((state) => state.loading);
   const hasActiveFilters = useGrailStore((state) => countActiveFilters(state.filter) > 0);
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  // Where to farm each missing item, for the card tooltips; computed once for all cards
+  const farmingHints = useFarmingHints(items, progress, settings);
 
   // Keep only items with a tracked version (normal and/or ethereal) according to grail settings
   const displayItems = useMemo(
@@ -147,14 +151,16 @@ export const ItemGrid = memo(function ItemGrid() {
         </div>
       ) : (
         /* Items Grid with Virtual Scrolling */
-        <VirtualizedItemsContainer
-          groupedItems={groupedItems}
-          viewMode={viewMode}
-          groupMode={groupMode}
-          progressLookup={progressLookup}
-          characters={characters}
-          handleItemClick={handleItemClick}
-        />
+        <FarmingHintsContext.Provider value={farmingHints}>
+          <VirtualizedItemsContainer
+            groupedItems={groupedItems}
+            viewMode={viewMode}
+            groupMode={groupMode}
+            progressLookup={progressLookup}
+            characters={characters}
+            handleItemClick={handleItemClick}
+          />
+        </FarmingHintsContext.Provider>
       )}
 
       {/* Item Details Dialog */}

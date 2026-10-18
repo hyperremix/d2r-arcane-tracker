@@ -22,27 +22,55 @@ describe('When filterAndSortItems is called', () => {
   const allTracked = { grailNormal: true, grailEthereal: true };
 
   describe('If sorting by found date and several items are missing', () => {
-    it('Then found items come first and missing items are ordered by name', () => {
-      // Arrange
+    const arrange = () => {
       const items = [
         HolyGrailItemBuilder.new().withId('c').withName('Cranebeak').build(),
+        HolyGrailItemBuilder.new().withId('old').withName('Old Find').build(),
         HolyGrailItemBuilder.new().withId('a').withName('Arreat').build(),
-        HolyGrailItemBuilder.new().withId('f').withName('Found Item').build(),
+        HolyGrailItemBuilder.new().withId('new').withName('New Find').build(),
         HolyGrailItemBuilder.new().withId('b').withName('Bloodfist').build(),
       ];
       const progress = [
         GrailProgressBuilder.new()
-          .withId('p1')
-          .withItemId('f')
+          .withId('p-old')
+          .withItemId('old')
           .withFoundDate(new Date('2024-01-01'))
           .build(),
+        GrailProgressBuilder.new()
+          .withId('p-new')
+          .withItemId('new')
+          .withFoundDate(new Date('2025-01-01'))
+          .build(),
       ];
+      return { items, progress };
+    };
+
+    it('Then missing items come first by name, followed by the newest finds first', () => {
+      // Arrange
+      const { items, progress } = arrange();
 
       // Act
       const result = filterAndSortItems(items, progress, noFilter, defaultSort, allTracked);
 
       // Assert
-      expect(result.map((item) => item.id)).toEqual(['f', 'a', 'b', 'c']);
+      expect(result.map((item) => item.id)).toEqual(['a', 'b', 'c', 'new', 'old']);
+    });
+
+    it('Then in ascending order missing items still come first, followed by the oldest finds', () => {
+      // Arrange
+      const { items, progress } = arrange();
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        progress,
+        noFilter,
+        { ...defaultSort, sortOrder: 'asc' },
+        allTracked,
+      );
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['a', 'b', 'c', 'old', 'new']);
     });
   });
 
@@ -380,7 +408,7 @@ describe('When filterAndSortItems is called', () => {
       const result = filterAndSortItems(items, progress, noFilter, defaultSort, trackedVersions);
 
       // Assert
-      expect(result.map((item) => item.id)).toEqual(['shako', 'needle', 'windforce']);
+      expect(result.map((item) => item.id)).toEqual(['needle', 'windforce', 'shako']);
     });
   });
 
@@ -417,7 +445,7 @@ describe('When filterAndSortItems is called', () => {
 
       // Assert
       expect(found.map((item) => item.id)).toEqual(['needle']);
-      expect(sorted.map((item) => item.id)).toEqual(['needle', 'a']);
+      expect(sorted.map((item) => item.id)).toEqual(['a', 'needle']);
     });
   });
 

@@ -138,7 +138,9 @@
       "setName": "Set: {{name}}",
       "cardLabel": "{{name}}, {{status}}",
       "versionFound": "{{version}} found",
-      "versionMissing": "{{version}} missing"
+      "versionMissing": "{{version}} missing",
+      "farmingHint": "Farm at {{location}} ({{difficulty}}, monster level {{level}})",
+      "farmingHintInArea": "Farm at {{location}} in {{area}} ({{difficulty}}, monster level {{level}})"
     },
     "statusIcons": {
       "recentlyFound": "Recently found!"
