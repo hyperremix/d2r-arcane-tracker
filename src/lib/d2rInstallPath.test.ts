@@ -34,6 +34,17 @@ describe('When getDefaultD2RPath is called', () => {
     expect(result).toBe('/Applications/Diablo II Resurrected.app');
   });
 
+  it('If the platform is Linux, Then it returns the Steam release folder', () => {
+    // Arrange
+    arrangePlatform('linux');
+
+    // Act
+    const result = getDefaultD2RPath();
+
+    // Assert
+    expect(result).toBe('~/.local/share/Steam/steamapps/common/Diablo II Resurrected');
+  });
+
   it('If the Electron API is unavailable, Then it returns the macOS default', () => {
     // Arrange
     window.electronAPI = undefined as unknown as typeof window.electronAPI;

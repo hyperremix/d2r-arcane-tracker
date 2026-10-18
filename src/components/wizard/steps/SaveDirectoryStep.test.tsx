@@ -112,6 +112,21 @@ describe('When SaveDirectoryStep is rendered', () => {
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
   });
 
+  it('When rendered on Linux, Then the typical location is inside a Proton prefix', async () => {
+    // Arrange
+    electronAPI.platform = 'linux';
+
+    // Act
+    await renderStep();
+
+    // Assert
+    expect(
+      screen.getByText(
+        '~/.local/share/Steam/steamapps/compatdata/[ID]/pfx/drive_c/users/steamuser/Saved Games/Diablo II Resurrected',
+      ),
+    ).toBeInTheDocument();
+  });
+
   describe('If the user browses to a different directory while progress exists', () => {
     it('Then a destructive confirmation is shown and no IPC change is made yet', async () => {
       // Arrange

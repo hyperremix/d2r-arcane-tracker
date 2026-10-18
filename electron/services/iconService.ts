@@ -4,6 +4,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { PNG } from 'pngjs';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { findWineD2RInstallations } from './winePrefixes';
 
 const log = createServiceLogger('IconService');
 
@@ -120,6 +121,9 @@ export class IconService {
         '/Applications/Diablo II Resurrected.app',
         path.join(home, 'Applications', 'Diablo II Resurrected.app'),
       );
+    } else if (currentPlatform === 'linux') {
+      // The Steam release, or a Battle.net install inside a Wine or Proton prefix
+      possiblePaths.push(...findWineD2RInstallations(home));
     }
 
     // Check each path
@@ -136,7 +140,8 @@ export class IconService {
 
   /**
    * Gets the platform's default D2R installation path, but only if it exists on disk,
-   * so the setup wizard never suggests a location that isn't there.
+   * so the setup wizard never suggests a location that isn't there. On Linux this is the first
+   * installation found in a Steam library or a Wine or Proton prefix.
    * Unlike {@link findD2RInstallation}, this does not change the configured path.
    * @returns The existing default installation path, or undefined
    */
@@ -147,6 +152,8 @@ export class IconService {
       defaultPath = WINDOWS_DEFAULT_D2R_INSTALL_PATH;
     } else if (currentPlatform === 'darwin') {
       defaultPath = MAC_DEFAULT_D2R_INSTALL_PATH;
+    } else if (currentPlatform === 'linux') {
+      [defaultPath] = findWineD2RInstallations(homedir());
     }
     return defaultPath && existsSync(defaultPath) ? defaultPath : undefined;
   }

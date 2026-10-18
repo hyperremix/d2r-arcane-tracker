@@ -18,6 +18,14 @@ The rest of the app works without this step.
 
 Extraction doesn't modify the game. Repeat it after a patch if you need new item icons or the patch changed terror zones.
 
+### On Linux and Steam Deck
+
+These steps haven't been tested on Linux yet:
+
+- CASC Viewer is a Windows program. Run `CascView.exe` with Wine, for example `wine CascView.exe`. In its folder dialog, drive `Z:` is your Linux root folder.
+- The D2R folder is `~/.local/share/Steam/steamapps/common/Diablo II Resurrected` for the Steam release. For a Battle.net install it's `drive_c/Program Files (x86)/Diablo II Resurrected` inside the game's Wine or Proton prefix. The app suggests the folder in **Settings → D2R installation** if it finds one of these.
+- Folder names are case-sensitive on Linux. Move the extracted folders into the top-level `Data` folder, with a capital D.
+
 ## Making D2R use the extracted files
 
 Item icons only need the files on disk. Terror zone changes also require D2R to load the extracted files instead of the archives:

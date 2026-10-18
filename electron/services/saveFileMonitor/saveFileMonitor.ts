@@ -17,6 +17,7 @@ import { createServiceLogger } from '../../utils/serviceLogger';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
 import type { SettingsService } from '../settingsService';
+import { findWineSaveDirectories } from '../winePrefixes';
 import { executeConcurrently } from './executeConcurrently';
 import { countAvailableRunes, mergeInventorySnapshots } from './inventorySnapshots';
 import {
@@ -171,12 +172,20 @@ class SaveFileMonitor {
   }
 
   /**
-   * Gets the platform-specific default save directory for Diablo 2 Resurrected.
+   * Gets the platform-specific default save directory for Diablo 2 Resurrected. On Linux, where the
+   * game runs under Wine or Proton, this is the first save folder found in a Wine prefix.
    * @private
    * @returns {string} The default save directory path for the current platform.
    */
   private getPlatformDefaultDirectory(): string {
-    return join(app.getPath('home'), 'Saved Games', 'Diablo II Resurrected');
+    const home = app.getPath('home');
+    if (process.platform === 'linux') {
+      const [detected] = findWineSaveDirectories(home);
+      if (detected) {
+        return detected;
+      }
+    }
+    return join(home, 'Saved Games', 'Diablo II Resurrected');
   }
 
   /**

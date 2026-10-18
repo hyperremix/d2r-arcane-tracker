@@ -789,7 +789,8 @@
       "browseForFolder": "Browse for folder",
       "typicalLocation": "Typical location:",
       "typicalLocationWindows": "C:\\Users\\[YourUsername]\\Saved Games\\Diablo II Resurrected",
-      "typicalLocationMac": "~/Library/Application Support/Diablo II Resurrected"
+      "typicalLocationMac": "~/Library/Application Support/Diablo II Resurrected",
+      "typicalLocationLinux": "~/.local/share/Steam/steamapps/compatdata/[ID]/pfx/drive_c/users/steamuser/Saved Games/Diablo II Resurrected"
     },
     "tracking": {
       "description": "Choose which characters and items count toward your Holy Grail. The defaults suit most players, and you can change them later in Settings."
