@@ -99,7 +99,10 @@
       "location": "Location",
       "type": "Type",
       "missingItems": "Missing items",
-      "none": "None of your missing items drop in this difficulty."
+      "none": "None of your missing items drop in this difficulty.",
+      "noMatches": "No location matches your search.",
+      "searchLabel": "Search locations",
+      "searchPlaceholder": "Search location, area or item..."
     },
     "itemSources": {
       "title": "Where to farm",

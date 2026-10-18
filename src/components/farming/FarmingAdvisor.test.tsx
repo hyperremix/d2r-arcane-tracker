@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { FarmingOverview, Item, TerrorZoneSchedule } from 'electron/types/grail';
+import type { FarmingOverviewData, Item, TerrorZoneSchedule } from 'electron/types/grail';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, HolyGrailItemBuilder } from '@/fixtures';
@@ -48,7 +48,7 @@ const schedule: TerrorZoneSchedule = {
   ],
 };
 
-const readyOverview: FarmingOverview = {
+const readyOverview: FarmingOverviewData = {
   status: 'ready',
   locations: [
     {
@@ -93,6 +93,21 @@ function setup(getOverview: ReturnType<typeof vi.fn>) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function manyLocationsOverview(count: number): FarmingOverviewData {
+  return {
+    ...readyOverview,
+    locations: Array.from({ length: count }, (_, index) => ({
+      id: `area:${index}:hell`,
+      kind: 'area' as const,
+      difficulty: 'hell' as const,
+      name: `Area ${String(index + 1).padStart(2, '0')}`,
+      monsterLevel: { min: 80, max: 80 },
+      // The first area also drops the second item, so it sorts first
+      itemIndexes: index === 0 ? [0, 1] : [0],
+    })),
+  };
 }
 
 describe('When the farming advisor page is shown', () => {
@@ -301,5 +316,65 @@ describe('When the farming advisor page is shown', () => {
       itemIds: ['harlequincrest', 'ber'],
       characterLevel: 75,
     });
+  });
+
+  it('If more locations drop missing items than fit a page, Then they are paged', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(manyLocationsOverview(12));
+    setup(getOverview);
+    await screen.findByText('Area 01');
+
+    // Act
+    const onFirstPage = screen.queryByText('Area 12');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Assert
+    expect(onFirstPage).not.toBeInTheDocument();
+    expect(screen.getByText('Area 12')).toBeInTheDocument();
+    expect(screen.queryByText('Area 01')).not.toBeInTheDocument();
+    expect(screen.getByText('11-12 of 12')).toBeInTheDocument();
+  });
+
+  it('If the locations are searched by item, Then only locations dropping a matching item remain', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(manyLocationsOverview(12));
+    setup(getOverview);
+    await screen.findByText('Area 01');
+
+    // Act
+    fireEvent.change(screen.getByLabelText('Search locations'), { target: { value: 'ber' } });
+
+    // Assert
+    expect(screen.getByText('Area 01')).toBeInTheDocument();
+    expect(screen.queryByText('Area 02')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument();
+  });
+
+  it('If a search is made on a later page, Then the results start at the first page', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(manyLocationsOverview(12));
+    setup(getOverview);
+    await screen.findByText('Area 01');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Act
+    fireEvent.change(screen.getByLabelText('Search locations'), { target: { value: 'area' } });
+
+    // Assert
+    expect(screen.getByText('Area 01')).toBeInTheDocument();
+    expect(screen.getByText('1-10 of 12')).toBeInTheDocument();
+  });
+
+  it('If no location matches the search, Then it says so', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(readyOverview);
+    setup(getOverview);
+    await screen.findByText('Mephisto');
+
+    // Act
+    fireEvent.change(screen.getByLabelText('Search locations'), { target: { value: 'zzz' } });
+
+    // Assert
+    expect(screen.getByText('No location matches your search.')).toBeInTheDocument();
   });
 });
