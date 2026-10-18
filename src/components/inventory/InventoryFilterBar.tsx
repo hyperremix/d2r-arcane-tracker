@@ -220,7 +220,16 @@ export function InventoryFilterBar({
     onTypeFilterChange('all'),
   );
   const propertyChips = propertyFilterProps ? buildPropertyFilterChips(propertyFilterProps, t) : [];
-  const chips = [...primaryChips, ...propertyChips];
+  // The removed chip and its button go away, so keyboard focus moves to the search box, which is
+  // always on the page
+  const focusSearch = () => document.getElementById(searchId)?.focus();
+  const chips = [...primaryChips, ...propertyChips].map((chip) => ({
+    ...chip,
+    onRemove: () => {
+      chip.onRemove();
+      focusSearch();
+    },
+  }));
 
   const clearAll = () => {
     onSearchTextChange('');
@@ -228,8 +237,7 @@ export function InventoryFilterBar({
     onLocationContextChange('all');
     onTypeFilterChange('all');
     propertyFilterProps?.onChange(DEFAULT_ITEM_PROPERTY_FILTERS);
-    // The chips and this button go away, so keyboard focus moves to the search box
-    document.getElementById(searchId)?.focus();
+    focusSearch();
   };
 
   return (

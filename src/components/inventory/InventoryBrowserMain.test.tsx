@@ -345,6 +345,30 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.getByRole('textbox', { name: 'Search' })).toHaveValue('');
       expect(within(chips).queryByText('Search: shako')).not.toBeInTheDocument();
       expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+    });
+
+    it('Then removing the Type chip sets the type back to all types and moves the focus to the search box', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Unique' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+      const removeButton = await screen.findByRole('button', {
+        name: 'Remove filter: Type: Unique',
+      });
+      removeButton.focus();
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All types');
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
     });
   });
 
@@ -1299,7 +1323,8 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Assert
       const toggle = screen.getByRole('button', { name: 'More filters (3 active)' });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      expect(toggle).toHaveTextContent('3');
+      expect(toggle).toHaveAccessibleName('More filters (3 active)');
+      expect(toggle).toHaveTextContent(/^More filters\s*3$/);
       expect(screen.queryByRole('group', { name: 'Item properties' })).not.toBeInTheDocument();
       const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Sockets: exactly 4')).toBeInTheDocument();
@@ -1324,7 +1349,74 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
     });
 
-    it('Then Clear all turns every filter off and moves the focus to the search box', async () => {
+    it('Then removing a hidden filter chip while More filters is closed turns that filter off and moves the focus to the search box', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+      fireEvent.click(screen.getByRole('button', { name: 'More filters (1 active)' }));
+      expect(screen.queryByRole('group', { name: 'Item properties' })).not.toBeInTheDocument();
+      const removeButton = screen.getByRole('button', {
+        name: 'Remove filter: Sockets: exactly 4',
+      });
+      removeButton.focus();
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+      openMoreFilters();
+      expect(screen.getByRole('combobox', { name: 'Sockets' })).toHaveTextContent('Any');
+    });
+
+    it('Then the sockets chip says whether the socket count is exact or a minimum', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+
+      // Act
+      await chooseOption('Sockets', '4');
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Sockets: exactly 4')).toBeInTheDocument();
+      await chooseOption('Socket count', 'At least');
+
+      // Assert
+      expect(within(chips).getByText('Sockets: at least 4')).toBeInTheDocument();
+      expect(within(chips).queryByText('Sockets: exactly 4')).not.toBeInTheDocument();
+    });
+
+    it('Then the minimum roll quality shows as a chip that removes it', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+
+      // Act
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' }), {
+        target: { value: '80' },
+      });
+
+      // Assert
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Roll quality at least 80%')).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Remove filter: Roll quality at least 80%' }),
+      );
+      expect(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' })).toHaveValue(
+        null,
+      );
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+    });
+
+    it('Then Clear all turns every filter off, keeps the sort order and moves the focus to the search box', async () => {
       // Arrange
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
@@ -1337,6 +1429,8 @@ describe('When InventoryBrowserMain is rendered', () => {
         target: { value: 'charm' },
       });
       await chooseOption('Ethereal', 'Not ethereal');
+      await chooseOption('Sockets', '4');
+      await chooseOption('Sort by', 'Best roll first');
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
@@ -1346,6 +1440,10 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
       expect(screen.getByRole('textbox', { name: 'Base item or type' })).toHaveValue('');
       expect(screen.getByRole('combobox', { name: 'Ethereal' })).toHaveTextContent('Any');
+      expect(screen.getByRole('combobox', { name: 'Sockets' })).toHaveTextContent('Any');
+      expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveTextContent(
+        'Best roll first',
+      );
       expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
