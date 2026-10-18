@@ -1182,7 +1182,15 @@
     },
     "filters": {
       "legend": "Filter items",
-      "scope": "Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches, and the matching items are listed below. Opened windows always show all items.",
+      "moreFilters": "More filters",
+      "moreFiltersWithCount": "More filters ({{count}} active)",
+      "chips": {
+        "value": "{{filter}}: {{value}}",
+        "socketsExactly": "Sockets: exactly {{count}}",
+        "socketsAtLeast": "Sockets: at least {{count}}",
+        "minRollPercent": "Roll quality at least {{value}}%",
+        "statAtLeast": "{{stat}} at least {{value}}"
+      },
       "vaultFiltered": "Showing only vaulted items that match your filters.",
       "itemProperties": "Item properties",
       "baseItem": "Base item or type",
@@ -1287,7 +1295,7 @@
     },
     "snapshotList": {
       "title": "Characters & stashes",
-      "description": "Open a character or stash in its own window to move its items. To vault an item, drag it from that window onto the vault area that appears here.",
+      "description": "Open a character or stash in its own window to move its items.",
       "empty": "No character or stash snapshots match your current filters.",
       "classLevel": "Level {{level}} {{characterClass}}"
     },
