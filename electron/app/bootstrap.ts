@@ -10,6 +10,7 @@ import { initializeIconHandlers } from '../ipc-handlers/iconHandlers';
 import { initializeInventoryWindowHandlers } from '../ipc-handlers/inventoryWindowHandlers';
 import { initializeRunTrackerHandlers } from '../ipc-handlers/runTrackerHandlers';
 import { initializeSaveFileHandlers } from '../ipc-handlers/saveFileHandlers';
+import { initializeSaveFileSnapshotHandlers } from '../ipc-handlers/saveFileSnapshotHandlers';
 import { initializeShellHandlers } from '../ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from '../ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
@@ -31,6 +32,7 @@ import { RunTrackerService } from '../services/runTracker';
 import { configureSaveFileBackups } from '../services/saveFileBackup';
 import * as saveFileEditor from '../services/saveFileEditor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
+import { SaveFileSnapshotService } from '../services/saveFileSnapshots';
 import { SettingsService } from '../services/settingsService';
 import { TerrorZoneService } from '../services/terrorZoneService';
 import { UpdateService } from '../services/updateService';
@@ -134,7 +136,8 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   });
 
   // Keep a copy of every save file before the vault/inventory editor modifies it
-  configureSaveFileBackups(path.join(app.getPath('userData'), 'save-file-backups'));
+  const saveFileBackupDirectory = path.join(app.getPath('userData'), 'save-file-backups');
+  configureSaveFileBackups(saveFileBackupDirectory);
 
   // Services, in dependency order
   const database = new GrailDatabase();
@@ -162,7 +165,24 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   lifecycle.onShutdown('process monitor', () => processMonitor?.shutdown());
   lifecycle.onShutdown('memory reader', () => memoryReader?.shutdown());
 
-  const saveFileMonitor = new SaveFileMonitor(eventBus, database, settings);
+  // Save files must not be edited while the game runs; uses the process monitor's state
+  const assertGameNotRunning = createGameProcessGuard({ processMonitor });
+
+  // Keeps a snapshot of every monitored save file whenever its content changes
+  const saveFileSnapshots = new SaveFileSnapshotService({
+    snapshotDirectory: path.join(app.getPath('userData'), 'save-file-snapshots'),
+    backupDirectory: saveFileBackupDirectory,
+    getSettings: () => settings.getAll(),
+    getSaveDirectory: (): string | undefined => getSaveDirectory(),
+    assertGameNotRunning,
+    writeSaveFile: saveFileEditor.replaceSaveFileContent,
+    rescan: (): Promise<void> => saveFileMonitor.refreshSaveFiles(),
+  });
+
+  const saveFileMonitor: SaveFileMonitor = new SaveFileMonitor(eventBus, database, settings, {
+    onSaveFileRead: (filePath, content): Promise<boolean> =>
+      saveFileSnapshots.capture(filePath, content),
+  });
   lifecycle.onShutdown('save file monitor', () => saveFileMonitor.shutdown());
   saveFileMonitor.start();
   // The effective save directory as the monitor applied it (see resolveEffectiveSaveDirectory)
@@ -184,8 +204,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   const vault = new VaultService({
     database,
     saveFileEditor,
-    // Save files must not be edited while the game runs; uses the process monitor's state
-    assertGameNotRunning: createGameProcessGuard({ processMonitor }),
+    assertGameNotRunning,
     getSaveDirectory,
     getInventorySnapshots: () => saveFileMonitor.getInventorySearchResult().snapshots,
   });
@@ -238,6 +257,10 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   lifecycle.onShutdown('grail detection pipeline', () => detectionPipeline.dispose());
   detectionPipeline.start();
   lifecycle.onShutdown('vault handlers', initializeVaultHandlers(vault));
+  lifecycle.onShutdown(
+    'save file snapshot handlers',
+    initializeSaveFileSnapshotHandlers(saveFileSnapshots),
+  );
   lifecycle.onShutdown(
     'run tracker handlers',
     initializeRunTrackerHandlers({

@@ -1,5 +1,7 @@
 import { isAbsolute } from 'node:path';
+import { parseSaveFileSnapshotId } from '../services/saveFileBackup';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
+import { MAX_SNAPSHOTS_PER_FILE, MIN_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { MAX_TERROR_ZONE_SCHEDULE_SLOTS } from '../types/terrorZones';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
@@ -248,6 +250,8 @@ const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
   runTrackerMemoryPollingInterval: true,
   runTrackerShortcuts: true,
   runTrackerGlobalHotkeys: true,
+  saveSnapshotsEnabled: true,
+  saveSnapshotsPerFile: true,
 };
 
 const rendererWritableSettingKeys: ReadonlySet<string> = new Set(
@@ -296,6 +300,18 @@ const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
       isValidRunTrackerShortcuts(value.runTrackerShortcuts),
     'Invalid runTrackerShortcuts setting: expected an object with a non-empty string for each shortcut action',
   );
+  // Settings that decide which save file snapshots are kept and deleted
+  ensure(
+    value.saveSnapshotsEnabled === undefined || typeof value.saveSnapshotsEnabled === 'boolean',
+    'Invalid saveSnapshotsEnabled setting: expected a boolean',
+  );
+  ensure(
+    value.saveSnapshotsPerFile === undefined ||
+      (Number.isInteger(value.saveSnapshotsPerFile) &&
+        (value.saveSnapshotsPerFile as number) >= MIN_SNAPSHOTS_PER_FILE &&
+        (value.saveSnapshotsPerFile as number) <= MAX_SNAPSHOTS_PER_FILE),
+    `Invalid saveSnapshotsPerFile setting: expected an integer from ${MIN_SNAPSHOTS_PER_FILE} to ${MAX_SNAPSHOTS_PER_FILE}`,
+  );
   return value as Partial<Settings>;
 };
 
@@ -343,6 +359,12 @@ const sqliteBackup: FieldValidator<Uint8Array> = (value) => {
   const header = String.fromCharCode(...value.subarray(0, SQLITE_HEADER.length));
   ensure(header === SQLITE_HEADER, 'Invalid backup data: not a SQLite database');
   return value;
+};
+
+/** A snapshot ID as listed by `saveSnapshots:list` (a copy file name, never a path). */
+const saveFileSnapshotId: FieldValidator<string> = (value) => {
+  ensure(parseSaveFileSnapshotId(value) !== undefined, 'Invalid snapshot ID');
+  return value as string;
 };
 
 /**
@@ -406,6 +428,10 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'saveFile:getAvailableRunes': noArgs,
   'saveFile:refreshSaveFiles': noArgs,
   'saveFile:getCharacterOverview': args(nonEmptyString('Invalid save file path')),
+
+  // Save file snapshots
+  'saveSnapshots:list': noArgs,
+  'saveSnapshots:restore': args(saveFileSnapshotId),
 
   // Vault
   'vault:addItem': args(vaultItemUpsertInput),

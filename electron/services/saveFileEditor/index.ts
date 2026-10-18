@@ -12,6 +12,7 @@ import {
 } from './itemOperations';
 import { type MoveSaveFileItemOptions, moveItemBetweenSaveFilesUnlocked } from './moveItem';
 import { runExclusively } from './mutationQueue';
+import { writeSaveFile } from './saveFileWrites';
 import { type SplitStackOptions, splitStackInSaveFileUnlocked } from './splitStack';
 
 export type { SaveFileItemLocator } from './itemLocators';
@@ -38,4 +39,9 @@ export function splitStackInSaveFile(options: SplitStackOptions): Promise<void> 
 
 export function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions): Promise<void> {
   return runExclusively(() => moveItemBetweenSaveFilesUnlocked(options));
+}
+
+/** Backs up a save file, then replaces it with `content` (a restore from one of its copies). */
+export function replaceSaveFileContent(filePath: string, content: Buffer): Promise<void> {
+  return runExclusively(() => writeSaveFile(filePath, content));
 }

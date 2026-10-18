@@ -209,6 +209,16 @@ To see the widget over the game, set D2R's display mode to **Windowed (Fullscree
 
 **Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data, including characters, grail progress, run history, settings and vaulted items; the confirmation names the backup file and offers **Back up first**, which receives focus when the dialog opens and is highlighted until a backup has been made. Vaulted items exist only in the database, so any that aren't in the backup are lost. The app checks the backup first and refuses files that aren't intact app databases. If the restore fails, your current data is kept. If a restore fails and the app also cannot put the previous database back, it keeps that database next to the live one as `grail.db.pre-restore` so the data can still be recovered; the next restore renames it to `grail.db.pre-restore.<timestamp>` instead of overwriting it. These copies are full copies of the database and are never deleted automatically, so delete them from the app data folder once you no longer need them.
 
+#### Save file snapshots
+
+Offline saves have no server copy, so **Settings → Data → Save file snapshots** keeps copies of your save files in `save-file-snapshots` in the app data folder. While the app monitors your save folder, every save file it reads (`.d2s`, `.d2i`, `.sss`, `.d2x`) is stored as a snapshot unless its content is identical to the newest snapshot of that file. Snapshots are on by default and the app keeps 50 per file. You can turn them off or change the number (1 to 500) in the same card. Turning snapshots off keeps the existing ones; after you lower the number, the oldest snapshots of a file are deleted the next time that file changes. No snapshots are taken in Manual entry mode, because save files aren't read then.
+
+Pick a save file to see its copies, newest first, with the time, the type, the size and, for characters, the level. The type is **Snapshot**, or **Before app change** for the copies the app takes right before it edits a file (see the [Inventory Browser safety notes](INVENTORY_BROWSER_GUIDE.md#safety)). Files that are no longer in the save folder, such as a deleted character, are listed too. Only copies of files in the current save folder are listed.
+
+**Restore** opens a confirmation that names the file and the time of the copy. On Windows, the app refuses to restore while Diablo II: Resurrected is running, because the game would overwrite the file. Other platforms can't check this, so close the game yourself first. Before the file is replaced, the app copies the current file, which then appears as **Before app change**, so you can undo a restore. The app only writes inside the configured save folder and rescans your save files afterwards. Grail finds the app has already recorded stay recorded.
+
+Restoring a hardcore character's save from before its death brings the character back. Whether you do that is your choice.
+
 ### Error screen
 
 If a page crashes, the app shows a **Something went wrong** screen instead of going blank. The title bar stays usable, so you can switch to another page. From the error screen:

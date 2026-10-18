@@ -1,5 +1,6 @@
 import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
 import { GameMode, GameVersion, type Settings } from '../types/grail';
+import { DEFAULT_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { DEFAULT_RUN_TRACKER_SHORTCUTS } from './runTrackerShortcuts';
 import type { WidgetSize } from './widgetDisplay';
 
@@ -218,6 +219,8 @@ export const SETTINGS_CODECS: { readonly [K in keyof Settings]-?: SettingCodec<K
     DEFAULT_RUN_TRACKER_SHORTCUTS,
   ),
   runTrackerGlobalHotkeys: flag(false),
+  saveSnapshotsEnabled: flag(true),
+  saveSnapshotsPerFile: integer(DEFAULT_SNAPSHOTS_PER_FILE),
 };
 
 const SETTING_KEYS = Object.keys(SETTINGS_CODECS) as (keyof Settings)[];

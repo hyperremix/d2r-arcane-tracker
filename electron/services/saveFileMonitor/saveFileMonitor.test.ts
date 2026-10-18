@@ -2348,6 +2348,56 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.saveFile).toMatchObject({ characterClass: 'warlock', level: 1 });
     });
 
+    it('Then processSingleFile passes the content it read to the onSaveFileRead hook', async () => {
+      // Arrange
+      const onSaveFileRead = vi.fn().mockResolvedValue(true);
+      const hookedMonitor = new SaveFileMonitor(
+        eventBus,
+        mockDatabase as any,
+        new SettingsService(mockDatabase as any, eventBus),
+        { onSaveFileRead },
+      );
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        items: [],
+        status: 'parsed',
+      });
+      vi.spyOn(hookedMonitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (hookedMonitor as any).processSingleFile(WARLOCK_SAVE_FIXTURE_PATH);
+
+      // Assert
+      expect(parseResult.success).toBe(true);
+      expect(onSaveFileRead).toHaveBeenCalledWith(
+        WARLOCK_SAVE_FIXTURE_PATH,
+        readFileSync(WARLOCK_SAVE_FIXTURE_PATH),
+      );
+    });
+
+    it('If the onSaveFileRead hook rejects, Then processSingleFile still parses the file', async () => {
+      // Arrange
+      const onSaveFileRead = vi.fn().mockRejectedValue(new Error('disk full'));
+      const hookedMonitor = new SaveFileMonitor(
+        eventBus,
+        mockDatabase as any,
+        new SettingsService(mockDatabase as any, eventBus),
+        { onSaveFileRead },
+      );
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        items: [],
+        status: 'parsed',
+      });
+      vi.spyOn(hookedMonitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      // Act
+      const parseResult = await (hookedMonitor as any).processSingleFile(WARLOCK_SAVE_FIXTURE_PATH);
+
+      // Assert
+      expect(parseResult.success).toBe(true);
+      expect(parseResult.saveFile).toMatchObject({ characterClass: 'warlock' });
+    });
+
     it('Then processSingleFile stamps every snapshot item with the stored character id', async () => {
       // Arrange
       const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));

@@ -143,6 +143,13 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       getCharacterOverview: (filePath: string) => invoke('saveFile:getCharacterOverview', filePath),
     },
 
+    saveSnapshots: {
+      /** Snapshots and pre-change copies of the save files of the configured save folder. */
+      list: () => invoke('saveSnapshots:list'),
+      /** Replaces a save file with one of its copies; refused while the game is running. */
+      restore: (snapshotId: string) => invoke('saveSnapshots:restore', snapshotId),
+    },
+
     vault: {
       addItem: (...args: InvokeArgs<'vault:addItem'>) => invoke('vault:addItem', ...args),
       removeItem: (itemId: string) => invoke('vault:removeItem', itemId),

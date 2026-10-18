@@ -84,6 +84,24 @@ describe('When renderer arguments are validated against the IPC contract', () =>
       'Invalid runTrackerGlobalHotkeys setting',
     ],
     ['grail:updateSettings', [{ runTrackerShortcuts: {} }], 'Invalid runTrackerShortcuts setting'],
+    ['grail:updateSettings', [{ saveSnapshotsEnabled: 1 }], 'Invalid saveSnapshotsEnabled setting'],
+    ['grail:updateSettings', [{ saveSnapshotsPerFile: 0 }], 'Invalid saveSnapshotsPerFile setting'],
+    [
+      'grail:updateSettings',
+      [{ saveSnapshotsPerFile: 2.5 }],
+      'Invalid saveSnapshotsPerFile setting',
+    ],
+    [
+      'grail:updateSettings',
+      [{ saveSnapshotsPerFile: 501 }],
+      'Invalid saveSnapshotsPerFile setting',
+    ],
+    ['saveSnapshots:restore', ['../Hero.d2s'], 'Invalid snapshot ID'],
+    [
+      'saveSnapshots:restore',
+      ['snapshot:../0123abcd-Hero.d2s.2026-10-18T08-52-23-468Z-000022.snap'],
+      'Invalid snapshot ID',
+    ],
     ['saveFile:updateSaveDirectory', ['saves'], 'expected a non-empty absolute path'],
     ['dialog:writeFile', ['export.csv', 'data'], 'Invalid file path'],
     ['dialog:writeFile', ['/tmp/export.csv', 42], 'Invalid file content'],
@@ -279,6 +297,8 @@ describe('When the renderer updates settings', () => {
       widgetSizeRunOnly: { width: 300, height: 200 },
       wizardCompleted: true,
       runTrackerGlobalHotkeys: true,
+      saveSnapshotsEnabled: false,
+      saveSnapshotsPerFile: 25,
     };
 
     // Act
