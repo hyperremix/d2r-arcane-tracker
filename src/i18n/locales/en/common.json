@@ -480,7 +480,7 @@
       "confirmTitle": "Restore save file",
       "confirmDescription": "Replace {{fileName}} with the copy from {{time}}?",
       "confirmBackupNote": "The current file is copied first and listed here as \"Before app change\", so you can undo the restore.",
-      "confirmGameNote": "Close Diablo II: Resurrected before you restore. On Windows, the app refuses while the game is running; other platforms can't check this.",
+      "confirmGameNote": "Close Diablo II: Resurrected before you restore. On Windows and Linux, the app refuses while the game is running; macOS can't check this.",
       "restoring": "Restoring...",
       "restoreSuccess": "Save file restored",
       "restoreSuccessDescription": "{{fileName}} now matches the copy from {{time}}.",
