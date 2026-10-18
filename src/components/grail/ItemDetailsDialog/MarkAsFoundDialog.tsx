@@ -22,7 +22,13 @@ import {
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
 import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/date';
-import { canItemBeNormal, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
+import {
+  canItemBeNormal,
+  getProgressVersion,
+  isFind,
+  shouldShowEtherealStatus,
+  shouldShowNormalStatus,
+} from '@/lib/ethereal';
 import { useGrailStore } from '@/stores/grailStore';
 
 export type ItemVersion = 'normal' | 'ethereal';
@@ -37,6 +43,20 @@ function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
   if (shouldShowEtherealStatus(item, settings)) versions.push('ethereal');
   if (versions.length === 0) versions.push(canItemBeNormal(item) ? 'normal' : 'ethereal');
   return versions;
+}
+
+/**
+ * Checks whether every version the user can record was already found, so recording a find adds
+ * another find rather than marking the item as found.
+ */
+export function isFoundInEveryRecordableVersion(
+  item: Item,
+  itemProgress: GrailProgress[],
+  settings: Settings,
+): boolean {
+  return getRecordableVersions(item, settings).every((version) =>
+    itemProgress.some((p) => isFind(p) && getProgressVersion(p) === version),
+  );
 }
 
 /**
@@ -117,10 +137,11 @@ function isVersionRecorded(
 
 interface MarkAsFoundFormProps {
   item: Item;
+  actionLabel: string;
   onDone: () => void;
 }
 
-function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
+function MarkAsFoundForm({ item, actionLabel, onDone }: MarkAsFoundFormProps) {
   const { t } = useTranslation();
   const characters = useGrailStore((state) => state.characters);
   const progress = useGrailStore((state) => state.progress);
@@ -245,7 +266,7 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
           disabled={!canSubmit || submitting}
           aria-describedby={idIf(message !== undefined, messageId)}
         >
-          {t(translations.grail.itemDetails.markAsFound)}
+          {actionLabel}
         </Button>
       </DialogFooter>
     </form>
@@ -254,6 +275,8 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
 
 interface MarkAsFoundDialogProps {
   item: Item;
+  /** Whether the item was already found, so the prompt records another find. */
+  anotherFind: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -261,20 +284,36 @@ interface MarkAsFoundDialogProps {
 /**
  * Dialog that prompts the user for the information needed to manually record an item as found:
  * the character who found it, the version (normal/ethereal) when ambiguous, and the found date.
+ * For an item that was already found it is named after recording another find.
  */
-export function MarkAsFoundDialog({ item, open, onOpenChange }: MarkAsFoundDialogProps) {
+export function MarkAsFoundDialog({
+  item,
+  anotherFind,
+  open,
+  onOpenChange,
+}: MarkAsFoundDialogProps) {
   const { t } = useTranslation();
+  const actionLabel = anotherFind
+    ? t(translations.grail.itemDetails.addAnotherFind)
+    : t(translations.grail.itemDetails.markAsFound);
+  const description = anotherFind
+    ? t(translations.grail.itemDetails.addAnotherFindDescription, { item: item.name })
+    : t(translations.grail.itemDetails.markAsFoundDescription, { item: item.name });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t(translations.grail.itemDetails.markAsFound)}</DialogTitle>
-          <DialogDescription>
-            {t(translations.grail.itemDetails.markAsFoundDescription, { item: item.name })}
-          </DialogDescription>
+          <DialogTitle>{actionLabel}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {open && <MarkAsFoundForm item={item} onDone={() => onOpenChange(false)} />}
+        {open && (
+          <MarkAsFoundForm
+            item={item}
+            actionLabel={actionLabel}
+            onDone={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

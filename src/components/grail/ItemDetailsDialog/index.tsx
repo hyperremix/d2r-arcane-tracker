@@ -23,7 +23,7 @@ import { BookmarkAction } from './BookmarkControls';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemCopiesSection } from './ItemCopiesSection';
 import { ItemInfoSection } from './ItemInfoSection';
-import { MarkAsFoundDialog } from './MarkAsFoundDialog';
+import { isFoundInEveryRecordableVersion, MarkAsFoundDialog } from './MarkAsFoundDialog';
 import { ProgressStatusSection } from './ProgressStatusSection';
 import { useGrailBookmark } from './useGrailBookmark';
 
@@ -35,17 +35,38 @@ interface ItemDetailsDialogProps {
 
 /**
  * Button and prompt for manually recording an item as found.
+ * While a tracked version is still missing it is the primary "Mark as found" action; once every
+ * version is found it becomes a secondary "Add another find" action.
  * Its open state lives here so it resets whenever the details dialog closes (this component
  * unmounts with the dialog content) or is keyed to another item.
  */
-function MarkAsFoundAction({ item }: { item: Item }) {
+function MarkAsFoundAction({ item, anotherFind }: { item: Item; anotherFind: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // The prompt keeps the name it was opened with, so saving the first find doesn't rename it
+  // while it closes
+  const [promptIsAnotherFind, setPromptIsAnotherFind] = useState(anotherFind);
+
+  const handleOpen = () => {
+    setPromptIsAnotherFind(anotherFind);
+    setOpen(true);
+  };
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>{t(translations.grail.itemDetails.markAsFound)}</Button>
-      <MarkAsFoundDialog item={item} open={open} onOpenChange={setOpen} />
+      {anotherFind ? (
+        <Button variant="outline" onClick={handleOpen}>
+          {t(translations.grail.itemDetails.addAnotherFind)}
+        </Button>
+      ) : (
+        <Button onClick={handleOpen}>{t(translations.grail.itemDetails.markAsFound)}</Button>
+      )}
+      <MarkAsFoundDialog
+        item={item}
+        anotherFind={promptIsAnotherFind}
+        open={open}
+        onOpenChange={setOpen}
+      />
     </>
   );
 }
@@ -183,7 +204,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             isPending={isBookmarkActionPending}
             onToggle={toggleBookmark}
           />
-          <MarkAsFoundAction key={item.id} item={item} />
+          <MarkAsFoundAction
+            key={item.id}
+            item={item}
+            anotherFind={isFoundInEveryRecordableVersion(item, itemProgress, settings)}
+          />
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t(translations.common.close)}
           </Button>

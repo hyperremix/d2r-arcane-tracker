@@ -67,10 +67,12 @@ function getCharacterFinds(
 function CharacterFindRow({
   find: { progress, foundDate, character },
   showVersion,
+  showActions,
   onRequestRemove,
 }: {
   find: CharacterFind;
   showVersion: boolean;
+  showActions: boolean;
   onRequestRemove: (removal: PendingRemoval) => void;
 }) {
   const { t } = useTranslation();
@@ -90,20 +92,22 @@ function CharacterFindRow({
       <TableCell className="text-muted-foreground">
         {progress.manuallyAdded ? t(translations.common.manual) : t(translations.common.auto)}
       </TableCell>
-      <TableCell className="text-right">
-        {/* Only manually added records can be removed; auto-detected ones mirror the save files */}
-        {progress.manuallyAdded && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={removeLabel}
-            title={removeLabel}
-            onClick={() => onRequestRemove({ progress, character })}
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        )}
-      </TableCell>
+      {showActions && (
+        <TableCell className="text-right">
+          {/* Only manually added records can be removed; auto-detected ones mirror the save files */}
+          {progress.manuallyAdded && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={removeLabel}
+              title={removeLabel}
+              onClick={() => onRequestRemove({ progress, character })}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          )}
+        </TableCell>
+      )}
     </TableRow>
   );
 }
@@ -111,7 +115,8 @@ function CharacterFindRow({
 /**
  * Lists who found the item: one row per find, most recent first, with the version of each find
  * when the item can be both normal and ethereal. Shows a single line when nobody found it yet.
- * Manually added finds can be removed after a confirmation.
+ * Manually added finds can be removed after a confirmation; the actions column only shows up
+ * when there is such a find.
  */
 export function CharacterProgressTable({
   characters,
@@ -158,6 +163,9 @@ export function CharacterProgressTable({
   );
   // The version only tells something when the item can be both normal and ethereal
   const showVersion = item.etherealType === 'optional';
+  // Only manually added finds can be removed, so the actions column is left out when there are
+  // none. It is decided across all pages so the columns don't shift while paging.
+  const showActions = finds.some((find) => find.progress.manuallyAdded);
 
   // Calculate pagination, clamping currentPage so it's always in range
   const totalPages = Math.max(1, Math.ceil(finds.length / FINDS_PER_PAGE));
@@ -201,9 +209,11 @@ export function CharacterProgressTable({
                 {showVersion && <TableHead>{t(translations.grail.itemDetails.version)}</TableHead>}
                 <TableHead>{t(translations.grail.itemDetails.foundDate)}</TableHead>
                 <TableHead>{t(translations.grail.itemDetails.method)}</TableHead>
-                <TableHead className="text-right">
-                  {t(translations.grail.itemDetails.actions)}
-                </TableHead>
+                {showActions && (
+                  <TableHead className="text-right">
+                    {t(translations.grail.itemDetails.actions)}
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -212,6 +222,7 @@ export function CharacterProgressTable({
                   key={find.progress.id}
                   find={find}
                   showVersion={showVersion}
+                  showActions={showActions}
                   onRequestRemove={handleRequestRemove}
                 />
               ))}

@@ -172,6 +172,8 @@
       "bookmarkActionFailed": "Failed to update the bookmark. Nothing was changed.",
       "bookmarkLoadError": "Failed to load bookmark status.",
       "markAsFoundDescription": "Record which character found {{item}}.",
+      "addAnotherFind": "Add another find",
+      "addAnotherFindDescription": "Record another find of {{item}}.",
       "selectCharacter": "Select a character",
       "noCharactersAvailable": "No characters available yet. Characters are added automatically once your save files are detected, so configure your save directory in Settings first.",
       "version": "Version",
