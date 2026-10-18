@@ -76,7 +76,7 @@ Vaulting and unvaulting are the only ways the app keeps an item outside a save f
 
 ## Safety
 
-- Before every write, the app copies the save file to `save-file-backups` in its data folder and keeps the 20 newest copies per file. If the backup fails, the file is not modified.
+- Before every write, the app copies the save file to `save-file-backups` in its data folder and keeps the 20 newest copies per file. If the backup fails, the file is not modified. You can restore these copies, and the snapshots the app takes whenever a save file changes, in **Settings → Data → Save file snapshots** (see [Save file snapshots](HOLY_GRAIL_GUIDE.md#save-file-snapshots)).
 - Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here. On Windows and Linux, writes are refused while the game is running, because it would overwrite the change. On Linux the app looks for `D2R.exe` running under Wine or Proton. macOS can't check this, so close the game yourself before editing.
 - The app only edits files inside your configured save folder, and refuses a change if the file changed since the last scan (refresh and try again).
 - Bookmarks never appear here and can't be unvaulted, since they hold no item.

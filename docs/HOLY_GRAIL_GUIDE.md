@@ -99,7 +99,7 @@ An item that is already recorded keeps its found date. The app reads the Chronic
 
 ### Manual entry
 
-In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there.
+In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there. To add many finds at once, [import](#import-and-export) them from a file.
 
 ## Browsing your grail
 
@@ -208,6 +208,39 @@ To see the widget over the game, set D2R's display mode to **Windowed (Fullscree
 ### Backups
 
 **Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data, including characters, grail progress, run history, settings and vaulted items; the confirmation names the backup file and offers **Back up first**, which receives focus when the dialog opens and is highlighted until a backup has been made. Vaulted items exist only in the database, so any that aren't in the backup are lost. The app checks the backup first and refuses files that aren't intact app databases. If the restore fails, your current data is kept. If a restore fails and the app also cannot put the previous database back, it keeps that database next to the live one as `grail.db.pre-restore` so the data can still be recovered; the next restore renames it to `grail.db.pre-restore.<timestamp>` instead of overwriting it. These copies are full copies of the database and are never deleted automatically, so delete them from the app data folder once you no longer need them.
+
+#### Save file snapshots
+
+Offline saves have no server copy, so **Settings → Data → Save file snapshots** keeps copies of your save files in `save-file-snapshots` in the app data folder. While the app monitors your save folder, every save file it reads (`.d2s`, `.d2i`, `.sss`, `.d2x`) is stored as a snapshot unless its content is identical to the newest snapshot of that file. Snapshots are on by default and the app keeps 50 per file. You can turn them off or change the number (1 to 500) in the same card. Turning snapshots off keeps the existing ones; after you lower the number, the oldest snapshots of a file are deleted the next time that file changes. No snapshots are taken in Manual entry mode, because save files aren't read then. Snapshots start with the first read after you install or update the app, so the first snapshot of a file is the file as it is then, not an earlier state.
+
+Pick a save file to see its copies, newest first, with the time, the type, the size and, for characters, the level. The type is **Snapshot**, or **Before app change** for the copies the app takes right before it edits a file (see the [Inventory Browser safety notes](INVENTORY_BROWSER_GUIDE.md#safety)). Files that are no longer in the save folder, such as a deleted character, are listed too. Only copies of files in the current save folder are listed.
+
+**Restore** opens a confirmation that names the file and the time of the copy. On Windows and Linux, the app refuses to restore while Diablo II: Resurrected is running, because the game would overwrite the file. macOS can't check this, so close the game yourself first. Before the file is replaced, the app copies the current file, which then appears as **Before app change**, so you can undo a restore. The app only writes inside the configured save folder and rescans your save files afterwards. Grail finds the app has already recorded stay recorded. Vaulted items live only in the app's database: vaulting removes the item from the save and unvaulting writes it back. A copy made before a vault or unvault therefore leaves the save and the vault inconsistent when you restore it, so check the vault afterwards.
+
+Restoring a hardcore character's save from before its death brings the character back. Whether you do that is your choice.
+
+### Import and export
+
+**Settings → Data → Grail import and export** saves your grail progress to a file or adds finds from one.
+
+**Export JSON** and **Export CSV** save every recorded find with the item, its version (normal or ethereal), the found date, the character and the source (manual or auto-detected). JSON is the app's own format, made to be imported again; CSV opens in spreadsheets and can be imported too.
+
+**Import from file** reads one of these files (up to 5 MB and 20,000 entries):
+
+- A JSON export of this app.
+- A JSON export of [Nasicus/d2-holy-grail](https://github.com/Nasicus/d2-holy-grail) (`HolyGrail_<name>.json`, `EthGrail_<name>.json` or `RunewordGrail_<name>.json`). The app reads these as that project's source code writes them (`ExportListItem.tsx`, `IItem.ts` and the grail data types, last updated in 2023), which is an assumption for exports made with other versions of it. Items marked as found count, including item counter values above 0. A file with uniques and sets is read as the normal grail, one with only uniques as the ethereal grail, and one that maps runeword names as runewords. A file that wraps these as `grailData`, `ethData` and `runewordData` is read too. These exports have no found dates.
+- A CSV file with one item name per row. With a header row, the app reads the `item` (or `name`) column and, if present, `version` (or `ethereal`), `found_date` (or `date`), `item_id`, `type` and `character`. Without a header row, the columns are name, version and found date. A version is `normal` or `ethereal` (`eth`, `yes` and `true` also mean ethereal). Dates are ISO dates (`2024-01-15`) or ISO dates with a time; other formats and dates in the future are ignored.
+
+Names are matched ignoring case, spaces and punctuation, and "Ber Rune" also finds Ber. When the file doesn't name a version, the normal version is used, or the ethereal one for items that only exist ethereal.
+
+The app has no importer for holygrail.link, d2grail.com or diablo2.io, because no export file format of theirs could be confirmed from public sources: holygrail.link's source code ([zeddicus-pl/d2rHolyGrail](https://github.com/zeddicus-pl/d2rHolyGrail)) writes no grail export file, and d2grail.com and diablo2.io don't document one. A CSV list of item names works for finds from any tracker.
+
+Before anything is saved, a preview names the file and shows how many finds will be added, how many item versions are already found, how many existing finds get an earlier date, and the entries that couldn't be matched to a grail item (or to a version the item doesn't have). When you confirm:
+
+- An item version that already has a find is never added again. If the file has an earlier date for it, the earliest existing find of that version gets the file's date, which replaces its date; this can't be undone from the app.
+- If the file lists an item version more than once, the earliest date counts.
+- New finds are saved as manual finds, as with **Mark as found**, so you can remove them in the item's character progress table. They belong to the character the file names if that character is in the app, otherwise to the character you choose in the preview. Importing new finds therefore needs at least one character in the app.
+- Finds without a date get the time of the import.
 
 ### Error screen
 

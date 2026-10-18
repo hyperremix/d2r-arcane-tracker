@@ -66,6 +66,15 @@ export type SaveFileMonitorDatabase = VaultPresenceDatabase &
 /** The settings access the save file monitor uses. */
 export type SaveFileMonitorSettings = Pick<SettingsService, 'get' | 'getAll'>;
 
+/** Optional hooks of the save file monitor. */
+export interface SaveFileMonitorOptions {
+  /**
+   * Called with the content of every save file the monitor reads, before it is parsed (used to
+   * keep snapshots). A rejection is logged and does not stop the parse.
+   */
+  onSaveFileRead?: (filePath: string, content: Buffer) => Promise<unknown>;
+}
+
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -99,6 +108,7 @@ class SaveFileMonitor {
   private monitoringOperations: Promise<void> = Promise.resolve();
   private readonly grailDatabase: SaveFileMonitorDatabase;
   private readonly settings: SaveFileMonitorSettings;
+  private readonly onSaveFileRead: SaveFileMonitorOptions['onSaveFileRead'];
   private saveDirectory: string | null = null;
   /** True only while a forced parse runs: every file is parsed regardless of its modification time. */
   private forceParseAll: boolean = false;
@@ -116,16 +126,19 @@ class SaveFileMonitor {
    * @param {EventBus} eventBus - EventBus instance for emitting events
    * @param {SaveFileMonitorDatabase} grailDatabase - Stores save file states and vault presence.
    * @param {SaveFileMonitorSettings} settings - Reads the save directory, game mode and intervals.
+   * @param {SaveFileMonitorOptions} options - Optional hooks.
    */
   constructor(
     eventBus: EventBus,
     grailDatabase: SaveFileMonitorDatabase,
     settings: SaveFileMonitorSettings,
+    options: SaveFileMonitorOptions = {},
   ) {
     log.info('constructor', 'Constructor called');
     this.eventBus = eventBus;
     this.grailDatabase = grailDatabase;
     this.settings = settings;
+    this.onSaveFileRead = options.onSaveFileRead;
     this.fileWatcher = null;
     this.watchPath = null;
     this.fileChangeCounter = 0;
@@ -530,6 +543,7 @@ class SaveFileMonitor {
       // the new content, so the next scan parses the file again.
       const { mtime } = await stat(filePath);
       const buffer = await readFile(filePath);
+      await this.notifySaveFileRead(filePath, buffer);
       const extension = extname(filePath).toLowerCase();
       let d2iHeader: D2iHeaderInfo | undefined;
 
@@ -603,6 +617,18 @@ class SaveFileMonitor {
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
       return { saveName, success: false };
+    }
+  }
+
+  /**
+   * Passes the content of a save file that was read to the `onSaveFileRead` hook.
+   * @private
+   */
+  private async notifySaveFileRead(filePath: string, content: Buffer): Promise<void> {
+    try {
+      await this.onSaveFileRead?.(filePath, content);
+    } catch (error) {
+      log.error('onSaveFileRead', error, { filePath });
     }
   }
 

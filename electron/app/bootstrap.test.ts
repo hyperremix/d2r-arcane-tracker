@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     initializeUpdateHandlers: disposer('updateHandlers'),
     initializeVaultHandlers: disposer('vaultHandlers'),
     initializeWidgetHandlers: disposer('widgetHandlers'),
+    initializeSaveFileSnapshotHandlers: disposer('saveFileSnapshotHandlers'),
   };
 });
 
@@ -81,6 +82,9 @@ vi.mock('../ipc-handlers/runTrackerHandlers', () => ({
 }));
 vi.mock('../ipc-handlers/saveFileHandlers', () => ({
   initializeSaveFileHandlers: mocks.initializeSaveFileHandlers,
+}));
+vi.mock('../ipc-handlers/saveFileSnapshotHandlers', () => ({
+  initializeSaveFileSnapshotHandlers: mocks.initializeSaveFileSnapshotHandlers,
 }));
 vi.mock('../ipc-handlers/shellHandlers', () => ({
   initializeShellHandlers: mocks.initializeShellHandlers,
@@ -161,7 +165,7 @@ vi.mock('../services/runTracker', () => ({
   }),
 }));
 vi.mock('../services/saveFileBackup', () => ({ configureSaveFileBackups: vi.fn() }));
-vi.mock('../services/saveFileEditor', () => ({}));
+vi.mock('../services/saveFileEditor', () => ({ replaceSaveFileContent: vi.fn() }));
 vi.mock('../services/saveFileMonitor', () => ({
   SaveFileMonitor: vi.fn(function SaveFileMonitor() {
     return {
@@ -175,6 +179,7 @@ vi.mock('../services/saveFileMonitor', () => ({
     };
   }),
 }));
+vi.mock('../services/saveFileSnapshots', () => ({ SaveFileSnapshotService: vi.fn() }));
 vi.mock('../services/terrorZoneService', () => ({ TerrorZoneService: vi.fn() }));
 vi.mock('../services/updateService', () => ({
   UpdateService: vi.fn(function UpdateService() {
@@ -355,6 +360,7 @@ describe('When the app is bootstrapped', () => {
         'grailHandlers.dispose',
         'saveFileHandlers.dispose',
         'vaultHandlers.dispose',
+        'saveFileSnapshotHandlers.dispose',
         'runTrackerHandlers.dispose',
         'globalHotkeyHandlers.dispose',
         'dialogHandlers.dispose',

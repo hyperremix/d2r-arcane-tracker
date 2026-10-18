@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock electron modules
 vi.mock('electron', () => ({
@@ -8,11 +8,15 @@ vi.mock('electron', () => ({
   },
 }));
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ipcMain } from 'electron';
 import { GrailProgressBuilder } from '@/fixtures';
 import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { MAX_RESTORE_BACKUP_BYTES } from '../ipc/validators';
+import { items as catalogItems } from '../items';
 import { EventBus } from '../services/EventBus';
 import { SettingsService } from '../services/settingsService';
 import type { Character, Settings } from '../types/grail';
@@ -20,6 +24,8 @@ import { GameMode } from '../types/grail';
 import { initializeGrailHandlers as initialize } from './grailHandlers';
 
 const grailDatabase = {
+  getAllItems: vi.fn(() => catalogItems),
+  getCharacterByName: vi.fn(),
   getAllCharacters: vi.fn(),
   getCharacterById: vi.fn(),
   getCharacterMap: vi.fn(() => new Map()),
@@ -1066,6 +1072,65 @@ describe('When grailHandlers is used', () => {
       // Assert
       expect(result).toEqual({});
     });
+  });
+});
+
+describe('When the grail progress is exported or imported over IPC', () => {
+  let directory: string;
+
+  function getHandler(channel: string) {
+    return vi.mocked(ipcMain.handle).mock.calls.find((call) => call[0] === channel)?.[1] as any;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    directory = await mkdtemp(join(tmpdir(), 'grail-handlers-'));
+    vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
+    vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1', name: 'Sorc' });
+    initializeGrailHandlers();
+  });
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('If CSV is exported, Then the handler returns the CSV text', async () => {
+    // Arrange
+    const handler = getHandler('grail:exportProgress');
+
+    // Act
+    const result = await handler({}, 'csv');
+
+    // Assert
+    expect(result).toBe('item,item_id,type,version,found_date,character,source\n');
+  });
+
+  it('If a previewed import is applied, Then the finds are saved and renderers reload progress', async () => {
+    // Arrange
+    const filePath = join(directory, 'finds.csv');
+    await writeFile(filePath, 'Annihilus\n');
+    const preview = await getHandler('grail:previewImport')({}, filePath);
+
+    // Act
+    const result = await getHandler('grail:applyImport')({}, preview.importId, 'char-1');
+
+    // Assert
+    expect(result).toEqual({ added: 1, earlierDates: 0 });
+    expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ itemId: 'annihilus', characterId: 'char-1', manuallyAdded: true }),
+    );
+    expect(broadcastToRenderers).toHaveBeenCalledWith('grail-progress-updated');
+  });
+
+  it('If the renderer passes a file that is not JSON or CSV, Then nothing is read', async () => {
+    // Arrange
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    // Act
+    const preview = getHandler('grail:previewImport')({}, join(directory, 'grail.db'));
+
+    // Assert
+    await expect(preview).rejects.toThrow('Invalid import file');
   });
 });
 

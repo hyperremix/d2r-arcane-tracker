@@ -122,6 +122,14 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       restore: (backupPath: string) => invoke('grail:restore', backupPath),
       restoreFromBuffer: (backupBuffer: Uint8Array) =>
         invoke('grail:restoreFromBuffer', backupBuffer),
+      /** Builds the export of the grail progress as JSON or CSV text. */
+      exportProgress: (...args: InvokeArgs<'grail:exportProgress'>) =>
+        invoke('grail:exportProgress', ...args),
+      /** Reads an import file and previews what importing it would change. */
+      previewImport: (filePath: string) => invoke('grail:previewImport', filePath),
+      /** Applies the latest import preview. */
+      applyImport: (importId: string, characterId?: string) =>
+        invoke('grail:applyImport', importId, characterId),
     },
 
     saveFile: {
@@ -141,6 +149,13 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       refreshSaveFiles: () => invoke('saveFile:refreshSaveFiles'),
       /** Overview of a scanned character save (.d2s), read from the file; undefined when unreadable. */
       getCharacterOverview: (filePath: string) => invoke('saveFile:getCharacterOverview', filePath),
+    },
+
+    saveSnapshots: {
+      /** Snapshots and pre-change copies of the save files of the configured save folder. */
+      list: () => invoke('saveSnapshots:list'),
+      /** Replaces a save file with one of its copies; refused while the game is running. */
+      restore: (snapshotId: string) => invoke('saveSnapshots:restore', snapshotId),
     },
 
     vault: {

@@ -16,11 +16,13 @@ import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
 import { GrailSettings } from './GrailSettings';
+import { GrailTransferCard } from './GrailTransfer';
 import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { ReportIssues } from './ReportIssues';
 import { RunTrackerSettings } from './RunTrackerSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
+import { SaveSnapshotsCard } from './SaveSnapshots';
 import { ThemeSettings } from './ThemeSettings';
 import { UpdateSettings } from './UpdateSettings';
 import { WidgetSettings } from './WidgetSettings';
@@ -191,7 +193,13 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
         </>
       );
     case 'data':
-      return <DatabaseCard />;
+      return (
+        <>
+          <DatabaseCard />
+          <GrailTransferCard />
+          <SaveSnapshotsCard />
+        </>
+      );
     case 'about':
       return (
         <>

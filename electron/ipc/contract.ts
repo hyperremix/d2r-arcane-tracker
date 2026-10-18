@@ -55,6 +55,12 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
+import type {
+  GrailExportFormat,
+  GrailImportPreview,
+  GrailImportResult,
+} from '../types/grailTransfer';
+import type { SaveFileSnapshotGroup } from '../types/saveFileSnapshots';
 import type { ServiceErrorPayload } from '../types/serviceError';
 import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 
@@ -262,6 +268,9 @@ export interface IpcInvokeContract {
   'grail:backup': Invoke<[backupPath: string], SuccessResult>;
   'grail:restore': Invoke<[backupPath: string], SuccessResult>;
   'grail:restoreFromBuffer': Invoke<[backupBuffer: Uint8Array], SuccessResult>;
+  'grail:exportProgress': Invoke<[format: GrailExportFormat], string>;
+  'grail:previewImport': Invoke<[filePath: string], GrailImportPreview>;
+  'grail:applyImport': Invoke<[importId: string, characterId?: string], GrailImportResult>;
 
   // Save files
   'saveFile:startMonitoring': Invoke<[], SuccessResult>;
@@ -275,6 +284,10 @@ export interface IpcInvokeContract {
   'saveFile:getAvailableRunes': Invoke<[], Record<string, number>>;
   'saveFile:refreshSaveFiles': Invoke<[], SuccessResult>;
   'saveFile:getCharacterOverview': Invoke<[filePath: string], CharacterOverview | undefined>;
+
+  // Save file snapshots
+  'saveSnapshots:list': Invoke<[], SaveFileSnapshotGroup[]>;
+  'saveSnapshots:restore': Invoke<[snapshotId: string], SuccessResult>;
 
   // Vault
   'vault:addItem': Invoke<[item: VaultItemUpsertInput], VaultItem>;

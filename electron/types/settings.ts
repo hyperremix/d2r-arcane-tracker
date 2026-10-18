@@ -91,4 +91,7 @@ export type Settings = {
     endSession: string; // default: 'Ctrl+Shift+E'
   };
   runTrackerGlobalHotkeys?: boolean; // Whether run tracker shortcuts also work while other apps are focused (default: false)
+  // Save file snapshots
+  saveSnapshotsEnabled?: boolean; // Whether a copy of a monitored save file is kept whenever it changes (default: true)
+  saveSnapshotsPerFile?: number; // How many snapshots are kept per save file (default: 50)
 };

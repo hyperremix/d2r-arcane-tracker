@@ -25,6 +25,8 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 - **Inventory Browser**: see what's in every character and shared stash, move items between them and keep items in a vault. Each character also has an overview with unclaimed quest rewards, missing waypoints and gear totals.
 - **Terror Zone Configuration**: choose which terror zones the game rotates through.
 - **Overlay widget, statistics and notifications**.
+- **Save file snapshots**: keeps copies of your save files whenever they change and restores an earlier one.
+- **Grail import and export**: JSON and CSV export, and import from those files, Nasicus/d2-holy-grail exports or a CSV list of item names.
 - **Local only**: data lives in a SQLite database on your machine.
 
 ## Install
