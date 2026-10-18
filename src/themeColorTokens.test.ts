@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 /**
  * Guards against color utilities that render without color (tokens missing from the theme)
  * or that bypass the theme (raw Tailwind palette colors and arbitrary hex values).
+ *
+ * Also guards the accent: primary stays blood red (not item gold), its text and filled
+ * states, including the /90 hovers, pass WCAG AA in the light and dark themes, and the
+ * ring, sidebar accent and first chart color follow primary.
  */
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
@@ -161,17 +165,29 @@ interface Oklch {
 type ThemeTokens = Record<string, Oklch>;
 
 const AA_TEXT = 4.5;
+const BLOOD_RED_HUE_MIN = 20;
+const BLOOD_RED_HUE_MAX = 30;
+const MIN_HUE_DISTANCE_FROM_GOLD = 20;
+const HOVER_ALPHA = 0.9;
 
-/** Reads the opaque `oklch(L C H)` custom properties of the theme block that starts with `selector`. */
-function getThemeTokens(selector: string): ThemeTokens {
-  const css = readFileSync(join(srcDir, 'index.css'), 'utf8');
+/** Reads the opaque `oklch(L C H)` custom properties of the theme block that starts with `selector`, whatever the line endings. */
+function parseThemeTokens(stylesheet: string, selector: string): ThemeTokens {
+  const css = stylesheet.replace(/\r\n/g, '\n');
   const start = css.indexOf(`${selector} {`);
-  const block = css.slice(start, css.indexOf('\n}', start));
+  const end = css.indexOf('\n}', start);
+  if (start === -1 || end === -1) {
+    throw new Error(`Theme block "${selector}" not found in the stylesheet`);
+  }
+  const block = css.slice(start, end);
   const tokens: ThemeTokens = {};
   for (const match of block.matchAll(/--([a-z0-9-]+): oklch\(([\d.]+) ([\d.]+) ([\d.]+)\);/g)) {
     tokens[match[1]] = { l: Number(match[2]), c: Number(match[3]), h: Number(match[4]) };
   }
   return tokens;
+}
+
+function getThemeTokens(selector: string): ThemeTokens {
+  return parseThemeTokens(readFileSync(join(srcDir, 'index.css'), 'utf8'), selector);
 }
 
 /** OKLCH to gamma-encoded sRGB (0-1), using the OKLab matrices from the CSS Color 4 spec. */
@@ -225,75 +241,153 @@ const themes = [
   ['dark (and widget)', '.dark,\nbody.widget'],
 ] as const;
 
+/** Names every check that falls below WCAG AA text contrast, so a failure points at the token and surface. */
+function belowAa(checks: Record<string, number>): string[] {
+  return Object.entries(checks)
+    .filter(([, ratio]) => ratio < AA_TEXT)
+    .map(([label, ratio]) => `${label}: ${ratio.toFixed(2)}`);
+}
+
 describe.each(themes)('When checking the %s theme accent tokens', (_name, selector) => {
   const tokens = getThemeTokens(selector);
+  const textSurfaces = ['background', 'card', 'muted'] as const;
+  const hoverSurfaces = ['background', 'card'] as const;
 
-  it('Then primary text passes WCAG AA on background, card and muted, and its /90 link hover on background and card', () => {
+  it('If primary is used as text, Then it passes WCAG AA on background, card and muted', () => {
     // Arrange
     const { primary } = tokens;
-    const surfaces = ['background', 'card', 'muted'] as const;
-    const hoverSurfaces = ['background', 'card'] as const;
 
     // Act
-    const ratios = [
-      ...surfaces.map((surface) => contrast(toSrgb(primary), toSrgb(tokens[surface]))),
-      ...hoverSurfaces.map((surface) =>
-        contrast(over(primary, 0.9, tokens[surface]), toSrgb(tokens[surface])),
+    const failing = belowAa(
+      Object.fromEntries(
+        textSurfaces.map((surface) => [
+          `primary on ${surface}`,
+          contrast(toSrgb(primary), toSrgb(tokens[surface])),
+        ]),
       ),
-    ];
+    );
 
     // Assert
-    for (const ratio of ratios) {
-      expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
-    }
+    expect(failing).toEqual([]);
   });
 
-  it('Then the primary foreground passes WCAG AA on filled primary, also at its /90 hover', () => {
+  it('If primary text link is hovered at /90, Then it passes WCAG AA on background and card', () => {
+    // Arrange
+    const { primary } = tokens;
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        hoverSurfaces.map((surface) => [
+          `primary/90 on ${surface}`,
+          contrast(over(primary, HOVER_ALPHA, tokens[surface]), toSrgb(tokens[surface])),
+        ]),
+      ),
+    );
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If the primary foreground sits on filled primary, Then it passes WCAG AA', () => {
     // Arrange
     const foreground = toSrgb(tokens['primary-foreground']);
     const sidebarForeground = toSrgb(tokens['sidebar-primary-foreground']);
 
     // Act
-    const ratios = [
-      contrast(foreground, toSrgb(tokens.primary)),
-      contrast(foreground, over(tokens.primary, 0.9, tokens.background)),
-      contrast(foreground, over(tokens.primary, 0.9, tokens.card)),
-      contrast(sidebarForeground, toSrgb(tokens['sidebar-primary'])),
-    ];
+    const failing = belowAa({
+      'primary-foreground on primary': contrast(foreground, toSrgb(tokens.primary)),
+      'sidebar-primary-foreground on sidebar-primary': contrast(
+        sidebarForeground,
+        toSrgb(tokens['sidebar-primary']),
+      ),
+    });
 
     // Assert
-    for (const ratio of ratios) {
-      expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
-    }
+    expect(failing).toEqual([]);
   });
 
-  it('Then the ring, sidebar accent and first chart color are the primary blood red', () => {
+  it('If filled primary is hovered at /90, Then the primary foreground passes WCAG AA', () => {
+    // Arrange
+    const foreground = toSrgb(tokens['primary-foreground']);
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        hoverSurfaces.map((surface) => [
+          `primary-foreground on primary/90 over ${surface}`,
+          contrast(foreground, over(tokens.primary, HOVER_ALPHA, tokens[surface])),
+        ]),
+      ),
+    );
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If a token is part of the accent, Then ring, sidebar accent and first chart color equal primary', () => {
     // Arrange
     const accentTokens = ['ring', 'sidebar-primary', 'sidebar-ring', 'chart-1'];
 
     // Act
-    const values = accentTokens.map((token) => tokens[token]);
+    const different = accentTokens.filter(
+      (token) => JSON.stringify(tokens[token]) !== JSON.stringify(tokens.primary),
+    );
 
     // Assert
-    for (const value of values) {
-      expect(value).toEqual(tokens.primary);
-    }
-    expect(tokens.primary.h).toBeGreaterThanOrEqual(20);
-    expect(tokens.primary.h).toBeLessThanOrEqual(30);
+    expect(different).toEqual([]);
   });
 
-  it('Then neither the primary nor any chart color reads as the unique item gold', () => {
+  it('If primary is the accent, Then its hue stays in the blood red range', () => {
+    // Arrange
+    const { h } = tokens.primary;
+
+    // Act
+    const inRange = h >= BLOOD_RED_HUE_MIN && h <= BLOOD_RED_HUE_MAX;
+
+    // Assert
+    expect({ h, inRange }).toEqual({ h, inRange: true });
+  });
+
+  it('If primary or a chart color is shown, Then it is not within the unique item gold hue', () => {
     // Arrange
     const uniqueGold = tokens['item-unique'];
     const accentTokens = ['primary', 'chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];
 
     // Act
-    const distances = accentTokens.map((token) => hueDistance(tokens[token], uniqueGold));
+    const tooClose = accentTokens.filter(
+      (token) => hueDistance(tokens[token], uniqueGold) <= MIN_HUE_DISTANCE_FROM_GOLD,
+    );
 
     // Assert
-    for (const distance of distances) {
-      expect(distance).toBeGreaterThan(20);
-    }
+    expect(tooClose).toEqual([]);
+  });
+});
+
+describe('When parsing theme tokens from stylesheet text', () => {
+  const css =
+    ':root {\n  --primary: oklch(0.44 0.16 25);\n}\n.dark,\nbody.widget {\n  --primary: oklch(0.67 0.18 27);\n}\n';
+
+  it('If the stylesheet uses CRLF line endings, Then the multi-line dark selector is still parsed', () => {
+    // Arrange
+    const crlfCss = css.replace(/\n/g, '\r\n');
+
+    // Act
+    const tokens = parseThemeTokens(crlfCss, '.dark,\nbody.widget');
+
+    // Assert
+    expect(tokens.primary).toEqual({ l: 0.67, c: 0.18, h: 27 });
+  });
+
+  it('If the selector is not in the stylesheet, Then parsing fails with a clear error', () => {
+    // Arrange
+    const selector = '.missing';
+
+    // Act
+    const parse = () => parseThemeTokens(css, selector);
+
+    // Assert
+    expect(parse).toThrow('Theme block ".missing" not found in the stylesheet');
   });
 });
 
