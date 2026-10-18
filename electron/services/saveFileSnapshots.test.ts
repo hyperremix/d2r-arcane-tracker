@@ -17,7 +17,7 @@ function characterSave(level: number, marker = 0): Buffer {
   return buffer;
 }
 
-describe('SaveFileSnapshotService', () => {
+describe('When using the save file snapshot service', () => {
   let root: string;
   let saveDirectory: string;
   let snapshotDirectory: string;
@@ -275,7 +275,7 @@ describe('SaveFileSnapshotService', () => {
   });
 });
 
-describe('parseSaveFileSnapshotId', () => {
+describe('When parsing a save file snapshot ID', () => {
   const copyFileName = buildCopyFileName('/saves/Hero.d2s', '.snap');
 
   it('When the ID names a snapshot, Then its parts are returned', () => {

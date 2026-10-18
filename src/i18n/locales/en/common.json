@@ -490,7 +490,7 @@
     "grailTransfer": {
       "title": "Grail import and export",
       "export": "Export",
-      "exportDescription": "Save every recorded find with its item, version, found date, character and source. JSON keeps everything for importing it again; CSV opens in spreadsheets.",
+      "exportDescription": "Save every recorded find with its item, version, found date, character and source. JSON has everything the app shows for a find and can be imported again; CSV opens in spreadsheets.",
       "exportJson": "Export JSON",
       "exportCsv": "Export CSV",
       "exporting": "Exporting...",

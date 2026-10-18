@@ -7,7 +7,7 @@ import { SAVE_FILE_EXTENSIONS } from '../utils/d2rFormat';
 const MAX_BACKUPS_PER_FILE = 20;
 
 /** Extension of the copies taken right before the app modifies a save file. */
-export const SAVE_FILE_BACKUP_EXTENSION = '.bak';
+const SAVE_FILE_BACKUP_EXTENSION = '.bak';
 
 let backupDirectory: string | undefined;
 // Disambiguates backups taken within the same millisecond, which would otherwise overwrite each other.
@@ -48,7 +48,7 @@ export function buildCopyFileName(filePath: string, extension: string): string {
 }
 
 /** What the name of a save file copy tells about it. */
-export interface SaveFileCopyName {
+interface SaveFileCopyName {
   /** The name prefix shared by all copies of the save file (see {@link buildBackupPrefix}). */
   prefix: string;
   /** File name of the save file the copy was taken of. */

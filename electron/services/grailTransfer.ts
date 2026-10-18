@@ -103,7 +103,7 @@ function isFind(progress: GrailProgress): progress is GrailProgress & { foundDat
 /**
  * Builds the export of every find (progress record with a found date), oldest first.
  * @param database - The grail database
- * @param format - `json` for the app's own format (full fidelity), `csv` for spreadsheets
+ * @param format - `json` for the app's own format (everything the app shows for a find), `csv` for spreadsheets
  * @param now - Export time written to the JSON file
  * @returns The file content
  */
@@ -615,7 +615,10 @@ export class GrailTransferService {
       plan.additions.forEach((find, index) => {
         const character =
           (find.characterName && this.database.getCharacterByName(find.characterName)) ||
-          (fallbackCharacter as NonNullable<typeof fallbackCharacter>);
+          fallbackCharacter;
+        if (!character) {
+          throw new Error(GRAIL_IMPORT_ERRORS.unknownCharacter);
+        }
         const version = find.isEthereal ? 'ethereal' : 'normal';
         this.database.upsertProgress({
           id: `manual_${character.id}_${find.itemId}_${version}_${importedAt.getTime()}_${index}`,
