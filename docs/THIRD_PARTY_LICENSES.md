@@ -36,6 +36,12 @@ The stat ranges used for the roll quality of unique and set items (`electron/ite
 
 Memory-reading research builds on [d2go](https://github.com/hectorgimenez/d2go) (see [MEMORY_READING.md](MEMORY_READING.md)).
 
+The character overview (see [Inventory Browser Guide](INVENTORY_BROWSER_GUIDE.md#character-overview)) bundles game facts, not code:
+
+- The faster cast rate, faster hit recovery and faster block rate breakpoint tables in `electron/services/characterOverview/breakpoints.ts` are the rows of the [michaelangel007 D2 cheat sheet](https://michaelangel007.github.io/d2_cheat_sheet/) that [d2-lab](https://github.com/bengous/d2-lab) (MIT) rebuilds from D2R's animation data in `tools/d2r-data/check-breakpoints.py`.
+- The meaning of the quest flags comes from [Trevin's Diablo II v1.09 save file format](https://user.xmission.com/~trevin/DiabloIIv1.09_File_Format.shtml), [D2SSharp](https://github.com/ResurrectedTrader/D2SSharp) (MIT) and [D2CE](https://github.com/WalterCouto/D2CE) (GPL-3.0). No code of these projects is included.
+- The resistance penalties are the `ResistPenalty` and `ResistPenaltyNonExpansion` values of D2R's `difficultylevels.txt`.
+
 The Warlock save file used as a test fixture (`electron/services/fixtures/WarlockV105.d2s`) comes from [halbu](https://github.com/feored/halbu) and is used under its MIT License (Copyright (c) 2023 feor); the license text is next to the file.
 
 The level 90 Warlock save used as a test fixture (`electron/services/fixtures/ChaosSCV105.d2s`) comes from [D2SSharp](https://github.com/ResurrectedTrader/D2SSharp) (`src/D2SSharp.Tests/Resources/105/ChaosSC.d2s`, added in commit `37f367e`, unchanged at `baf955a`). D2SSharp has no LICENSE file; its README ("License": MIT) and the `PackageLicenseExpression` (MIT, author ResurrectedTrader) in `src/D2SSharp/D2SSharp.csproj` state the MIT License. The license text and these details are next to the file.

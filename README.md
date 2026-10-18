@@ -22,7 +22,7 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 - **Configurable grail**: track normal and ethereal items, runes and runewords, for softcore, hardcore or both.
 - **Run Tracker**: farming sessions with per-run timing and loot, started automatically or with keyboard shortcuts. CSV, JSON and text export.
 - **Runeword Calculator**: shows which runewords you can make with the runes you have.
-- **Inventory Browser**: see what's in every character and shared stash, move items between them and keep items in a vault.
+- **Inventory Browser**: see what's in every character and shared stash, move items between them and keep items in a vault. Each character also has an overview with unclaimed quest rewards, missing waypoints and gear totals.
 - **Terror Zone Configuration**: choose which terror zones the game rotates through.
 - **Overlay widget, statistics and notifications**.
 - **Local only**: data lives in a SQLite database on your machine.
@@ -42,7 +42,7 @@ The app checks for updates on startup and installs them when you confirm.
 | Guide | Covers |
 | --- | --- |
 | [Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md) | The challenge, setup, tracking options, how detection works, and the other app features |
-| [Inventory Browser Guide](docs/INVENTORY_BROWSER_GUIDE.md) | Browsing, moving and vaulting items in your save files, and the safety rules |
+| [Inventory Browser Guide](docs/INVENTORY_BROWSER_GUIDE.md) | Browsing, moving and vaulting items in your save files, the character overview, and the safety rules |
 | [Run Tracker Guide](docs/RUN_TRACKER.md) | Sessions, runs, auto mode, shortcuts and exports |
 | [Terror Zone Configuration](docs/TERROR_ZONE_CONFIGURATION.md) | Changing the terror zone rotation |
 | [Extracting Game Files](docs/EXTRACTING_GAME_FILES.md) | CASC extraction, needed for item icons and terror zones |
