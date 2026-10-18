@@ -1547,6 +1547,34 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByRole('button', { name: 'Mark as found' })).toHaveClass('bg-primary');
     });
   });
+
+  describe('If the item has no tracked version and was found in its own version', () => {
+    it('Then it reads Found (not tracked) and Mark as found stays the primary action', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('only').build();
+      const characters = [CharacterBuilder.new().withId('char-1').build()];
+      const progress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asEthereal()
+        .build();
+      setupStoreMock({
+        items: [item],
+        characters,
+        progress: [progress],
+        settings: { grailNormal: true, grailEthereal: false },
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Found (not tracked)')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mark as found' })).toHaveClass('bg-primary');
+      expect(screen.queryByRole('button', { name: 'Add another find' })).not.toBeInTheDocument();
+    });
+  });
 });
 
 function openMarkAsFoundPrompt(name = 'Mark as found') {
@@ -1752,7 +1780,6 @@ describe('When the user marks an item as found', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
       fireEvent.click(screen.getByRole('button', { name: 'Add another find' }));
       const prompt = screen.getByRole('dialog', { name: 'Add another find' });
-      expect(prompt).toHaveAccessibleDescription('Record another find of Shako.');
       const characterSelect = within(prompt).getByRole('combobox', { name: 'Character' });
       fireEvent.click(characterSelect);
       const pallyOption = await screen.findByRole('option', { name: 'Pally' });
@@ -1764,11 +1791,88 @@ describe('When the user marks an item as found', () => {
       fireEvent.click(within(prompt).getByRole('button', { name: 'Add another find' }));
 
       // Assert
+      expect(prompt).toHaveAccessibleDescription('Record another find of Shako.');
       await waitFor(() =>
         expect(mockAddManualProgress).toHaveBeenCalledWith(
           expect.objectContaining({ itemId: 'item-1', characterId: 'char-2', isEthereal: false }),
         ),
       );
+    });
+
+    it('Then a character that has not recorded the version yet is preselected', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const characters = [
+        CharacterBuilder.new().withId('char-1').withName('Sorc').build(),
+        CharacterBuilder.new().withId('char-2').withName('Pally').build(),
+      ];
+      const progress = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters, progress: [progress] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt('Add another find');
+
+      // Assert
+      expect(within(prompt).getByRole('combobox', { name: 'Character' })).toHaveTextContent(
+        'Pally',
+      );
+      expect(within(prompt).getByRole('button', { name: 'Add another find' })).toBeEnabled();
+    });
+  });
+
+  describe('If saving a find makes the item found in every tracked version', () => {
+    it('Then the open prompt keeps the name it was opened with', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const characters = [CharacterBuilder.new().withId('char-1').withName('Sorc').build()];
+      const normalFind = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      const etherealFind = GrailProgressBuilder.new()
+        .withId('prog-2')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-02'))
+        .asEthereal()
+        .build();
+      const settings = { grailEthereal: true };
+      setupStoreMock({ items: [item], characters, progress: [normalFind], settings });
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />,
+      );
+      let promptNameAfterSave: 'Mark as found' | 'Add another find' | undefined;
+      mockAddManualProgress.mockImplementation(async () => {
+        await Promise.resolve();
+        setupStoreMock({
+          items: [item],
+          characters,
+          progress: [normalFind, etherealFind],
+          settings,
+        });
+        rerender(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+        promptNameAfterSave = screen.queryByRole('dialog', { name: 'Add another find' })
+          ? 'Add another find'
+          : 'Mark as found';
+      });
+      const prompt = openMarkAsFoundPrompt();
+
+      // Act
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as found' }));
+
+      // Assert
+      await waitFor(() => expect(promptNameAfterSave).toBeDefined());
+      expect(promptNameAfterSave).toBe('Mark as found');
     });
   });
 
@@ -1825,6 +1929,37 @@ describe('When the user marks an item as found', () => {
           expect.objectContaining({ itemId: 'item-1', isEthereal: true }),
         ),
       );
+    });
+  });
+
+  describe('If the character already has one of the versions recorded', () => {
+    it('Then the version that is not recorded yet is preselected', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      const progress = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({
+        items: [item],
+        characters: [character],
+        progress: [progress],
+        settings: { grailEthereal: true },
+      });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      expect(within(prompt).getByRole('combobox', { name: 'Version' })).toHaveTextContent(
+        'Ethereal',
+      );
+      expect(within(prompt).getByRole('button', { name: 'Mark as found' })).toBeEnabled();
     });
   });
 

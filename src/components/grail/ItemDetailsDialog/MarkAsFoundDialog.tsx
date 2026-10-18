@@ -1,4 +1,4 @@
-import type { GrailProgress, Item, Settings } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { type FormEvent, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
   canItemBeNormal,
   getProgressVersion,
   isFind,
+  isVersionTracked,
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
@@ -46,16 +47,23 @@ function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
 }
 
 /**
- * Checks whether every version the user can record was already found, so recording a find adds
- * another find rather than marking the item as found.
+ * Checks whether every tracked version was already found, so recording a find adds another find
+ * rather than marking the item as found. An item with no tracked version is never complete: a
+ * find of its untracked version doesn't count as found (see ProgressStatusSection).
  */
 export function isFoundInEveryRecordableVersion(
   item: Item,
   itemProgress: GrailProgress[],
   settings: Settings,
 ): boolean {
-  return getRecordableVersions(item, settings).every((version) =>
-    itemProgress.some((p) => isFind(p) && getProgressVersion(p) === version),
+  const trackedVersions = (['normal', 'ethereal'] as const).filter((version) =>
+    isVersionTracked(item, version, settings),
+  );
+  return (
+    trackedVersions.length > 0 &&
+    trackedVersions.every((version) =>
+      itemProgress.some((p) => isFind(p) && getProgressVersion(p) === version),
+    )
   );
 }
 
@@ -135,6 +143,27 @@ function isVersionRecorded(
   );
 }
 
+/**
+ * Picks the character and version the prompt starts on: the first combination that isn't
+ * recorded yet, so a prompt that adds another find isn't opened on one that can't be saved.
+ * Falls back to the first character and version when all are recorded.
+ */
+function getInitialSelection(
+  characters: Character[],
+  versions: ItemVersion[],
+  progress: GrailProgress[],
+  itemId: string,
+): { characterId: string | undefined; version: ItemVersion } {
+  for (const character of characters) {
+    for (const version of versions) {
+      if (!isVersionRecorded(progress, itemId, character.id, version === 'ethereal')) {
+        return { characterId: character.id, version };
+      }
+    }
+  }
+  return { characterId: characters[0]?.id, version: versions[0] };
+}
+
 interface MarkAsFoundFormProps {
   item: Item;
   actionLabel: string;
@@ -154,8 +183,11 @@ function MarkAsFoundForm({ item, actionLabel, onDone }: MarkAsFoundFormProps) {
   const versions = useMemo(() => getRecordableVersions(item, settings), [item, settings]);
   const today = toLocalIsoDate();
 
-  const [characterId, setCharacterId] = useState<string | undefined>(characters[0]?.id);
-  const [version, setVersion] = useState<ItemVersion>(versions[0]);
+  const [initialSelection] = useState(() =>
+    getInitialSelection(characters, versions, progress, item.id),
+  );
+  const [characterId, setCharacterId] = useState<string | undefined>(initialSelection.characterId);
+  const [version, setVersion] = useState<ItemVersion>(initialSelection.version);
   const [foundDate, setFoundDate] = useState(today);
   const [submitting, setSubmitting] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);

@@ -127,6 +127,44 @@ describe('When CharacterProgressTable is rendered', () => {
     });
   });
 
+  describe('If the only manually added find is on another page', () => {
+    it('Then the Actions column is shown on the first page too', () => {
+      // Arrange
+      const characters = ['A', 'B', 'C', 'D', 'E', 'F'].map((name) =>
+        CharacterBuilder.new().withId(`char-${name}`).withName(name).build(),
+      );
+      const autoFinds = ['A', 'B', 'C', 'D', 'E'].map((name, index) => ({
+        ...findBy(`p-${name}`, `char-${name}`, `2024-02-0${index + 1}`),
+        manuallyAdded: false,
+      }));
+      const oldestManualFind = GrailProgressBuilder.new()
+        .withId('p-manual')
+        .withCharacterId('char-F')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .withManuallyAdded(true)
+        .asNormal()
+        .build();
+
+      // Act
+      render(
+        <CharacterProgressTable
+          characters={characters}
+          itemProgress={[...autoFinds, oldestManualFind]}
+          item={item}
+          onRemoveProgress={vi.fn()}
+        />,
+      );
+
+      // Assert
+      expect(listedCharacterNames()).toEqual(['E', 'D', 'C', 'B', 'A']);
+      expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+      for (const row of screen.getAllByRole('row')) {
+        expect(row.children).toHaveLength(4);
+      }
+    });
+  });
+
   describe('If several characters found the item on the same date', () => {
     it('Then they are ordered by character name', () => {
       // Arrange
