@@ -11,8 +11,12 @@ export const FARMING_DIFFICULTY_ORDER: readonly Difficulty[] = ['hell', 'nightma
 /** Item types that can drop from monsters; runewords are made, not found. */
 const DROPPABLE_TYPES = new Set<Item['type']>(['unique', 'set', 'rune']);
 
+/** The Latent and Renewed upgrades of the sunder charms are crafted, never dropped. */
+const CRAFTED_ITEM_ID_PATTERN = /^(latent|renewed)/;
+
 /** Whether an item can drop from monsters, so the farming advisor has something to say about it. */
-export const isFarmableItem = (item: Item): boolean => DROPPABLE_TYPES.has(item.type);
+export const isFarmableItem = (item: Item): boolean =>
+  DROPPABLE_TYPES.has(item.type) && !CRAFTED_ITEM_ID_PATTERN.test(item.id);
 
 const VERSIONS: ItemVersion[] = ['normal', 'ethereal'];
 

@@ -32,6 +32,17 @@ describe('When the missing items to farm are listed', () => {
     expect(missing.map((item) => item.id)).toEqual(['griffon']);
   });
 
+  it('If an item is a crafted sunder charm upgrade, Then it is left out', () => {
+    // Arrange
+    const items = [unique('latentblackcleft'), unique('renewedflamerift'), unique('shako')];
+
+    // Act
+    const missing = getMissingFarmingItems(items, [], { grailNormal: true, grailEthereal: false });
+
+    // Assert
+    expect(missing.map((item) => item.id)).toEqual(['shako']);
+  });
+
   it('If ethereal versions are tracked, Then an item found only as normal is still missing', () => {
     // Arrange
     const items = [unique('titan', 'optional'), unique('shako')];
