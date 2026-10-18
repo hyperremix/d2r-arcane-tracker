@@ -1,5 +1,6 @@
-import type { Item } from 'electron/types/grail';
+import type { Item, VaultItem } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
+import type { OwnedRunewordBase, RunewordReadiness } from './runeword-readiness';
 import {
   filterRunewordsByRunes,
   getRunewordCompletionStatus,
@@ -31,6 +32,15 @@ const callToArms = createRuneword('call_to_arms', 'Call to Arms', [
   'ohm',
 ]);
 const runewords = [steel, enigma, infinity, callToArms];
+
+const ownedBase: OwnedRunewordBase = {
+  key: 'base-1',
+  itemName: 'Archon Plate',
+  itemTypes: ['Armor', 'Any Armor'],
+  socketCount: 3,
+  ethereal: false,
+  location: { kind: 'vault', item: {} as VaultItem },
+};
 
 describe('runeword-utils', () => {
   describe('filterRunewordsByRunes', () => {
@@ -85,6 +95,47 @@ describe('runeword-utils', () => {
 
       // Assert
       expect(result).toEqual([]);
+    });
+
+    it('When availability is ready, then only craftable runewords with an owned base match', () => {
+      // Arrange
+      const availableRunes = { tir: 1, el: 1, jah: 1, ith: 1, ber: 1 };
+      const readinessById: Record<string, RunewordReadiness> = {
+        steel: { upgradePlan: [], bases: [] },
+        enigma: { upgradePlan: [], bases: [ownedBase] },
+        infinity: { upgradePlan: undefined, bases: [ownedBase] },
+      };
+
+      // Act
+      const result = filterRunewordsByRunes(runewords, [], 'ready', availableRunes, readinessById);
+
+      // Assert
+      expect(result.map((r) => r.id)).toEqual(['enigma']);
+    });
+
+    it('When availability is upgradable, then runewords with an upgrade plan match, however many runes they miss', () => {
+      // Arrange
+      const availableRunes = { tir: 1, el: 1 };
+      const upgradePlan = [
+        { runeId: 'sur', runeCount: 2, gemCode: 'gzv', resultRuneId: 'ber', times: 2 },
+      ];
+      const readinessById: Record<string, RunewordReadiness> = {
+        steel: { upgradePlan: [], bases: [] },
+        infinity: { upgradePlan, bases: [] },
+        enigma: { upgradePlan: undefined, bases: [] },
+      };
+
+      // Act
+      const result = filterRunewordsByRunes(
+        runewords,
+        [],
+        'upgradable',
+        availableRunes,
+        readinessById,
+      );
+
+      // Assert
+      expect(result.map((r) => r.id)).toEqual(['steel', 'infinity']);
     });
 
     it('If a runeword has no runes, then it is excluded', () => {

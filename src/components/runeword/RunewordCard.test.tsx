@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
-import type { Item } from 'electron/types/grail';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { Item, ParsedInventoryItem, VaultItem } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { OwnedRunewordBase, RunewordReadiness } from '@/lib/runeword-readiness';
 import { RunewordCard } from './RunewordCard';
 
 function createRuneword(runes: string[] | undefined, link = ''): Item {
@@ -32,6 +33,52 @@ function stubElectronApi() {
 function renderCard(runes: string[] | undefined, link = '') {
   stubElectronApi();
   render(<RunewordCard runeword={createRuneword(runes, link)} availableRunes={{}} />);
+}
+
+function createSaveBase(
+  overrides: Partial<ParsedInventoryItem>,
+  baseOverrides: Partial<OwnedRunewordBase> = {},
+): OwnedRunewordBase {
+  const item = {
+    characterName: 'Sorc',
+    sourceFileType: 'd2s',
+    locationContext: 'inventory',
+    itemName: 'Phase Blade',
+    ...overrides,
+  } as ParsedInventoryItem;
+  return {
+    key: `save-${item.characterName}-${item.locationContext}`,
+    itemName: item.itemName,
+    itemTypes: [],
+    socketCount: 2,
+    ethereal: false,
+    location: { kind: 'save', item },
+    ...baseOverrides,
+  };
+}
+
+function createVaultBase(): OwnedRunewordBase {
+  const item = { itemName: 'Phase Blade' } as VaultItem;
+  return {
+    key: 'vault-1',
+    itemName: 'Phase Blade',
+    itemTypes: [],
+    socketCount: 2,
+    ethereal: false,
+    location: { kind: 'vault', item },
+  };
+}
+
+function renderCardWithBases(bases: OwnedRunewordBase[]) {
+  stubElectronApi();
+  render(
+    <RunewordCard
+      runeword={createRuneword(['tir', 'el'])}
+      availableRunes={{ tir: 1, el: 1 }}
+      readiness={{ upgradePlan: [], bases }}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /owned bases?/ }));
 }
 
 describe('RunewordCard', () => {
@@ -138,5 +185,96 @@ describe('RunewordCard', () => {
 
     // Assert
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('When upgrades make the missing runes, Then each step names the runes and gem it takes and how often', () => {
+    // Arrange
+    stubElectronApi();
+    const readiness: RunewordReadiness = {
+      upgradePlan: [
+        { runeId: 'nef', runeCount: 3, resultRuneId: 'eth', times: 1 },
+        { runeId: 'lem', runeCount: 3, gemCode: 'gfg', resultRuneId: 'pul', times: 2 },
+      ],
+      bases: [],
+    };
+
+    // Act
+    render(
+      <RunewordCard
+        runeword={createRuneword(['eth', 'pul', 'pul'])}
+        availableRunes={{}}
+        readiness={readiness}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByText('Makeable with upgrades')).toBeInTheDocument();
+    const plan = screen.getByRole('list', { name: 'Horadric Cube rune upgrades' });
+    expect(
+      within(plan)
+        .getAllByRole('listitem')
+        .map((step) => step.textContent),
+    ).toEqual(['Cube 3 Nef → Eth', 'Cube 3 Lem + Flawed Emerald → Pul, 2 times']);
+  });
+
+  it('If every rune is owned, Then no upgrade plan or upgrade badge is shown', () => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(
+      <RunewordCard
+        runeword={createRuneword(['tir', 'el'])}
+        availableRunes={{ tir: 1, el: 1 }}
+        readiness={{ upgradePlan: [], bases: [] }}
+      />,
+    );
+
+    // Assert
+    expect(screen.queryByText('Makeable with upgrades')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('If the card has no readiness, Then it shows neither an upgrade plan nor owned bases', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el']);
+
+    // Assert
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByText('No owned base')).not.toBeInTheDocument();
+  });
+
+  it('If the owned bases are in the vault, a character and the shared stash, Then each is listed with its location', () => {
+    // Arrange & Act
+    renderCardWithBases([
+      createVaultBase(),
+      createSaveBase({ characterName: 'Sorc', locationContext: 'inventory' }),
+      createSaveBase({
+        characterName: 'Shared',
+        sourceFileType: 'd2i',
+        locationContext: 'stash',
+        stashTab: 1,
+      }),
+    ]);
+
+    // Assert
+    expect(screen.getByText('3 owned bases')).toBeInTheDocument();
+    const locations = screen
+      .getAllByRole('listitem')
+      .map((entry) => entry.lastElementChild?.textContent);
+    expect(locations).toEqual(['Vaulted', 'Sorc, Inventory', 'Shared stash, Stash tab 2']);
+  });
+
+  it('If an owned base is ethereal, Then it shows the ethereal badge and a normal base does not', () => {
+    // Arrange & Act
+    renderCardWithBases([
+      createSaveBase({ characterName: 'Ethereal' }, { ethereal: true }),
+      createSaveBase({ characterName: 'Plain' }),
+    ]);
+
+    // Assert
+    const [etherealEntry, plainEntry] = screen.getAllByRole('listitem');
+    expect(within(etherealEntry).getByText('Ethereal')).toBeInTheDocument();
+    expect(within(plainEntry).queryByText('Ethereal')).not.toBeInTheDocument();
   });
 });

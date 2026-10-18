@@ -30,6 +30,8 @@ Each dependency keeps its own license. For the full list and versions, see [`pac
 | [chokidar](https://github.com/paulmillr/chokidar) and [win32-api](https://github.com/waitingsong/node-win32-api) | MIT |
 | [Inter](https://github.com/rsms/inter) and [Cinzel](https://github.com/NDISCOVER/Cinzel) fonts, bundled via [Fontsource](https://github.com/fontsource/fontsource) | OFL-1.1 |
 
+The Runeword Calculator's rune upgrade recipes (`electron/items/runeUpgrades.ts`) and the item types each runeword can be made in (`electron/items/runewordBases.ts`) come from the game data of [blizzhackers/d2data](https://github.com/blizzhackers/d2data) (MIT License, Copyright (c) 2020 blizzhackers) at commit `fc469993502d0498809b9fc1af140ee2a9eb8902`: the rune upgrade rows of `json/cubemain.json`, and the `itype` columns of `json/runes.json` mapped to their `ItemType` names in `json/itemtypes.json`.
+
 Memory-reading research builds on [d2go](https://github.com/hectorgimenez/d2go) (see [MEMORY_READING.md](MEMORY_READING.md)).
 
 The Warlock save file used as a test fixture (`electron/services/fixtures/WarlockV105.d2s`) comes from [halbu](https://github.com/feored/halbu) and is used under its MIT License (Copyright (c) 2023 feor); the license text is next to the file.

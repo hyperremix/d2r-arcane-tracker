@@ -1,14 +1,22 @@
-import type { Item } from 'electron/types/grail';
+import type { Item, VaultItemFilter } from 'electron/types/grail';
+import i18n from 'i18next';
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { loadInventorySearchResponse } from '@/components/inventory/inventorySearch';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { translations } from '@/i18n/translations';
+import {
+  collectOwnedRunewordBases,
+  countAvailableGems,
+  getRunewordReadiness,
+  type OwnedRunewordBase,
+} from '@/lib/runeword-readiness';
 import {
   filterRunewordsByName,
   filterRunewordsByRunes,
@@ -48,21 +56,63 @@ async function loadAvailableRunes(): Promise<Record<string, number>> {
   return runes || {};
 }
 
-type BroaderAvailability = Exclude<RunewordAvailabilityFilter, 'craftable'>;
+/** Gems and runeword bases owned across the save files and the vault. */
+interface OwnedItems {
+  availableGems: Record<string, number>;
+  ownedBases: OwnedRunewordBase[];
+}
 
-const availabilityFilters: RunewordAvailabilityFilter[] = ['craftable', 'missingOne', 'all'];
+/** Every item of the latest save file scan that is not socketed into another one, and the vault. */
+const OWNED_ITEMS_FILTER: VaultItemFilter = {
+  includeSocketed: false,
+  vaultedState: 'vaulted',
+  page: 1,
+  pageSize: 200,
+};
+
+/**
+ * Loads gem counts from save files and the runeword bases owned in save files and the vault.
+ * Without them the calculator still works from the rune counts, so a failure yields none.
+ */
+async function loadOwnedItems(): Promise<OwnedItems> {
+  try {
+    const response = await loadInventorySearchResponse(OWNED_ITEMS_FILTER);
+    return {
+      availableGems: countAvailableGems(response.inventory.snapshots),
+      ownedBases: collectOwnedRunewordBases(response.inventory.snapshots, response.vault.items),
+    };
+  } catch (error) {
+    console.error('Failed to load owned gems and bases:', error);
+    toast.error(i18n.t(translations.runeword.calculator.ownedItemsFailed));
+    return { availableGems: {}, ownedBases: [] };
+  }
+}
+
+type BroaderAvailability = Exclude<RunewordAvailabilityFilter, 'ready'>;
+
+const availabilityFilters: RunewordAvailabilityFilter[] = [
+  'ready',
+  'craftable',
+  'upgradable',
+  'missingOne',
+  'all',
+];
 
 /**
  * Tiers broader than each availability filter, in the order they are suggested.
  */
 const broaderAvailabilityTiers: Record<RunewordAvailabilityFilter, BroaderAvailability[]> = {
-  craftable: ['missingOne', 'all'],
+  ready: ['craftable', 'upgradable', 'missingOne', 'all'],
+  craftable: ['upgradable', 'missingOne', 'all'],
+  upgradable: ['missingOne', 'all'],
   missingOne: ['all'],
   all: [],
 };
 
 const availabilityLabelKeys: Record<RunewordAvailabilityFilter, string> = {
+  ready: translations.runeword.calculator.availability.ready,
   craftable: translations.runeword.calculator.availability.craftable,
+  upgradable: translations.runeword.calculator.availability.upgradable,
   missingOne: translations.runeword.calculator.availability.missingOne,
   all: translations.grail.advancedSearch.statusAll,
 };
@@ -71,6 +121,8 @@ const availabilityLabelKeys: Record<RunewordAvailabilityFilter, string> = {
  * Label keys for the empty-state button that switches to a broader availability tier.
  */
 const showAvailabilityLabelKeys: Record<BroaderAvailability, string> = {
+  craftable: translations.runeword.calculator.showCraftable,
+  upgradable: translations.runeword.calculator.showUpgradable,
   missingOne: translations.runeword.calculator.showMissingOne,
   all: translations.runeword.calculator.showAll,
 };
@@ -84,7 +136,8 @@ interface AvailabilityFilterProps {
 }
 
 /**
- * Segmented control choosing between craftable, missing-at-most-one and all runewords.
+ * Segmented control choosing between ready, craftable, makeable with upgrades, missing-at-most-one
+ * and all runewords.
  * Rendered as a labeled fieldset of toggle buttons exposing their state via aria-pressed.
  */
 function AvailabilityFilter({ value, onChange }: AvailabilityFilterProps) {
@@ -117,7 +170,8 @@ function AvailabilityFilter({ value, onChange }: AvailabilityFilterProps) {
 
 /**
  * RunewordCalculator component that serves as the main page for the runeword calculator.
- * Displays all runewords with filtering capabilities by name and available runes.
+ * Displays all runewords with filtering capabilities by name and available runes, with the rune
+ * upgrades owned runes and gems allow and the owned bases each runeword fits.
  * Loads runewords directly from the database to work independently of grailRunewords setting.
  */
 export function RunewordCalculator() {
@@ -125,6 +179,7 @@ export function RunewordCalculator() {
   const searchInputId = useId();
   const [allRunewords, setAllRunewords] = useState<Item[]>([]);
   const [availableRunes, setAvailableRunes] = useState<Record<string, number>>({});
+  const [ownedItems, setOwnedItems] = useState<OwnedItems>({ availableGems: {}, ownedBases: [] });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRunes, setSelectedRunes] = useState<string[]>([]);
   const [availability, setAvailability] = useState<RunewordAvailabilityFilter>('craftable');
@@ -143,11 +198,14 @@ export function RunewordCalculator() {
         await refreshSaveFiles();
         setIsScanning(false);
 
-        setAvailableRunes(await loadAvailableRunes());
+        const [runes, owned] = await Promise.all([loadAvailableRunes(), loadOwnedItems()]);
+        setAvailableRunes(runes);
+        setOwnedItems(owned);
       } catch (error) {
         console.error('Failed to load data:', error);
         setIsScanning(false);
-        // Fallback: try to load runes even if refresh failed
+        // Fallback: try to load runes, gems and bases even if refresh failed
+        setOwnedItems(await loadOwnedItems());
         try {
           setAvailableRunes(await loadAvailableRunes());
         } catch (runeError) {
@@ -161,12 +219,29 @@ export function RunewordCalculator() {
     loadData();
   }, []);
 
+  const readinessById = useMemo(
+    () =>
+      getRunewordReadiness(
+        allRunewords,
+        availableRunes,
+        ownedItems.availableGems,
+        ownedItems.ownedBases,
+      ),
+    [allRunewords, availableRunes, ownedItems],
+  );
+
   // Filter runewords by name, selected runes and availability, then sort by craftability
   const filteredRunewords = useMemo(() => {
     const byName = filterRunewordsByName(allRunewords, searchTerm);
-    const byRunes = filterRunewordsByRunes(byName, selectedRunes, availability, availableRunes);
+    const byRunes = filterRunewordsByRunes(
+      byName,
+      selectedRunes,
+      availability,
+      availableRunes,
+      readinessById,
+    );
     return sortRunewordsByCraftability(byRunes, availableRunes);
-  }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes]);
+  }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes, readinessById]);
 
   /**
    * Rescans save files and reloads owned rune counts without hiding the current results.
@@ -175,7 +250,9 @@ export function RunewordCalculator() {
     setIsRefreshing(true);
     try {
       await refreshSaveFiles();
-      setAvailableRunes(await loadAvailableRunes());
+      const [runes, owned] = await Promise.all([loadAvailableRunes(), loadOwnedItems()]);
+      setAvailableRunes(runes);
+      setOwnedItems(owned);
     } catch (error) {
       console.error('Failed to refresh available runes:', error);
       toast.error(t(translations.runeword.calculator.refreshFailed));
@@ -188,9 +265,11 @@ export function RunewordCalculator() {
   const nextAvailability = useMemo(() => {
     const byName = filterRunewordsByName(allRunewords, searchTerm);
     return broaderAvailabilityTiers[availability].find(
-      (tier) => filterRunewordsByRunes(byName, selectedRunes, tier, availableRunes).length > 0,
+      (tier) =>
+        filterRunewordsByRunes(byName, selectedRunes, tier, availableRunes, readinessById).length >
+        0,
     );
-  }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes]);
+  }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes, readinessById]);
 
   // "Nothing craftable" is only a valid diagnosis when no search or rune filter narrows the list.
   const hasActiveFilters = searchTerm.trim() !== '' || selectedRunes.length > 0;
@@ -287,7 +366,8 @@ export function RunewordCalculator() {
           )}
 
           {/* Runeword Grid: columns follow the available width, not the viewport. Each card spans
-            three rows (header, runes, footer) via subgrid and takes its row gap from this grid. */}
+            four rows (header, runes, readiness, footer) via subgrid and takes its row gap from
+            this grid. */}
           {!isLoading && filteredRunewords.length > 0 && (
             <div
               data-testid="runeword-grid"
@@ -298,6 +378,7 @@ export function RunewordCalculator() {
                   key={runeword.id}
                   runeword={runeword}
                   availableRunes={availableRunes}
+                  readiness={readinessById[runeword.id]}
                 />
               ))}
             </div>
