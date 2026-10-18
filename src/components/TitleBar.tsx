@@ -7,10 +7,10 @@ import {
   Crosshair,
   PackageSearch,
   Settings,
-  Skull,
   Timer,
   Trophy,
 } from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import logoUrl from '/logo.png';
 import { NotificationButton } from './grail/NotificationButton';
 import { isMacPlatform, TitleBarFrame } from './TitleBarFrame';
+import { TerrorZoneIcon } from './terror-zone/TerrorZoneIcon';
 
 /**
  * Describes a single top-level destination in the title bar navigation.
@@ -28,7 +29,7 @@ import { isMacPlatform, TitleBarFrame } from './TitleBarFrame';
 interface NavigationItem {
   to: string;
   labelKey: string;
-  icon: LucideIcon;
+  icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
 }
 
 /**
@@ -51,12 +52,11 @@ const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
  * Secondary destinations (Farming advisor, Terror zones and Settings) shown as icon-only links
  * after the primary navigation.
  * The farming advisor uses `Crosshair`, for picking a target to hunt.
- * Terror Zones uses `Skull`, which reads as the dangerous, empowered zones of D2R. A map pin
- * reads as a profile avatar at icon size, and a warning icon would read as an error state.
+ * Terror Zones uses `TerrorZoneIcon`, a recreation of the in-game D2R terror zone emblem.
  */
 const SECONDARY_NAVIGATION_ITEMS: NavigationItem[] = [
   { to: '/farming', labelKey: translations.titleBar.farming, icon: Crosshair },
-  { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: Skull },
+  { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: TerrorZoneIcon },
   { to: '/settings', labelKey: translations.titleBar.settings, icon: Settings },
 ];
 

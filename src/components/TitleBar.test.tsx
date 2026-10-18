@@ -149,14 +149,16 @@ describe('When TitleBar is rendered', () => {
     }
   });
 
-  it('Then the Terror zones link shows a skull icon rather than a map pin', () => {
+  it('Then the Terror zones link shows the terror zone emblem rather than a lucide icon', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
     const link = within(getNavigation()).getByRole('link', { name: 'Terror zones' });
-    expect(link.querySelector('svg.lucide-skull')).not.toBeNull();
-    expect(link.querySelector('svg.lucide-map-pinned')).toBeNull();
+    const icon = link.querySelector('svg');
+    expect(icon).toHaveAttribute('viewBox', '12 12 198 208');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon).not.toHaveClass('lucide');
   });
 
   it('Then Farming advisor, Terror zones and Settings are icon-only links with an accessible name at every width', () => {
