@@ -342,8 +342,8 @@ describe('When TitleBar is rendered', () => {
 
     // Assert
     const menu = await screen.findByRole('menu');
-    expect(menu.className).toContain('app-region:no-drag');
-    expect(menu.className).toContain('-webkit-app-region:no-drag');
+    expect(menu.className).toContain('[app-region:no-drag]');
+    expect(menu.className).toContain('[-webkit-app-region:no-drag]');
   });
 
   it('If a destination in the More menu is chosen, Then it navigates there', async () => {
