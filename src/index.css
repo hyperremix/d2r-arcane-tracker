@@ -312,7 +312,7 @@ body.widget {
 }
 
 .release-notes a {
-  @apply text-primary hover:text-primary/90 underline;
+  @apply text-primary underline hover:no-underline;
 }
 
 .release-notes p {

@@ -432,3 +432,18 @@ describe('When scanning stylesheet text for color utilities', () => {
     expect(violations).toEqual([]);
   });
 });
+
+describe('When checking links that sit on the muted surface', () => {
+  it('If release-notes links are hovered, Then they do not fade primary text with an alpha', () => {
+    // Arrange
+    const css = readFileSync(join(srcDir, 'index.css'), 'utf8');
+    const rule = css.match(/\.release-notes a \{([^}]*)\}/)?.[1] ?? '';
+
+    // Act
+    const alphaHovers = rule.match(/hover:text-primary\/\d+/g) ?? [];
+
+    // Assert
+    expect(rule).toContain('text-primary');
+    expect(alphaHovers).toEqual([]);
+  });
+});
