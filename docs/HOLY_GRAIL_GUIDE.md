@@ -144,6 +144,8 @@ To show the game's own item icons:
 2. Go to **Settings → Item icon management**, click **Convert sprite files to PNG**, and wait for it to finish.
 3. Turn on **Show item icons**.
 
+To make the icons on the grail page bigger, pick **Large** or **Extra large** under **Icon size** in the same card. The size applies to the grid and the list view.
+
 Conversion only reads game files and is safe to run again. The PNGs are stored in the app's data folder.
 
 Icons of Reign of the Warlock items, such as the Warlock grimoires and the Colossal Ancient jewels, only exist in the game files of Reign of the Warlock. If you extracted the game files before installing it, [extract them again](EXTRACTING_GAME_FILES.md) and convert again. Conversion skips icons it already converted.

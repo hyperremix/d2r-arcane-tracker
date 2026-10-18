@@ -8,7 +8,12 @@ import {
   MAX_FARMING_MAGIC_FIND,
   MAX_FARMING_PLAYERS,
 } from '../types/farming';
-import type { Difficulty, GrailProgress, Settings } from '../types/grail';
+import {
+  type Difficulty,
+  type GrailProgress,
+  ITEM_ICON_SIZES,
+  type Settings,
+} from '../types/grail';
 import { MAX_SNAPSHOTS_PER_FILE, MIN_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { MAX_TERROR_ZONE_SCHEDULE_SLOTS } from '../types/terrorZones';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
@@ -271,6 +276,7 @@ const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
   needsSeeding: false,
   theme: true,
   showItemIcons: true,
+  itemIconSize: true,
   d2rInstallPath: false,
   iconConversionStatus: false,
   iconConversionProgress: false,
@@ -361,6 +367,11 @@ const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
         (value.saveSnapshotsPerFile as number) >= MIN_SNAPSHOTS_PER_FILE &&
         (value.saveSnapshotsPerFile as number) <= MAX_SNAPSHOTS_PER_FILE),
     `Invalid saveSnapshotsPerFile setting: expected an integer from ${MIN_SNAPSHOTS_PER_FILE} to ${MAX_SNAPSHOTS_PER_FILE}`,
+  );
+  // Preset that the grail page looks up icon sizes with
+  ensure(
+    value.itemIconSize === undefined || ITEM_ICON_SIZES.some((size) => size === value.itemIconSize),
+    `Invalid itemIconSize setting: expected one of ${ITEM_ICON_SIZES.join(', ')}`,
   );
   return value as Partial<Settings>;
 };

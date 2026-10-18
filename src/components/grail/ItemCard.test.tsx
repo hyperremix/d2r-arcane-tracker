@@ -396,7 +396,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} />);
 
       // Assert
-      expect(screen.getByTestId('item-artwork')).toHaveClass('h-10', alignment);
+      expect(screen.getByTestId('item-artwork')).toHaveClass(alignment);
+      expect(screen.getByTestId('item-artwork')).toHaveStyle({ height: '40px' });
       expect(screen.getByTestId('rune-images')).toHaveClass(runeSize);
     });
   });
@@ -412,6 +413,76 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       expect(screen.getByRole('img')).toBeInTheDocument();
+    });
+  });
+
+  describe('If an icon size preset is passed', () => {
+    it.each([
+      ['default', 'grid', '40px'],
+      ['large', 'grid', '80px'],
+      ['extraLarge', 'grid', '120px'],
+      ['default', 'list', '48px'],
+      ['large', 'list', '96px'],
+      ['extraLarge', 'list', '144px'],
+    ] as const)('Then the %s icon in the %s view is %s wide and high', (iconSize, viewMode, pixels) => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} iconSize={iconSize} />);
+
+      // Assert
+      const artwork = screen.getByRole('img').parentElement;
+      const slot = viewMode === 'grid' ? artwork : artwork?.parentElement;
+      expect(slot).toHaveStyle({ width: pixels, height: pixels });
+    });
+
+    it('Then the grid icon shrinks to fit a tile narrower than the icon', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+      // Act
+      render(<ItemCard item={item} iconSize="extraLarge" />);
+
+      // Assert
+      expect(screen.getByTestId('item-artwork')).toHaveClass('max-w-full');
+    });
+
+    it('Then the runeword artwork slot of a grid tile is as high as the icon', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02', 'r03'];
+
+      // Act
+      render(<ItemCard item={item} iconSize="extraLarge" />);
+
+      // Assert
+      expect(screen.getByTestId('item-artwork')).toHaveStyle({ height: '120px' });
+    });
+  });
+
+  describe('If an icon size preset is passed and the tile has no artwork', () => {
+    it.each([
+      ['item icons are hidden', false, 'unique'],
+      ['the item is a runeword without runes', true, 'runeword'],
+    ] as const)('Then the empty artwork slot is as high as the icon if %s', (_name, showItemIcons, type) => {
+      // Arrange
+      setupStoreMock({ showItemIcons });
+      const item = HolyGrailItemBuilder.new().withType(type).build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} iconSize="large" />);
+
+      // Assert
+      const slot = container.querySelector('[data-slot="card-content"]')?.firstElementChild;
+      expect(slot).toHaveAttribute('aria-hidden', 'true');
+      expect(slot).toHaveStyle({ height: '80px' });
     });
   });
 
@@ -530,7 +601,7 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       const content = container.querySelector('[data-slot="card-content"]');
-      expect(content?.firstElementChild).toHaveClass('h-10');
+      expect(content?.firstElementChild).toHaveStyle({ height: '40px' });
       expect(content?.querySelector('p.h-4')).toBeEmptyDOMElement();
     });
 

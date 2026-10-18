@@ -1,11 +1,12 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, ItemIconSize } from 'electron/types/grail';
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
+import { getGrailItemIconSize, ITEM_ICON_PIXELS } from '@/lib/itemIconSize';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
@@ -28,6 +29,7 @@ interface ItemCardCellProps {
  * Renders an ItemCard for a virtualized cell with a stable click handler and stable progress arrays,
  * so mounted cards only re-render when the item, the progress lookup or the characters change
  * (and not on every scroll frame or parent render of the surrounding virtualizer).
+ * The item icon has the size chosen for the grail page.
  */
 export const ItemCardCell = memo(function ItemCardCell({
   item,
@@ -41,6 +43,7 @@ export const ItemCardCell = memo(function ItemCardCell({
   const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
   const itemId = item.id;
   const handleClick = useCallback(() => onItemClick(itemId), [onItemClick, itemId]);
+  const iconSize = useGrailStore((state) => getGrailItemIconSize(state.settings));
 
   return (
     <ItemCard
@@ -50,6 +53,7 @@ export const ItemCardCell = memo(function ItemCardCell({
       characters={characters}
       onClick={handleClick}
       viewMode={viewMode}
+      iconSize={iconSize}
     />
   );
 });
@@ -125,18 +129,28 @@ export function getColumnCount(containerWidth: number): number {
 const HEADER_ROW_HEIGHT_ESTIMATE = 60;
 
 /**
- * Height of a grid tile in pixels: 112px without the version pill row. While ethereal tracking is
- * on, every tile also reserves the pill row (6px margin + 18px row, see GridView), making it 136px.
+ * Height of a grid tile in pixels without its artwork slot and the version pill row: 72px, so a
+ * tile with the default 40px icon is 112px high. While ethereal tracking is on, every tile also
+ * reserves the pill row (6px margin + 18px row, see GridView).
  */
-const TILE_HEIGHT = 112;
+const TILE_HEIGHT_WITHOUT_ARTWORK = 72;
 const VERSION_ROW_HEIGHT = 6 + 18;
 
 /**
  * Estimated height of a row of grid tiles in pixels, including the row gap (refined by measuring
- * rendered rows). With ethereal tracking on, the tile reserves the version pill row.
+ * rendered rows). The artwork slot is as high as the icon size preset; with ethereal tracking on,
+ * the tile reserves the version pill row.
  */
-export function getItemRowHeightEstimate(reserveVersionRow: boolean): number {
-  return TILE_HEIGHT + (reserveVersionRow ? VERSION_ROW_HEIGHT : 0) + COLUMN_GUTTER;
+export function getItemRowHeightEstimate(
+  reserveVersionRow: boolean,
+  iconSize: ItemIconSize = 'default',
+): number {
+  return (
+    TILE_HEIGHT_WITHOUT_ARTWORK +
+    ITEM_ICON_PIXELS[iconSize].grid +
+    (reserveVersionRow ? VERSION_ROW_HEIGHT : 0) +
+    COLUMN_GUTTER
+  );
 }
 
 /**
@@ -257,6 +271,7 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
   const [contentRef, columnCount] = useElementColumnCount();
   // Tiles reserve the version pill row while ethereal tracking is on (see ItemCard)
   const reserveVersionRow = useGrailStore((state) => state.settings.grailEthereal);
+  const iconSize = useGrailStore((state) => getGrailItemIconSize(state.settings));
 
   const rows = useMemo(
     () => createGridRows(groupedItems, columnCount, showGroupHeaders),
@@ -269,8 +284,8 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
     (index: number) =>
       rows[index]?.type === 'header'
         ? HEADER_ROW_HEIGHT_ESTIMATE
-        : getItemRowHeightEstimate(reserveVersionRow),
-    [rows, reserveVersionRow],
+        : getItemRowHeightEstimate(reserveVersionRow, iconSize),
+    [rows, reserveVersionRow, iconSize],
   );
   const getItemKey = useCallback((index: number) => rows[index].key, [rows]);
 

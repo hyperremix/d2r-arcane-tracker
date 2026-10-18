@@ -1,3 +1,4 @@
+import { ITEM_ICON_SIZES, type ItemIconSize } from 'electron/types/grail';
 import { AlertCircle, AlertTriangle, CheckCircle, Image, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
 import { forgetMissingIcons } from '@/lib/iconLoader';
@@ -31,6 +39,7 @@ import { useGrailStore } from '@/stores/grailStore';
 export function ItemIconSettings() {
   const { t } = useTranslation();
   const itemIconsSwitchId = useId();
+  const iconSizeSelectId = useId();
   const { settings, setSettings } = useGrailStore(
     useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
   );
@@ -53,6 +62,15 @@ export function ItemIconSettings() {
 
   const toggleItemIcons = async (checked: boolean) => {
     await setSettings({ showItemIcons: checked });
+  };
+
+  const iconSizeItems = ITEM_ICON_SIZES.map((size) => ({
+    value: size,
+    label: t(translations.settings.itemIcons.iconSizes[size]),
+  }));
+
+  const updateIconSize = async (size: ItemIconSize) => {
+    await setSettings({ itemIconSize: size });
   };
 
   const loadValidation = useCallback(async () => {
@@ -127,6 +145,35 @@ export function ItemIconSettings() {
               checked={settings.showItemIcons}
               onCheckedChange={toggleItemIcons}
             />
+          </div>
+
+          {/* Icon Size Preset (only applies while item icons are shown) */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor={iconSizeSelectId} className="font-medium text-sm">
+                {t(translations.settings.itemIcons.iconSize)}
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                {t(translations.settings.itemIcons.iconSizeDescription)}
+              </p>
+            </div>
+            <Select
+              items={iconSizeItems}
+              value={settings.itemIconSize ?? 'default'}
+              onValueChange={(selected) => selected && updateIconSize(selected as ItemIconSize)}
+              disabled={!settings.showItemIcons}
+            >
+              <SelectTrigger id={iconSizeSelectId} className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {iconSizeItems.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Validation Status */}

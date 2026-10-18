@@ -1,8 +1,9 @@
-import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, ItemIconSize } from 'electron/types/grail';
 import type { HTMLAttributes } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
+import { ITEM_ICON_PIXELS } from '@/lib/itemIconSize';
 import { cn } from '@/lib/utils';
 import { RuneImages } from '../RuneImages';
 import { RecentDiscoveryIndicator } from '../StatusIcons';
@@ -38,6 +39,8 @@ export interface ItemCardViewProps {
   /** Date of a recent find, shown as a "New" badge; undefined hides the badge */
   recentFindDate: Date | undefined;
   showItemIcons: boolean;
+  /** Size preset of the item icon */
+  iconSize: ItemIconSize;
   className: string | undefined;
   interactiveProps?: InteractiveCardProps;
 }
@@ -60,19 +63,28 @@ interface GridArtworkProps {
   item: Item;
   isFound: boolean;
   showItemIcons: boolean;
+  iconSize: ItemIconSize;
   focusableTriggers: boolean;
 }
 
 /**
  * Renders the item icon or rune images for a grid card, dimmed and grayscale while missing.
- * The artwork slot has a fixed height, also when it is empty, so every tile is equally tall.
+ * The artwork slot is as high as the icon size preset, also when it is empty, so every tile is
+ * equally tall.
  */
-function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridArtworkProps) {
+function GridArtwork({
+  item,
+  isFound,
+  showItemIcons,
+  iconSize,
+  focusableTriggers,
+}: GridArtworkProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
+  const iconPixels = ITEM_ICON_PIXELS[iconSize].grid;
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
     // Up to three runes sit in one centered row. Longer runewords wrap into two rows of three:
-    // smaller runes (34px high) sit at the bottom of the 40px slot, so the top 6px of the slot
+    // smaller runes (34px high) sit at the bottom of the slot (at least 40px), so its top 6px
     // stay free. The corner "New" badge (12px high at the card's top edge) ends 13px below the
     // card top, the slot starts 9px and the top rune row 15px below it, so the rune rows clear it.
     const isOneRow = item.runes.length <= 3;
@@ -80,10 +92,11 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
       <div
         data-testid="item-artwork"
         className={cn(
-          'flex h-10 justify-center',
+          'flex justify-center',
           isOneRow ? 'items-center' : 'items-end',
           !isFound && missingArtworkStyles,
         )}
+        style={{ height: iconPixels }}
       >
         <RuneImages
           runeIds={item.runes}
@@ -96,13 +109,15 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
   }
 
   if (!showItemIcons || item.type === 'runeword') {
-    return <div aria-hidden="true" className="h-10" />;
+    return <div aria-hidden="true" style={{ height: iconPixels }} />;
   }
 
+  // In the narrowest columns the extra large icon is wider than the tile, so it shrinks to fit
   return (
     <div
       data-testid="item-artwork"
-      className={cn('relative mx-auto size-10', !isFound && missingArtworkStyles)}
+      className={cn('relative mx-auto max-w-full', !isFound && missingArtworkStyles)}
+      style={{ width: iconPixels, height: iconPixels }}
     >
       <img
         src={iconUrl}
@@ -132,6 +147,7 @@ export function GridView({
   versionStatuses,
   recentFindDate,
   showItemIcons,
+  iconSize,
   reserveVersionRow = false,
   className,
   interactiveProps,
@@ -176,6 +192,7 @@ export function GridView({
             item={item}
             isFound={isFound}
             showItemIcons={showItemIcons}
+            iconSize={iconSize}
             focusableTriggers={focusableTriggers}
           />
 

@@ -194,6 +194,22 @@ describe('When a setting row is missing or empty', () => {
   });
 });
 
+describe('When the stored item icon size is parsed', () => {
+  it.each([
+    ['large', 'large'],
+    ['extraLarge', 'extraLarge'],
+    [undefined, 'default'],
+    ['', 'default'],
+    ['huge', 'default'],
+  ])('If %s is stored, Then the preset is %s', (stored, expected) => {
+    // Act
+    const settings = parseSettings({ itemIconSize: stored });
+
+    // Assert
+    expect(settings.itemIconSize).toBe(expected);
+  });
+});
+
 describe('When settings are serialized for storage', () => {
   it('Then objects are stored as JSON and primitives as text', () => {
     // Act

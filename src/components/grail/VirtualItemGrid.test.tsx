@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import {
   COLUMN_GUTTER,
   createGridRows,
@@ -234,6 +235,19 @@ describe('When getItemRowHeightEstimate is called', () => {
 
       // Assert
       expect(estimate).toBe(112 + 6 + 18 + COLUMN_GUTTER);
+    });
+  });
+
+  describe('If a larger icon size preset is used', () => {
+    it.each([
+      ['large', 152],
+      ['extraLarge', 192],
+    ] as const)('Then the %s tile is %ipx high plus the row gap', (iconSize, tileHeight) => {
+      // Act
+      const estimate = getItemRowHeightEstimate(false, iconSize);
+
+      // Assert
+      expect(estimate).toBe(tileHeight + COLUMN_GUTTER);
     });
   });
 });
@@ -791,6 +805,50 @@ describe('When VirtualItemGrid is sized to its container', () => {
       expect(rows[0].style.paddingBottom).toBe(`${COLUMN_GUTTER}px`);
       expect(rows[0].children).toHaveLength(3);
       expect(rows[1].children).toHaveLength(1);
+    });
+  });
+});
+
+describe('When VirtualItemGrid estimates the height of rows it has not measured yet', () => {
+  const initialGrailState = useGrailStore.getInitialState();
+
+  afterEach(() => {
+    useGrailStore.setState(initialGrailState, true);
+    vi.restoreAllMocks();
+  });
+
+  describe.each([
+    [true, 'default', 112],
+    [true, 'large', 152],
+    [true, 'extraLarge', 192],
+    [false, 'extraLarge', 112],
+  ] as const)('If item icons are shown is %s and the preset is %s', (showItemIcons, itemIconSize, tileHeight) => {
+    it(`Then a row is estimated as a ${tileHeight}px tile plus the row gap`, () => {
+      // Arrange
+      stubLayout({ height: 0, width: widthForColumns(1) });
+      useGrailStore.setState({
+        settings: {
+          ...initialGrailState.settings,
+          showItemIcons,
+          itemIconSize,
+          grailEthereal: false,
+        },
+      });
+
+      // Act
+      const { container } = render(
+        <VirtualItemGrid
+          groupedItems={[{ title: 'Unique Armor', items: [createMockItem()], foundCount: 0 }]}
+          showGroupHeaders={false}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const content = container.firstElementChild?.firstElementChild as HTMLElement;
+      expect(content.style.height).toBe(`${tileHeight + COLUMN_GUTTER}px`);
     });
   });
 });

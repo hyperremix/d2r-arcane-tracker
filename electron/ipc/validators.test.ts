@@ -97,6 +97,7 @@ describe('When renderer arguments are validated against the IPC contract', () =>
       [{ saveSnapshotsPerFile: 501 }],
       'Invalid saveSnapshotsPerFile setting',
     ],
+    ['grail:updateSettings', [{ itemIconSize: 'huge' }], 'Invalid itemIconSize setting'],
     ['grail:exportProgress', ['xlsx'], 'Invalid export format'],
     ['grail:previewImport', ['grail.json'], 'Invalid import file'],
     ['grail:previewImport', ['/tmp/grail.db'], 'Invalid import file'],
@@ -350,6 +351,7 @@ describe('When the renderer updates settings', () => {
       runTrackerGlobalHotkeys: true,
       saveSnapshotsEnabled: false,
       saveSnapshotsPerFile: 25,
+      itemIconSize: 'large',
     };
 
     // Act
