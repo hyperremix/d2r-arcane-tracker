@@ -69,8 +69,9 @@ export function useTheme(): void {
       cacheThemePreference(theme);
     }
 
-    // Update Windows titlebar overlay colors to match theme
-    if (window.electronAPI?.platform === 'win32') {
+    // Update the Windows and Linux titlebar overlay colors to match theme
+    const platform = window.electronAPI?.platform;
+    if (platform === 'win32' || platform === 'linux') {
       window.electronAPI.updateTitleBarOverlay(THEME_CHROME_COLORS[resolvedTheme]);
     }
   }, [resolvedTheme, settingsHydrated, theme]);

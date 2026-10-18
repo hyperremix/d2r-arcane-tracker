@@ -359,18 +359,21 @@ describe('When useTheme hook is used', () => {
     });
   });
 
-  describe('If running on Windows', () => {
+  describe('If running on Windows or Linux', () => {
     const originalElectronAPI = window.electronAPI;
 
     afterEach(() => {
       window.electronAPI = originalElectronAPI;
     });
 
-    it('Then should update the title bar overlay colors to match the theme', () => {
+    it.each([
+      'win32',
+      'linux',
+    ] as const)('Then should update the title bar overlay colors to match the theme on %s', (platform) => {
       // Arrange
       const updateTitleBarOverlay = vi.fn();
       window.electronAPI = {
-        platform: 'win32',
+        platform,
         updateTitleBarOverlay,
       } as unknown as typeof window.electronAPI;
       mockStore('light');
@@ -380,6 +383,30 @@ describe('When useTheme hook is used', () => {
 
       // Assert
       expect(updateTitleBarOverlay).toHaveBeenCalledWith(THEME_CHROME_COLORS.light);
+    });
+  });
+
+  describe('If running on macOS', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    afterEach(() => {
+      window.electronAPI = originalElectronAPI;
+    });
+
+    it('Then should not update the title bar overlay, which macOS windows do not have', () => {
+      // Arrange
+      const updateTitleBarOverlay = vi.fn();
+      window.electronAPI = {
+        platform: 'darwin',
+        updateTitleBarOverlay,
+      } as unknown as typeof window.electronAPI;
+      mockStore('light');
+
+      // Act
+      renderHook(() => useTheme());
+
+      // Assert
+      expect(updateTitleBarOverlay).not.toHaveBeenCalled();
     });
   });
 });
