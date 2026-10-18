@@ -105,6 +105,8 @@
  * Neutrals use a low-chroma warm stone hue (~55-85) instead of the stock cool zinc.
  * Text tokens are checked for WCAG AA (>= 4.5:1) on background, card, muted and the
  * missing-card surface (muted/40 over background; muted/20 in dark) in both themes.
+ * The primary pairs (text on background, card and muted; foreground on filled and hovered
+ * primary) are asserted in themeColorTokens.test.ts.
  */
 :root {
   --radius: 0.5rem;
@@ -114,7 +116,10 @@
   --card-foreground: oklch(0.17 0.012 55);
   --popover: oklch(0.995 0.003 85);
   --popover-foreground: oklch(0.17 0.012 55);
-  /* Brand: D2 blood red */
+  /*
+   * Brand: D2 blood red, the single UI accent (buttons, links, focus rings, selection, chart-1).
+   * Gold, green, orange, purple, blue and yellow are reserved for item qualities (--item-*).
+   */
   --primary: oklch(0.44 0.16 25);
   --primary-foreground: oklch(0.985 0.01 85);
   --secondary: oklch(0.955 0.008 75);
@@ -127,8 +132,12 @@
   --border: oklch(0.9 0.012 70);
   --input: oklch(0.9 0.012 70);
   --ring: oklch(0.44 0.16 25);
+  /*
+   * Charts: chart-1 is the accent; chart-3/4/5 back the set, runeword and rune gauges; chart-2 is
+   * a teal that matches no item quality. No chart color is the unique gold.
+   */
   --chart-1: oklch(0.44 0.16 25);
-  --chart-2: oklch(0.66 0.13 80);
+  --chart-2: oklch(0.55 0.09 200);
   --chart-3: oklch(0.55 0.13 150);
   --chart-4: oklch(0.5 0.2 300);
   --chart-5: oklch(0.58 0.16 50);
@@ -174,9 +183,13 @@ body.widget {
   --card-foreground: oklch(0.965 0.01 85);
   --popover: oklch(0.205 0.01 62);
   --popover-foreground: oklch(0.965 0.01 85);
-  /* Brand: D2 gold (dark red is too dim on a dark background) */
-  --primary: oklch(0.8 0.13 85);
-  --primary-foreground: oklch(0.2 0.03 60);
+  /*
+   * Brand: a brightened blood red, the light theme's red lifted so it reads on dark stone.
+   * Gold stays reserved for unique items. A red light enough for text on muted (>= 4.5:1) is too
+   * light for light text, so filled primary surfaces carry a dark red-black foreground instead.
+   */
+  --primary: oklch(0.67 0.18 27);
+  --primary-foreground: oklch(0.15 0.02 25);
   --secondary: oklch(0.265 0.012 62);
   --secondary-foreground: oklch(0.965 0.01 85);
   --muted: oklch(0.265 0.012 62);
@@ -186,20 +199,20 @@ body.widget {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(0.92 0.02 75 / 12%);
   --input: oklch(0.92 0.02 75 / 16%);
-  --ring: oklch(0.8 0.13 85);
-  --chart-1: oklch(0.65 0.2 25);
-  --chart-2: oklch(0.8 0.13 85);
+  --ring: oklch(0.67 0.18 27);
+  --chart-1: oklch(0.67 0.18 27);
+  --chart-2: oklch(0.74 0.09 200);
   --chart-3: oklch(0.72 0.15 150);
   --chart-4: oklch(0.68 0.17 300);
   --chart-5: oklch(0.75 0.16 55);
   --sidebar: oklch(0.205 0.01 62);
   --sidebar-foreground: oklch(0.965 0.01 85);
-  --sidebar-primary: oklch(0.8 0.13 85);
-  --sidebar-primary-foreground: oklch(0.2 0.03 60);
+  --sidebar-primary: oklch(0.67 0.18 27);
+  --sidebar-primary-foreground: oklch(0.15 0.02 25);
   --sidebar-accent: oklch(0.265 0.012 62);
   --sidebar-accent-foreground: oklch(0.965 0.01 85);
   --sidebar-border: oklch(0.92 0.02 75 / 12%);
-  --sidebar-ring: oklch(0.8 0.13 85);
+  --sidebar-ring: oklch(0.67 0.18 27);
   --success: oklch(0.75 0.17 150);
   --success-foreground: oklch(0.155 0.008 60);
   --warning: oklch(0.8 0.14 75);
@@ -299,7 +312,7 @@ body.widget {
 }
 
 .release-notes a {
-  @apply text-primary hover:text-primary/80 underline;
+  @apply text-primary hover:text-primary/90 underline;
 }
 
 .release-notes p {
