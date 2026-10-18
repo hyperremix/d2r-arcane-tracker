@@ -332,6 +332,20 @@ describe('When TitleBar is rendered', () => {
     expect(trigger).not.toHaveAttribute('aria-current');
   });
 
+  it('If the More menu is open, Then its popup is excluded from the draggable title bar region', async () => {
+    // Arrange
+    stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
+    renderTitleBar();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+
+    // Assert
+    const menu = await screen.findByRole('menu');
+    expect(menu.className).toContain('app-region:no-drag');
+    expect(menu.className).toContain('-webkit-app-region:no-drag');
+  });
+
   it('If a destination in the More menu is chosen, Then it navigates there', async () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
@@ -376,24 +390,24 @@ describe('When TitleBar is rendered', () => {
   it('If the title bar is measured, Then both the navigation region and the measuring copy are observed until it unmounts', () => {
     // Arrange
     stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH);
-
-    // Act
     const { unmount } = renderTitleBar();
-
-    // Assert
     const region = screen
       .getByRole('banner')
       .querySelector('[data-overflow-part="logo"]')?.parentElement;
     const measuredCopy = document.querySelector(
       '[aria-hidden="true"] [data-overflow-part="name"]',
     )?.parentElement;
+    const disconnectsBeforeUnmount = resizeObservers[0].disconnect.mock.calls.length;
+
+    // Act
+    unmount();
+
+    // Assert
     expect(resizeObservers).toHaveLength(1);
     expect(resizeObservers[0].observe).toHaveBeenCalledWith(region);
     expect(resizeObservers[0].observe).toHaveBeenCalledWith(measuredCopy);
     expect(resizeObservers[0].observe).toHaveBeenCalledTimes(2);
-    expect(resizeObservers[0].disconnect).not.toHaveBeenCalled();
-
-    unmount();
+    expect(disconnectsBeforeUnmount).toBe(0);
     expect(resizeObservers[0].disconnect).toHaveBeenCalledTimes(1);
   });
 
