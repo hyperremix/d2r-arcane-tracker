@@ -139,6 +139,8 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       getAvailableRunes: () => invoke('saveFile:getAvailableRunes'),
       /** Forces a re-parse of all save files. */
       refreshSaveFiles: () => invoke('saveFile:refreshSaveFiles'),
+      /** Overview of a scanned character save (.d2s), read from the file; undefined when unreadable. */
+      getCharacterOverview: (filePath: string) => invoke('saveFile:getCharacterOverview', filePath),
     },
 
     vault: {

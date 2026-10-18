@@ -1102,6 +1102,149 @@
       "notFound": "No snapshot is available for {{characterName}} yet."
     }
   },
+  "characterOverview": {
+    "tabsLabel": "Character view",
+    "tabs": {
+      "items": "Items",
+      "overview": "Overview"
+    },
+    "unavailable": "The overview couldn't be read from this save file. It's read again after the game saves the character.",
+    "readOnlyNote": "Read from the save file. The overview never changes it.",
+    "difficulties": {
+      "normal": "Normal",
+      "nightmare": "Nightmare",
+      "hell": "Hell"
+    },
+    "basics": {
+      "title": "Character",
+      "softcore": "Softcore",
+      "hardcore": "Hardcore",
+      "classic": "Classic",
+      "experience": "Experience",
+      "goldInventory": "Gold in inventory",
+      "goldStash": "Gold in stash",
+      "attributesTitle": "Base attributes",
+      "attributesNote": "As stored in the save, without item bonuses.",
+      "strength": "Strength",
+      "dexterity": "Dexterity",
+      "vitality": "Vitality",
+      "energy": "Energy",
+      "unusedStatPoints": "Unused stat points",
+      "unusedSkillPoints": "Unused skill points"
+    },
+    "progress": {
+      "title": "Difficulty progress",
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "notReached": "Not reached",
+      "difficultyState": "{{difficulty}}: {{state}}"
+    },
+    "quests": {
+      "title": "Quest rewards",
+      "description": "Rewards that are earned but not taken yet are highlighted.",
+      "unconfirmedNote": "Radament's skill point, Larzuk's socket and Akara's reset are read from flags that weren't confirmed in game.",
+      "noData": "The quest data of this save couldn't be read.",
+      "rewardColumn": "Reward",
+      "states": {
+        "claimed": "Claimed",
+        "unclaimed": "Not claimed",
+        "notEarned": "Not earned"
+      },
+      "respecStates": {
+        "claimed": "Used",
+        "unclaimed": "Available",
+        "notEarned": "Not earned"
+      },
+      "rewards": {
+        "denOfEvil": "Den of Evil: skill point",
+        "charsiImbue": "Tools of the Trade: Charsi's imbue",
+        "akaraRespec": "Akara's stat and skill reset",
+        "radament": "Radament's Lair: skill point",
+        "lamEsen": "Lam Esen's Tome: 5 stat points",
+        "goldenBird": "The Golden Bird: Potion of Life",
+        "izual": "The Fallen Angel: 2 skill points",
+        "larzukSocket": "Siege on Harrogath: Larzuk's socket",
+        "anyaScroll": "Prison of Ice: Scroll of Resistance"
+      }
+    },
+    "waypoints": {
+      "title": "Missing waypoints",
+      "count": "{{activated}} of {{total}} activated",
+      "allActivated": "Every waypoint is activated.",
+      "act": "Act {{act}}",
+      "names": {
+        "rogueEncampment": "Rogue Encampment",
+        "coldPlains": "Cold Plains",
+        "stonyField": "Stony Field",
+        "darkWood": "Dark Wood",
+        "blackMarsh": "Black Marsh",
+        "outerCloister": "Outer Cloister",
+        "jail": "Jail Level 1",
+        "innerCloister": "Inner Cloister",
+        "catacombs": "Catacombs Level 2",
+        "lutGholein": "Lut Gholein",
+        "sewers": "Sewers Level 2",
+        "dryHills": "Dry Hills",
+        "hallsOfTheDead": "Halls of the Dead Level 2",
+        "farOasis": "Far Oasis",
+        "lostCity": "Lost City",
+        "palaceCellar": "Palace Cellar Level 1",
+        "arcaneSanctuary": "Arcane Sanctuary",
+        "canyonOfTheMagi": "Canyon of the Magi",
+        "kurastDocks": "Kurast Docks",
+        "spiderForest": "Spider Forest",
+        "greatMarsh": "Great Marsh",
+        "flayerJungle": "Flayer Jungle",
+        "lowerKurast": "Lower Kurast",
+        "kurastBazaar": "Kurast Bazaar",
+        "upperKurast": "Upper Kurast",
+        "travincal": "Travincal",
+        "duranceOfHate": "Durance of Hate Level 2",
+        "pandemoniumFortress": "The Pandemonium Fortress",
+        "cityOfTheDamned": "City of the Damned",
+        "riverOfFlame": "River of Flame",
+        "harrogath": "Harrogath",
+        "frigidHighlands": "Frigid Highlands",
+        "arreatPlateau": "Arreat Plateau",
+        "crystallinePassage": "Crystalline Passage",
+        "hallsOfPain": "Halls of Pain",
+        "glacialTrail": "Glacial Trail",
+        "frozenTundra": "Frozen Tundra",
+        "ancientsWay": "The Ancients' Way",
+        "worldstoneKeep": "Worldstone Keep Level 2"
+      }
+    },
+    "gear": {
+      "title": "Gear totals",
+      "description": "Equipped items of the active weapon set and charms in the inventory.",
+      "magicFind": "Magic find",
+      "goldFind": "Gold find",
+      "resistances": "Resistances",
+      "resistanceColumn": "Resistance",
+      "resistanceNames": {
+        "fire": "Fire",
+        "cold": "Cold",
+        "lightning": "Lightning",
+        "poison": "Poison"
+      },
+      "percent": "{{value}}%",
+      "overCap": "{{total}}% before the {{cap}}% cap",
+      "anyaScrollBonus": "Includes +{{value}}% from Anya's Scrolls of Resistance.",
+      "speed": "Speed",
+      "speedColumn": "Stat",
+      "totalColumn": "Total",
+      "breakpointColumn": "Breakpoint",
+      "nextBreakpointColumn": "Next breakpoint",
+      "lastBreakpoint": "Last one reached",
+      "weaponDependent": "Depends on weapon and skill",
+      "noBreakpointTable": "No breakpoint table for this class",
+      "fasterCastRate": "Faster cast rate",
+      "fasterHitRecovery": "Faster hit recovery",
+      "fasterBlockRate": "Faster block rate",
+      "increasedAttackSpeed": "Increased attack speed",
+      "notCounted": "Not counted: set bonuses, auras, skills, shrines and the mercenary. Item requirements aren't checked and charms only count in the inventory grid. Breakpoints use the standard table of the class; some skills, weapons and shapeshifted forms have their own."
+    }
+  },
   "gameItemTooltip": {
     "oneHandDamageLabel": "One Hand Damage:",
     "oneHandDamageValue": "{{min}} to {{max}}",

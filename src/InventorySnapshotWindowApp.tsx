@@ -4,7 +4,9 @@ import type { JSX } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterInventoryBrowser } from '@/components/inventory/CharacterInventoryBrowser';
+import { CharacterOverviewPanel } from '@/components/inventory/CharacterOverviewPanel';
 import { TitleBarFrame } from '@/components/TitleBarFrame';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWindowBootstrap } from '@/hooks/useWindowBootstrap';
 import { translations } from '@/i18n/translations';
 import logoUrl from '/logo.png';
@@ -50,6 +52,37 @@ function SnapshotTitleBar({ title }: { title: string }): JSX.Element {
   );
 }
 
+/**
+ * Window content of a character save: its items and its overview, in two tabs. The items tab
+ * stays mounted so switching tabs keeps its selection and drag state.
+ */
+function CharacterSnapshotTabs({
+  snapshotTarget,
+}: {
+  snapshotTarget: InventorySnapshotWindowTarget;
+}): JSX.Element {
+  const { t } = useTranslation();
+
+  return (
+    <Tabs defaultValue="items" className="min-h-0 flex-1 gap-0">
+      <div className="px-4 pt-3">
+        <TabsList aria-label={t(translations.characterOverview.tabsLabel)}>
+          <TabsTrigger value="items">{t(translations.characterOverview.tabs.items)}</TabsTrigger>
+          <TabsTrigger value="overview">
+            {t(translations.characterOverview.tabs.overview)}
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="items" keepMounted className="flex min-h-0 flex-col">
+        <CharacterInventoryBrowser mode="snapshot" snapshotTarget={snapshotTarget} />
+      </TabsContent>
+      <TabsContent value="overview" className="flex min-h-0 flex-col">
+        <CharacterOverviewPanel filePath={snapshotTarget.sourceFilePath} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 export default function InventorySnapshotWindowApp(): JSX.Element {
   const { t } = useTranslation();
 
@@ -70,6 +103,8 @@ export default function InventorySnapshotWindowApp(): JSX.Element {
           <div className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
             {t(translations.inventoryBrowser.snapshotWindow.invalidTarget)}
           </div>
+        ) : snapshotTarget.sourceFileType === 'd2s' ? (
+          <CharacterSnapshotTabs snapshotTarget={snapshotTarget} />
         ) : (
           <CharacterInventoryBrowser mode="snapshot" snapshotTarget={snapshotTarget} />
         )}

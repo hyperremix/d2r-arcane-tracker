@@ -27,6 +27,44 @@ Unique and set items whose stats can roll in a range show their roll quality in 
 
 The ranges come from the game's `uniqueitems.txt` and `setitems.txt` as converted by [d2data](https://github.com/blizzhackers/d2data) (see [Third-party licenses](THIRD_PARTY_LICENSES.md)), so they match the patch that data was taken from. A stat is shown as **Not rated** when its value can't be read from the item or told apart from other stats that add to the same value, or when the value lies outside the range, for example because a patch changed the range since the item dropped. Properties whose minimum and maximum aren't a single value, such as damage ranges (elemental damage included), chance to cast, charges and per-level stats, aren't rated, and neither are ranges of the base item (such as the defense of the base armor) and variable socket counts.
 
+## Character overview
+
+A character's window has two tabs: **Items** (the boards above) and **Overview**. The overview is read from the `.d2s` file when you open the tab and again whenever the app sees the file change. It never writes the file. Shared stash windows have no overview.
+
+- **Character**: class, level, softcore or hardcore (and **Classic** for characters without the expansion), experience, gold in the inventory and in the stash, the base attributes as stored in the save (without item bonuses), unused stat and skill points, and which difficulties are completed, in progress or not reached.
+- **Quest rewards**: one row per reward, one column per difficulty. Each cell says **Claimed**, **Not claimed** (highlighted: the quest is done but the reward is still waiting) or **Not earned**. For Akara's reset the states read **Used**, **Available** and **Not earned**. Characters without the expansion have no Larzuk or Anya rows.
+- **Missing waypoints**: per difficulty, how many waypoints are active and which are missing, by act. Characters without the expansion have no Act V waypoints.
+- **Gear totals**: magic find and gold find, the four resistances in Normal, Nightmare and Hell, and faster cast rate, faster hit recovery, faster block rate and increased attack speed.
+
+### How quest rewards are read
+
+The app reads the quest flags stored in the save. Their meaning comes from the public save format notes ([Trevin's v1.09 file format](https://user.xmission.com/~trevin/DiabloIIv1.09_File_Format.shtml)) and two open source save editors ([D2SSharp](https://github.com/ResurrectedTrader/D2SSharp) and [D2CE](https://github.com/WalterCouto/D2CE)):
+
+| Reward | Claimed | Not claimed |
+| --- | --- | --- |
+| Den of Evil, Tools of the Trade (Charsi's imbue), Radament's Lair, Lam Esen's Tome, The Fallen Angel, Siege on Harrogath (Larzuk's socket) | The quest's "reward granted" flag is set | Only the "requirements met, reward waiting" flag is set |
+| The Golden Bird (Potion of Life) | Quest done and the "holds the Potion of Life" flag is clear | The "holds the Potion of Life" flag is set (the game clears it when you drink the potion), or the reward is waiting |
+| Prison of Ice (Scroll of Resistance) | The "read the scroll" flag is set | The scroll flag is clear and the quest is done or its reward is waiting |
+| Akara's reset | The "used" flag of the reset slot in the Act V quest data is set (**Used**) | The "used" flag is clear and either the slot's "available" flag is set or the Den of Evil is done (**Available**) |
+
+The Potion of Life (bit 5) and Scroll of Resistance (bit 7) bits follow Trevin's notes and the real version 105 save used in the tests; D2CE's table numbers them differently (6 and 8).
+
+The app's tests check these rules against real saves only for a character that took every reward and a new character. The **Not claimed** states were tested with edited flags, not with real saves of characters that left a reward waiting, so they are assumptions. In particular:
+
+- Radament's skill point comes from reading the Book of Skill. Whether the game marks the reward as granted before you read the book wasn't checked.
+- The rule for Larzuk's socket is the general "reward waiting" flag; Trevin's notes list a separate "Larzuk offers to socket an item" flag whose relation to it wasn't checked.
+- The Akara reset flag is read as described by D2SSharp and D2CE; it wasn't checked against a save before and after a reset. Showing the row for characters without the expansion is an assumption that the slot works the same way there.
+
+If the quest data can't be found in a save, the overview says so and lists no rewards. Reign of the Warlock saves (version 105) store quests, waypoints and attributes in the same format, and the overview reads them; the tests use real version 105 saves. Quests that Reign of the Warlock might add are not shown.
+
+### How gear totals are counted
+
+- Counted: every equipped item except the inactive weapon set, and the charms in the inventory grid (not in the stash or the cube). An item's stats include its runeword and the runes, gems and jewels socketed into it. "Per character level" stats (for example Enigma's magic find) count value × level / 8, rounded down.
+- Resistances add 10 to every resistance for each difficulty in which you read Anya's Scroll of Resistance. This is an assumption: a scroll is assumed to apply in every difficulty column, including the ones before the one where it was read. Nightmare and Hell subtract a penalty, taken from community sources for `difficultylevels.txt` and assumed correct: 40 and 100 for expansion characters, 20 and 50 for characters without the expansion. A value above the cap (75, plus maximum resistance bonuses, at most 95) shows the cap and the uncapped value.
+- Not counted: set bonuses (partial and full), auras, skills, shrines and the mercenary. Item requirements aren't checked, so an item counts even if the character can't use it.
+- Breakpoints: faster cast rate, faster hit recovery and faster block rate show the breakpoint reached and the next one, from the standard table of the class (Druid and Necromancer in human form, the Druid's hit recovery without one-handed swinging weapons, the Paladin's hit recovery without spears and staves, the Amazon's block without one-handed swinging weapons). Skill-specific tables (Lightning and Chain Lightning, Holy Shield) and shapeshifted forms (werewolf, werebear, vampire) aren't used. Increased attack speed shows only the total, because its breakpoints depend on the weapon and the skill. The tables, Warlock included, are the published rows, which [d2-lab](https://github.com/bengous/d2-lab) checks against the animation data of D2R 3.3.93847; see [Third-Party Licenses](THIRD_PARTY_LICENSES.md). The Warlock's block row in that source ends at 86%, so the overview shows no breakpoint past it.
+- The active weapon set is read from the save. The tests cover a save with weapon set I active; weapon set II is only tested with constructed data.
+
 ## Changing your items
 
 - **Move**: drag an item to a free spot in the same file or another file. Occupied spots, invalid equipment slots and class restrictions are refused with a message, and nothing is changed. While you drag over the equipment, a slot turns green when the item type fits it (for example a helm, circlet or pelt on the head) and the slot is free, and red otherwise. Class restrictions and two-handed weapon rules are checked when you drop.

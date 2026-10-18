@@ -405,6 +405,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'saveFile:restoreDefaultDirectory': noArgs,
   'saveFile:getAvailableRunes': noArgs,
   'saveFile:refreshSaveFiles': noArgs,
+  'saveFile:getCharacterOverview': args(nonEmptyString('Invalid save file path')),
 
   // Vault
   'vault:addItem': args(vaultItemUpsertInput),
