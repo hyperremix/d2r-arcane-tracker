@@ -1,5 +1,13 @@
 import { extname, isAbsolute } from 'node:path';
 import { parseSaveFileSnapshotId } from '../services/saveFileBackup';
+import {
+  type FarmingItemSourcesRequest,
+  type FarmingOverviewRequest,
+  MAX_FARMING_CHARACTER_LEVEL,
+  MAX_FARMING_ITEM_IDS,
+  MAX_FARMING_MAGIC_FIND,
+  MAX_FARMING_PLAYERS,
+} from '../types/farming';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { MAX_SNAPSHOTS_PER_FILE, MIN_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { MAX_TERROR_ZONE_SCHEDULE_SLOTS } from '../types/terrorZones';
@@ -120,6 +128,47 @@ const terrorZoneScheduleSlotCount: FieldValidator<number> = (value) => {
     `Invalid terror zone slot count: expected an integer from 1 to ${MAX_TERROR_ZONE_SCHEDULE_SLOTS}`,
   );
   return value as number;
+};
+
+/** An integer within a range, for the numeric inputs of the farming advisor. */
+const integerInRange = (min: number, max: number, message: string): FieldValidator<number> => {
+  return (value) => {
+    ensure(
+      Number.isInteger(value) && (value as number) >= min && (value as number) <= max,
+      `${message}: expected an integer from ${min} to ${max}`,
+    );
+    return value as number;
+  };
+};
+
+const farmingCharacterLevel = integerInRange(
+  1,
+  MAX_FARMING_CHARACTER_LEVEL,
+  'Invalid character level',
+);
+
+const farmingOverviewRequest: FieldValidator<FarmingOverviewRequest> = (value) => {
+  ensure(isPlainObject(value), 'Invalid farming request: expected an object');
+  ensure(
+    Array.isArray(value.itemIds) &&
+      value.itemIds.length <= MAX_FARMING_ITEM_IDS &&
+      value.itemIds.every(isNonEmptyString),
+    `Invalid item IDs: expected at most ${MAX_FARMING_ITEM_IDS} non-empty strings`,
+  );
+  return {
+    itemIds: value.itemIds as string[],
+    characterLevel: farmingCharacterLevel(value.characterLevel),
+  };
+};
+
+const farmingItemSourcesRequest: FieldValidator<FarmingItemSourcesRequest> = (value) => {
+  ensure(isPlainObject(value), 'Invalid farming request: expected an object');
+  return {
+    itemId: nonEmptyString('Invalid item ID')(value.itemId),
+    players: integerInRange(1, MAX_FARMING_PLAYERS, 'Invalid players setting')(value.players),
+    magicFind: integerInRange(0, MAX_FARMING_MAGIC_FIND, 'Invalid magic find')(value.magicFind),
+    characterLevel: farmingCharacterLevel(value.characterLevel),
+  };
 };
 
 const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
@@ -534,6 +583,10 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'terrorZone:restoreOriginal': noArgs,
   'terrorZone:validatePath': noArgs,
   'terrorZone:getSchedule': args(terrorZoneScheduleSlotCount),
+
+  // Farming advisor
+  'farming:getOverview': args(farmingOverviewRequest),
+  'farming:getItemSources': args(farmingItemSourcesRequest),
 };
 
 /** All invoke channels of the contract. */

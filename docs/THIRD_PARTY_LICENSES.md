@@ -8,7 +8,7 @@ Diablo II: Resurrected is a trademark of Blizzard Entertainment, Inc. This proje
 
 ## Game data and use
 
-The app reads your save files and, with Run Tracker auto mode on, reads (never writes) D2R's process memory. The optional Terror Zone feature modifies a game data file. You're responsible for making sure your use follows Blizzard's Terms of Service and EULA. The authors aren't responsible for consequences of using the software. See also [SECURITY.md](../SECURITY.md#what-the-app-accesses).
+The app reads your save files and, with Run Tracker auto mode on, reads (never writes) D2R's process memory. The optional Terror Zone feature modifies a game data file. The optional Farming Advisor reads the game data tables of your installation; the app doesn't ship them. You're responsible for making sure your use follows Blizzard's Terms of Service and EULA. The authors aren't responsible for consequences of using the software. See also [SECURITY.md](../SECURITY.md#what-the-app-accesses).
 
 ## Privacy
 

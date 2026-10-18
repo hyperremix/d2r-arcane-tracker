@@ -107,7 +107,9 @@ const hustleSuccessorsByIndex: Readonly<Record<number, string>> = {
  * @param entry - The Chronicle entry
  * @returns The grail item id, or null when the row is unknown or not part of the grail
  */
-export function resolveChronicleGrailItemId(entry: ChronicleEntry): string | null {
+export function resolveChronicleGrailItemId(
+  entry: Pick<ChronicleEntry, 'category' | 'index'>,
+): string | null {
   switch (entry.category) {
     case 'set':
       return getGrailItemId({ set_name: constants105.set_items[entry.index]?.n });

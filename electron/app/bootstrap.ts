@@ -4,6 +4,7 @@ import { GrailDatabase } from '../database/database';
 import { createRendererBroadcaster } from '../ipc/broadcast';
 import { initializeAppWindowHandlers } from '../ipc-handlers/appWindowHandlers';
 import { initializeDialogHandlers } from '../ipc-handlers/dialogHandlers';
+import { initializeFarmingHandlers } from '../ipc-handlers/farmingHandlers';
 import { initializeGlobalHotkeyHandlers } from '../ipc-handlers/globalHotkeyHandlers';
 import { initializeGrailHandlers } from '../ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from '../ipc-handlers/iconHandlers';
@@ -17,6 +18,7 @@ import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from '../ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from '../ipc-handlers/widgetHandlers';
 import { EventBus } from '../services/EventBus';
+import { FarmingService } from '../services/farming/farmingService';
 import { createGameProcessGuard } from '../services/gameProcessGuard';
 import { GlobalHotkeyService } from '../services/globalHotkeys';
 import { GrailDetectionPipeline } from '../services/grailDetectionPipeline';
@@ -219,6 +221,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   });
   const iconService = new IconService();
   const terrorZoneService = new TerrorZoneService();
+  const farmingService = new FarmingService();
   const updateService = new UpdateService();
   lifecycle.onShutdown('update service', () => updateService.dispose());
 
@@ -291,6 +294,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
     'terror zone handlers',
     initializeTerrorZoneHandlers({ terrorZoneService, settings }),
   );
+  lifecycle.onShutdown('farming handlers', initializeFarmingHandlers({ farmingService, settings }));
   lifecycle.onShutdown(
     'update handlers',
     initializeUpdateHandlers({ updateService, getMainWindow }),

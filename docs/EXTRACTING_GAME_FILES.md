@@ -1,9 +1,10 @@
 # Extracting Game Files
 
-D2R keeps its data in CASC archives that other programs can't read directly. Two features need the data extracted to plain files:
+D2R keeps its data in CASC archives that other programs can't read directly. Three features need the data extracted to plain files:
 
 - **Item icons**: read from `Data/hd/global/ui/items`. See [item icons](HOLY_GRAIL_GUIDE.md#item-icons).
 - **Terror zone configuration**: edits `Data/hd/global/excel/desecratedzones.json`. See the [Terror Zone guide](TERROR_ZONE_CONFIGURATION.md).
+- **Farming advisor**: reads the drop tables in `Data/global/excel`. See the [Farming Advisor guide](FARMING_ADVISOR.md).
 
 The rest of the app works without this step.
 
@@ -16,7 +17,7 @@ The rest of the app works without this step.
 5. Move the three folders into the top-level `Data` folder of your D2R install, for example `C:\Program Files (x86)\Diablo II Resurrected\Data`. There is another `data` folder inside it. Don't use that one.
 6. In the app, set **Settings → D2R installation** to your D2R folder: type the path and press Enter or click away, or click **Browse**. The field only shows a path you saved; while it's empty, a notice says no installation path is saved. If the app finds D2R at the default location, the notice shows that folder with a **Use this folder** button instead of filling it in.
 
-Extraction doesn't modify the game. Repeat it after a patch if you need new item icons or the patch changed terror zones.
+Extraction doesn't modify the game. Repeat it after a patch if you need new item icons, the patch changed terror zones, or you use the farming advisor (its drop rates come from the extracted tables).
 
 ### On Linux and Steam Deck
 
@@ -28,7 +29,7 @@ These steps haven't been tested on Linux yet:
 
 ## Making D2R use the extracted files
 
-Item icons only need the files on disk. Terror zone changes also require D2R to load the extracted files instead of the archives:
+Item icons and the farming advisor only need the files on disk. Terror zone changes also require D2R to load the extracted files instead of the archives:
 
 1. Create a shortcut to `D2R.exe`.
 2. In **Properties → Target**, add `-direct -txt` after the path, for example `"C:\Program Files (x86)\Diablo II Resurrected\D2R.exe" -direct -txt`.

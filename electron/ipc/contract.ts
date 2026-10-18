@@ -28,6 +28,10 @@ import type {
   CharacterOverview,
   D2Item,
   D2SaveFile,
+  FarmingItemSources,
+  FarmingItemSourcesRequest,
+  FarmingOverview,
+  FarmingOverviewRequest,
   GlobalHotkeyStatus,
   GrailProgress,
   InventoryItemMoveInput,
@@ -391,6 +395,10 @@ export interface IpcInvokeContract {
   'terrorZone:restoreOriginal': Invoke<[], SuccessResult>;
   'terrorZone:validatePath': Invoke<[], TerrorZoneValidationResult>;
   'terrorZone:getSchedule': Invoke<[slotCount: number], TerrorZoneSchedule>;
+
+  // Farming advisor
+  'farming:getOverview': Invoke<[request: FarmingOverviewRequest], FarmingOverview>;
+  'farming:getItemSources': Invoke<[request: FarmingItemSourcesRequest], FarmingItemSources>;
 }
 
 /**

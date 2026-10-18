@@ -11,6 +11,8 @@ const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
 // Mock dependencies
 vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
 vi.mock('@/stores/grailStore');
+// The farming section loads drop data over IPC; it has its own tests
+vi.mock('@/components/farming/ItemFarmingSources', () => ({ ItemFarmingSources: () => null }));
 vi.mock('@/hooks/useItemIcon', () => ({
   useItemIcon: () => ({ iconUrl: '/mock-icon.png', isLoading: false, error: null }),
 }));

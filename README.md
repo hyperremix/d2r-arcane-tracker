@@ -24,6 +24,7 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 - **Runeword Calculator**: shows which runewords you can make with the runes you have.
 - **Inventory Browser**: see what's in every character and shared stash, move items between them and keep items in a vault. Each character also has an overview with unclaimed quest rewards, missing waypoints and gear totals.
 - **Terror Zone Configuration**: choose which terror zones the game rotates through.
+- **Farming Advisor**: where your missing items drop, what the current terror zone can drop, and how many kills a drop takes.
 - **Overlay widget, statistics and notifications**.
 - **Save file snapshots**: keeps copies of your save files whenever they change and restores an earlier one.
 - **Grail import and export**: JSON and CSV export, and import from those files, Nasicus/d2-holy-grail exports or a CSV list of item names.
@@ -66,7 +67,8 @@ The app checks for updates on startup and installs them when you confirm. On Lin
 | [Inventory Browser Guide](docs/INVENTORY_BROWSER_GUIDE.md) | Browsing, moving and vaulting items in your save files, the character overview, and the safety rules |
 | [Run Tracker Guide](docs/RUN_TRACKER.md) | Sessions, runs, auto mode, shortcuts and exports |
 | [Terror Zone Configuration](docs/TERROR_ZONE_CONFIGURATION.md) | Changing the terror zone rotation |
-| [Extracting Game Files](docs/EXTRACTING_GAME_FILES.md) | CASC extraction, needed for item icons and terror zones |
+| [Farming Advisor](docs/FARMING_ADVISOR.md) | Where missing items drop, terror zones and drop rates, and how they are calculated |
+| [Extracting Game Files](docs/EXTRACTING_GAME_FILES.md) | CASC extraction, needed for item icons, terror zones and the farming advisor |
 | [Tracker Comparison](docs/COMPARISON.md) | How this app compares to other grail trackers |
 
 ## Troubleshooting

@@ -29,6 +29,96 @@
     "next": "Next",
     "allItems": "All items"
   },
+  "farming": {
+    "title": "Farming advisor",
+    "description": "Where the items missing from your grail can drop, read from the drop tables of your D2R installation",
+    "loading": "Reading the game files...",
+    "loadFailed": "Could not load the farming data.",
+    "notConfigured": {
+      "title": "Set your D2R installation folder",
+      "description": "The farming advisor reads the drop tables from the extracted game files of your D2R installation. Choose your D2R folder in Settings to use it."
+    },
+    "gameFilesMissing": {
+      "title": "Game files must be extracted",
+      "description": "The farming advisor reads these files from Data/global/excel in your D2R folder, and they are missing: {{files}}. Extract the game files once, then reopen this page."
+    },
+    "readFailed": "The game files could not be read. Extract them again, then reopen this page.",
+    "characterLevel": "Character level",
+    "characterLevelDescription": "Sets the monster level in terror zones",
+    "players": "Players",
+    "playersDescription": "The /players setting of your game",
+    "magicFind": "Magic find",
+    "magicFindDescription": "Magic find in percent",
+    "summary_one": "{{count}} missing item is tracked by your grail.",
+    "summary_other": "{{count}} missing items are tracked by your grail.",
+    "noMissingItems": "Your grail has no missing uniques, set items or runes.",
+    "noDropSource_one": "{{count}} missing item doesn't drop from any monster in the game files: {{items}}",
+    "noDropSource_other": "{{count}} missing items don't drop from any monster in the game files: {{items}}",
+    "difficulties": {
+      "normal": "Normal",
+      "nightmare": "Nightmare",
+      "hell": "Hell"
+    },
+    "locationKinds": {
+      "area": "Area",
+      "superUnique": "Super unique",
+      "boss": "Boss"
+    },
+    "monsterKinds": {
+      "regular": "Monsters",
+      "champion": "Champions",
+      "unique": "Unique monsters",
+      "superUnique": "Super unique",
+      "boss": "Boss"
+    },
+    "monsterLevel": "Monster level",
+    "levelRange": "{{min}}–{{max}}",
+    "oneIn": "1 in {{kills}}",
+    "perKill": "{{drops}} per kill",
+    "dropRateRange": "{{best}} to {{worst}}",
+    "showItems": "Show items",
+    "hideItems": "Hide items",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "terrorZones": {
+      "title": "Terror zones",
+      "current": "Current terror zone",
+      "next": "Next terror zone",
+      "none": "No terror zone",
+      "unavailable": "The terror zones can't be read from the game files of your D2R installation.",
+      "zoneUnavailable": "The game files have no drop data for this terror zone.",
+      "assumption": "Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.",
+      "itemsWhenTerrorized": "Missing items that can drop here when terrorized",
+      "difficultyItems_one": "{{difficulty}}: {{count}} item, monster level {{level}}",
+      "difficultyItems_other": "{{difficulty}}: {{count}} items, monster level {{level}}"
+    },
+    "locations": {
+      "title": "Where your missing items drop",
+      "description": "Every area, super unique and boss with the number of your missing items its monsters can drop. Select an item to see how often it drops.",
+      "difficulty": "Difficulty",
+      "location": "Location",
+      "type": "Type",
+      "missingItems": "Missing items",
+      "none": "None of your missing items drop in this difficulty.",
+      "noMatches": "No location matches your search.",
+      "searchLabel": "Search locations",
+      "searchPlaceholder": "Search location, area or item..."
+    },
+    "itemSources": {
+      "title": "Where to farm",
+      "loading": "Calculating drop rates...",
+      "unknown": "The game files have no drop data for this item.",
+      "noSources": "No monster in the game files drops this item.",
+      "source": "Source",
+      "dropRate": "Drop rate",
+      "terrorized": "Terror zone",
+      "showAll": "Show all {{count}}",
+      "showFewer": "Show fewer",
+      "note": "Drop rates are the average number of drops per kill, from the drop tables of your game files. Whether the item drops ethereal isn't included. Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.",
+      "unavailable": "Drop rates need the extracted game files of your D2R installation.",
+      "openAdvisor": "Open the farming advisor"
+    }
+  },
   "grail": {
     "title": "Holy Grail",
     "tracker": {
@@ -808,6 +898,7 @@
     "runs": "Runs",
     "runewords": "Runewords",
     "terrorZones": "Terror zones",
+    "farming": "Farming advisor",
     "inventoryBrowser": "Inventory",
     "settings": "Settings",
     "goBack": "Go back",

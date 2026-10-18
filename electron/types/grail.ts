@@ -6,6 +6,7 @@
  */
 export * from './catalog';
 export * from './characterOverview';
+export * from './farming';
 export * from './grailProgress';
 export * from './inventory';
 export * from './runs';

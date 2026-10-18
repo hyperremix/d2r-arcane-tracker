@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => {
     initializeGlobalHotkeyHandlers: disposer('globalHotkeyHandlers'),
     initializeAppWindowHandlers: disposer('appWindowHandlers'),
     initializeDialogHandlers: disposer('dialogHandlers'),
+    initializeFarmingHandlers: disposer('farmingHandlers'),
     initializeGrailHandlers: disposer('grailHandlers'),
     initializeIconHandlers: disposer('iconHandlers'),
     initializeInventoryWindowHandlers: disposer('inventoryWindowHandlers'),
@@ -88,6 +89,9 @@ vi.mock('../ipc-handlers/saveFileSnapshotHandlers', () => ({
 }));
 vi.mock('../ipc-handlers/shellHandlers', () => ({
   initializeShellHandlers: mocks.initializeShellHandlers,
+}));
+vi.mock('../ipc-handlers/farmingHandlers', () => ({
+  initializeFarmingHandlers: mocks.initializeFarmingHandlers,
 }));
 vi.mock('../ipc-handlers/terrorZoneHandlers', () => ({
   initializeTerrorZoneHandlers: mocks.initializeTerrorZoneHandlers,
@@ -181,6 +185,7 @@ vi.mock('../services/saveFileMonitor', () => ({
 }));
 vi.mock('../services/saveFileSnapshots', () => ({ SaveFileSnapshotService: vi.fn() }));
 vi.mock('../services/terrorZoneService', () => ({ TerrorZoneService: vi.fn() }));
+vi.mock('../services/farming/farmingService', () => ({ FarmingService: vi.fn() }));
 vi.mock('../services/updateService', () => ({
   UpdateService: vi.fn(function UpdateService() {
     return { dispose: mocks.log('updateService.dispose') };
@@ -368,6 +373,7 @@ describe('When the app is bootstrapped', () => {
         'iconHandlers.dispose',
         'inventoryWindowHandlers.dispose',
         'terrorZoneHandlers.dispose',
+        'farmingHandlers.dispose',
         'updateHandlers.dispose',
         'widgetHandlers.dispose',
         'appWindowHandlers.dispose',

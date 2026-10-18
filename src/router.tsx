@@ -1,4 +1,5 @@
 import { createHashRouter, Outlet } from 'react-router';
+import { FarmingAdvisor } from './components/farming/FarmingAdvisor';
 import { GrailTracker } from './components/grail/GrailTracker';
 import { InventoryBrowserMain } from './components/inventory/InventoryBrowserMain';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
@@ -59,6 +60,10 @@ export const router = createHashRouter([
           {
             path: '/settings',
             Component: Settings,
+          },
+          {
+            path: '/farming',
+            Component: FarmingAdvisor,
           },
           {
             path: '/terror-zones',
