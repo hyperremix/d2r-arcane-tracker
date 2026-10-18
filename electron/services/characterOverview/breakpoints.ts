@@ -11,8 +11,8 @@ type PlayableClass = Exclude<CharacterClass, 'shared_stash'>;
 /**
  * Faster cast rate, faster hit recovery and faster block rate breakpoints per class, in percent.
  *
- * The rows are the michaelangel007 D2 cheat sheet rows that bengous/d2-lab
- * (tools/d2r-data/check-breakpoints.py, MIT) rebuilds from the `animdata.d2` of D2R 3.3.93847.
+ * The rows are the michaelangel007 D2 cheat sheet rows, which bengous/d2-lab
+ * (tools/d2r-data/check-breakpoints.py, MIT) checks against the `animdata.d2` of D2R 3.3.93847.
  * Each class has its standard row: the Druid and Necromancer in human form, the Druid's hit
  * recovery for weapons other than one-handed swinging ones, the Paladin's hit recovery for
  * weapons other than spears and staves, and the Amazon's block for weapons other than one-handed
