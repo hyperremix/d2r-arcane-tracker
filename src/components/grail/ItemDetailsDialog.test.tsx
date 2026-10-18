@@ -1462,7 +1462,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If the item was found in every tracked version', () => {
-    it('Then the action is a secondary Add another find button', () => {
+    it('Then the action is an outline Add another find button', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       const characters = [CharacterBuilder.new().withId('char-1').build()];

@@ -36,7 +36,7 @@ interface ItemDetailsDialogProps {
 /**
  * Button and prompt for manually recording an item as found.
  * While a tracked version is still missing it is the primary "Mark as found" action; once every
- * version is found it becomes an outline "Add another find" action.
+ * tracked version is found it becomes an outline "Add another find" action.
  * Its open state lives here so it resets whenever the details dialog closes (this component
  * unmounts with the dialog content) or is keyed to another item.
  */
