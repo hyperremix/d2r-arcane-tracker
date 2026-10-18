@@ -99,7 +99,7 @@ An item that is already recorded keeps its found date. The app reads the Chronic
 
 ### Manual entry
 
-In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there.
+In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there. To add many finds at once, [import](#import-and-export) them from a file.
 
 ## Browsing your grail
 
@@ -218,6 +218,29 @@ Pick a save file to see its copies, newest first, with the time, the type, the s
 **Restore** opens a confirmation that names the file and the time of the copy. On Windows, the app refuses to restore while Diablo II: Resurrected is running, because the game would overwrite the file. Other platforms can't check this, so close the game yourself first. Before the file is replaced, the app copies the current file, which then appears as **Before app change**, so you can undo a restore. The app only writes inside the configured save folder and rescans your save files afterwards. Grail finds the app has already recorded stay recorded.
 
 Restoring a hardcore character's save from before its death brings the character back. Whether you do that is your choice.
+
+### Import and export
+
+**Settings → Data → Grail import and export** saves your grail progress to a file or adds finds from one.
+
+**Export JSON** and **Export CSV** save every recorded find with the item, its version (normal or ethereal), the found date, the character and the source (manual or auto-detected). JSON is the app's own format, made to be imported again; CSV opens in spreadsheets and can be imported too.
+
+**Import from file** reads one of these files (up to 5 MB and 20,000 entries):
+
+- A JSON export of this app.
+- A JSON export of [Nasicus/d2-holy-grail](https://github.com/Nasicus/d2-holy-grail) (`HolyGrail_<name>.json`, `EthGrail_<name>.json` or `RunewordGrail_<name>.json`). The app reads these as that project's source code writes them (`ExportListItem.tsx`, `IItem.ts` and the grail data types, last updated in 2023), which is an assumption for exports made with other versions of it. Items marked as found count, including item counter values above 0. A file with uniques and sets is read as the normal grail, one with only uniques as the ethereal grail, and one that maps runeword names as runewords. These exports have no found dates.
+- A CSV file with one item name per row. With a header row, the app reads the `item` (or `name`) column and, if present, `version` (or `ethereal`), `found_date` (or `date`), `item_id`, `type` and `character`. Without a header row, the columns are name, version and found date. A version is `normal` or `ethereal` (`eth`, `yes` and `true` also mean ethereal). Dates are ISO dates (`2024-01-15`) or ISO dates with a time; other formats and dates in the future are ignored.
+
+Names are matched ignoring case, spaces and punctuation, and "Ber Rune" also finds Ber. When the file doesn't name a version, the normal version is used, or the ethereal one for items that only exist ethereal.
+
+The app has no importer for holygrail.link, d2grail.com or diablo2.io, because no export file format of theirs could be confirmed from public sources: holygrail.link's source code ([zeddicus-pl/d2rHolyGrail](https://github.com/zeddicus-pl/d2rHolyGrail)) writes no grail export file, and d2grail.com and diablo2.io don't document one. A CSV list of item names works for finds from any tracker.
+
+Before anything is saved, a preview names the file and shows how many finds will be added, how many item versions are already found, how many existing finds get an earlier date, and the entries that couldn't be matched to a grail item (or to a version the item doesn't have). When you confirm:
+
+- An item version that already has a find is never added again. If the file has an earlier date for it, the earliest existing find of that version gets the file's date.
+- If the file lists an item version more than once, the earliest date counts.
+- New finds are saved as manual finds, as with **Mark as found**, so you can remove them in the item's character progress table. They belong to the character the file names if that character is in the app, otherwise to the character you choose in the preview. Importing new finds therefore needs at least one character in the app.
+- Finds without a date get the time of the import.
 
 ### Error screen
 

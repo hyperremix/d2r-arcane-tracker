@@ -16,6 +16,7 @@ import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
 import { GrailSettings } from './GrailSettings';
+import { GrailTransferCard } from './GrailTransfer';
 import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { ReportIssues } from './ReportIssues';
@@ -195,6 +196,7 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
       return (
         <>
           <DatabaseCard />
+          <GrailTransferCard />
           <SaveSnapshotsCard />
         </>
       );

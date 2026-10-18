@@ -18,6 +18,7 @@ vi.mock('./NotificationSettings', () => ({
 }));
 vi.mock('./Database', () => ({ DatabaseCard: () => <div>DatabaseCard</div> }));
 vi.mock('./SaveSnapshots', () => ({ SaveSnapshotsCard: () => <div>SaveSnapshotsCard</div> }));
+vi.mock('./GrailTransfer', () => ({ GrailTransferCard: () => <div>GrailTransferCard</div> }));
 vi.mock('./UpdateSettings', () => ({ UpdateSettings: () => <div>UpdateCard</div> }));
 vi.mock('./ReportIssues', () => ({ ReportIssues: () => <div>ReportIssuesCard</div> }));
 

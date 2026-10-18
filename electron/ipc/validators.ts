@@ -1,4 +1,4 @@
-import { isAbsolute } from 'node:path';
+import { extname, isAbsolute } from 'node:path';
 import { parseSaveFileSnapshotId } from '../services/saveFileBackup';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { MAX_SNAPSHOTS_PER_FILE, MIN_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
@@ -33,6 +33,7 @@ import {
   isPlainObject,
   noArgs,
   nonEmptyString,
+  oneOf,
   optional,
   plainObject,
   string,
@@ -335,6 +336,18 @@ const writableFilePath: FieldValidator<string> = (value) => {
   return value;
 };
 
+/** File the user picked to import grail progress from: an absolute path to a .json or .csv file. */
+const grailImportFilePath: FieldValidator<string> = (value) => {
+  ensure(
+    typeof value === 'string' &&
+      isAbsolute(value) &&
+      !value.includes('\0') &&
+      ['.json', '.csv'].includes(extname(value).toLowerCase()),
+    'Invalid import file: expected an absolute path to a .json or .csv file',
+  );
+  return value;
+};
+
 /** Largest database backup accepted from the renderer. */
 export const MAX_RESTORE_BACKUP_BYTES = 256 * 1024 * 1024;
 
@@ -415,6 +428,12 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'grail:backup': args(nonEmptyString('Invalid backup path')),
   'grail:restore': args(nonEmptyString('Invalid backup path')),
   'grail:restoreFromBuffer': args(sqliteBackup),
+  'grail:exportProgress': args(oneOf(['json', 'csv'] as const, 'Invalid export format')),
+  'grail:previewImport': args(grailImportFilePath),
+  'grail:applyImport': args(
+    nonEmptyString('Invalid import ID'),
+    optional(nonEmptyString('Invalid character ID')),
+  ),
 
   // Save files
   'saveFile:startMonitoring': noArgs,

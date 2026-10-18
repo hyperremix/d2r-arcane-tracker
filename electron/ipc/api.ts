@@ -122,6 +122,14 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       restore: (backupPath: string) => invoke('grail:restore', backupPath),
       restoreFromBuffer: (backupBuffer: Uint8Array) =>
         invoke('grail:restoreFromBuffer', backupBuffer),
+      /** Builds the export of the grail progress as JSON or CSV text. */
+      exportProgress: (...args: InvokeArgs<'grail:exportProgress'>) =>
+        invoke('grail:exportProgress', ...args),
+      /** Reads an import file and previews what importing it would change. */
+      previewImport: (filePath: string) => invoke('grail:previewImport', filePath),
+      /** Applies the latest import preview. */
+      applyImport: (importId: string, characterId?: string) =>
+        invoke('grail:applyImport', importId, characterId),
     },
 
     saveFile: {

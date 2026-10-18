@@ -96,6 +96,10 @@ describe('When renderer arguments are validated against the IPC contract', () =>
       [{ saveSnapshotsPerFile: 501 }],
       'Invalid saveSnapshotsPerFile setting',
     ],
+    ['grail:exportProgress', ['xlsx'], 'Invalid export format'],
+    ['grail:previewImport', ['grail.json'], 'Invalid import file'],
+    ['grail:previewImport', ['/tmp/grail.db'], 'Invalid import file'],
+    ['grail:applyImport', ['import-1', ''], 'Invalid character ID'],
     ['saveSnapshots:restore', ['../Hero.d2s'], 'Invalid snapshot ID'],
     [
       'saveSnapshots:restore',

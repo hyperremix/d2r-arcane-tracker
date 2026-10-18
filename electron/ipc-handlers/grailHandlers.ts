@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
+import { GrailTransferService } from '../services/grailTransfer';
 import type { SettingsService } from '../services/settingsService';
 import type { GrailProgress } from '../types/grail';
 
@@ -64,6 +65,7 @@ export function initializeGrailHandlers({
   broadcastToRenderers,
 }: GrailHandlerDependencies): () => void {
   const { handle, dispose } = createIpcMainRegistry(ipcMain);
+  const grailTransfer = new GrailTransferService(grailDB);
 
   /** Notifies all renderer windows that grail progress changed so they can reload it. */
   const notifyProgressUpdated = () => broadcastToRenderers('grail-progress-updated');
@@ -216,6 +218,37 @@ export function initializeGrailHandlers({
     grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
     settingsService.notifyRestored();
     return { success: true };
+  });
+
+  // Export and import handlers
+  /**
+   * IPC handler for exporting the grail progress. The renderer writes the returned text to the
+   * file the user picks in a save dialog.
+   * @param _ - IPC event (unused)
+   * @param format - `json` or `csv`
+   */
+  handle('grail:exportProgress', async (_, format) => grailTransfer.exportProgress(format));
+
+  /**
+   * IPC handler for previewing an import. Reads the file the user picked; nothing is written.
+   * @param _ - IPC event (unused)
+   * @param filePath - Absolute path of a .json or .csv file
+   */
+  handle('grail:previewImport', async (_, filePath) => grailTransfer.previewImport(filePath));
+
+  /**
+   * IPC handler for applying the latest import preview.
+   * Emits a grail-progress-updated event to all renderer windows after the import.
+   * @param _ - IPC event (unused)
+   * @param importId - ID of the preview
+   * @param characterId - Character for finds without a known character
+   */
+  handle('grail:applyImport', async (_, importId, characterId) => {
+    const result = grailTransfer.applyImport(importId, characterId);
+    if (result.added > 0 || result.earlierDates > 0) {
+      notifyProgressUpdated();
+    }
+    return result;
   });
 
   console.log('Grail IPC handlers initialized');

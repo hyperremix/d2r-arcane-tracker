@@ -26,6 +26,7 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 - **Terror Zone Configuration**: choose which terror zones the game rotates through.
 - **Overlay widget, statistics and notifications**.
 - **Save file snapshots**: keeps copies of your save files whenever they change and restores an earlier one.
+- **Grail import and export**: JSON and CSV export, and import from those files, Nasicus/d2-holy-grail exports or a CSV list of item names.
 - **Local only**: data lives in a SQLite database on your machine.
 
 ## Install
