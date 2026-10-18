@@ -77,7 +77,7 @@ Vaulting and unvaulting are the only ways the app keeps an item outside a save f
 ## Safety
 
 - Before every write, the app copies the save file to `save-file-backups` in its data folder and keeps the 20 newest copies per file. If the backup fails, the file is not modified.
-- Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here. On Windows, writes are refused while the game is running, because it would overwrite the change. Other platforms can't check this, so close the game yourself before editing.
+- Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here. On Windows and Linux, writes are refused while the game is running, because it would overwrite the change. On Linux the app looks for `D2R.exe` running under Wine or Proton. macOS can't check this, so close the game yourself before editing.
 - The app only edits files inside your configured save folder, and refuses a change if the file changed since the last scan (refresh and try again).
 - Bookmarks never appear here and can't be unvaulted, since they hold no item.
 - Character saves in the Reign of the Warlock format (version 105), which includes every Warlock, can be changed like older saves. Besides the items you change, only the file size and checksum stored in it are updated; everything else stays as it was. If a save holds data the app can't write back unchanged, a move, split, vault or unvault that involves it is refused before any file is written.

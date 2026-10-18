@@ -99,11 +99,40 @@ describe('When the game process guard checks for D2R', () => {
     });
   });
 
-  describe('If the platform is not Windows', () => {
+  describe('If the platform is Linux', () => {
+    it('Then a game running under Wine or Proton refuses writes', async () => {
+      // Arrange
+      const findProcess = vi.fn().mockResolvedValue(4321);
+      const assertGameNotRunning = createGameProcessGuard({ findProcess, platform: 'linux' });
+
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).rejects.toThrow('GAME_RUNNING');
+      expect(findProcess).toHaveBeenCalledTimes(1);
+    });
+
+    it('If the lookup finds no game, Then writes are allowed', async () => {
+      // Arrange
+      const assertGameNotRunning = createGameProcessGuard({
+        findProcess: vi.fn().mockResolvedValue(null),
+        platform: 'linux',
+      });
+
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
+    });
+  });
+
+  describe('If the platform is macOS', () => {
     it('Then no process lookup is attempted', async () => {
       // Arrange
       const findProcess = vi.fn();
-      const assertGameNotRunning = createGameProcessGuard({ findProcess, platform: 'linux' });
+      const assertGameNotRunning = createGameProcessGuard({ findProcess, platform: 'darwin' });
 
       // Act
       const check = assertGameNotRunning();
