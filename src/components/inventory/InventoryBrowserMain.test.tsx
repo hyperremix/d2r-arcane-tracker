@@ -254,7 +254,7 @@ describe('When InventoryBrowserMain is rendered', () => {
         listTitle.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       expect(filters).toHaveAccessibleDescription(
-        'Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches. Opened windows always show all items.',
+        'Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches, and the matching items are listed below. Opened windows always show all items.',
       );
     });
 
@@ -1160,6 +1160,205 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Assert
       expect(await screen.findByRole('button', { name: /^Sorc Character/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /^Barb Character/ })).toBeInTheDocument();
+    });
+  });
+
+  describe('If item property filters are set', () => {
+    const baseSnapshot = {
+      snapshotId: 'snap-stash',
+      characterName: 'Shared stash',
+      sourceFileType: 'd2i',
+      sourceFilePath: '/tmp/stash.d2i',
+      capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+    };
+
+    function createInventoryItem(
+      fingerprint: string,
+      itemName: string,
+      raw: Record<string, unknown>,
+      ethereal = false,
+    ) {
+      return {
+        fingerprint,
+        characterName: 'Shared stash',
+        sourceFileType: 'd2i',
+        sourceFilePath: '/tmp/stash.d2i',
+        locationContext: 'stash',
+        stashTab: 0,
+        itemName,
+        quality: 'normal',
+        ethereal,
+        socketCount: 1,
+        rawItemJson: JSON.stringify(raw),
+        seenAt: new Date('2024-01-01T00:00:00.000Z'),
+      };
+    }
+
+    function mockStash(items: ReturnType<typeof createInventoryItem>[], vault: VaultItem[] = []) {
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [{ ...baseSnapshot, items }],
+          totalSnapshots: 1,
+          totalItems: items.length,
+        },
+        vault: { items: vault, total: vault.length, page: 1, pageSize: 200 },
+      });
+    }
+
+    async function chooseOption(comboboxName: string, optionName: string): Promise<void> {
+      fireEvent.click(screen.getByRole('combobox', { name: comboboxName }));
+      const option = await screen.findByRole('option', { name: optionName });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+    }
+
+    it('Then ethereal and socket filters narrow the list and the matching items are listed', async () => {
+      // Arrange
+      mockStash([
+        createInventoryItem(
+          'fp-eth',
+          'Thresher',
+          { type: '7s8', type_name: 'Thresher', total_nr_of_sockets: 4 },
+          true,
+        ),
+        createInventoryItem('fp-plain', 'Giant Thresher', {
+          type: '7wc',
+          type_name: 'Giant Thresher',
+          total_nr_of_sockets: 4,
+        }),
+      ]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox', { name: 'Base item or type' }), {
+        target: { value: 'thresher' },
+      });
+      await chooseOption('Sockets', '4');
+      await chooseOption('Ethereal', 'Ethereal only');
+
+      // Assert
+      const matches = await screen.findByRole('region', { name: 'Matching items' });
+      await waitFor(() => {
+        expect(within(matches).queryByText('Giant Thresher')).not.toBeInTheDocument();
+      });
+      expect(within(matches).getByRole('button', { name: /Thresher/ })).toHaveTextContent(
+        'Shared stash, Stash tab 1',
+      );
+      expect(screen.getByRole('button', { name: /^Shared stash/ })).toHaveTextContent('1 item');
+    });
+
+    it('Then a stat filter keeps only items with that stat at the minimum', async () => {
+      // Arrange
+      mockStash([
+        createInventoryItem('fp-life', 'Small Charm of Life', {
+          combined_magic_attributes: [
+            { name: 'maxhp', values: [20] },
+            { name: 'item_fastergethitrate', values: [5] },
+          ],
+        }),
+        createInventoryItem('fp-weak', 'Small Charm of Vita', {
+          combined_magic_attributes: [{ name: 'maxhp', values: [10] }],
+        }),
+      ]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Life at least' }), {
+        target: { value: '15' },
+      });
+
+      // Assert
+      const matches = await screen.findByRole('region', { name: 'Matching items' });
+      await waitFor(() => {
+        expect(within(matches).queryByText('Small Charm of Vita')).not.toBeInTheDocument();
+      });
+      expect(within(matches).getByText('Small Charm of Life')).toBeInTheDocument();
+    });
+
+    it('Then each stat row is a labelled group inside the Item properties group', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+
+      // Assert
+      const properties = screen.getByRole('group', { name: 'Item properties' });
+      expect(within(properties).getByRole('group', { name: 'Stat filter 1' })).toBeInTheDocument();
+      expect(within(properties).getByRole('group', { name: 'Stat filter 2' })).toBeInTheDocument();
+    });
+
+    it('Then a new stat row gets the focus and removing a row moves the focus to Add stat', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      const newRow = screen.getByRole('group', { name: 'Stat filter 1' });
+
+      // Assert
+      await waitFor(() => {
+        expect(within(newRow).getByRole('combobox', { name: 'Stat' })).toHaveFocus();
+      });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Life filter' }));
+
+      // Assert
+      expect(screen.queryByRole('group', { name: 'Stat filter 1' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add stat' })).toHaveFocus();
+    });
+
+    it('Then sorting by roll quality puts the best vaulted roll first', async () => {
+      // Arrange: two Annihilus (unique 381), one perfect and one with the lowest rolls
+      const rawAnnihilus = (statValue: number, experience: number) =>
+        JSON.stringify({
+          quality: 7,
+          unique_id: 381,
+          magic_attributes: [
+            { name: 'strength', values: [statValue] },
+            { name: 'fireresist', values: [statValue] },
+            { name: 'item_addexperience', values: [experience] },
+          ],
+        });
+      mockStash(
+        [],
+        [
+          createVaultItem({
+            id: 'vault-low',
+            itemName: 'Low Anni',
+            rawItemJson: rawAnnihilus(10, 5),
+          }),
+          createVaultItem({
+            id: 'vault-perfect',
+            fingerprint: 'vfp-2',
+            itemName: 'Perfect Anni',
+            rawItemJson: rawAnnihilus(20, 10),
+          }),
+        ],
+      );
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Low Anni' });
+
+      // Act
+      await chooseOption('Sort by', 'Best roll first');
+
+      // Assert
+      await waitFor(() => {
+        const tiles = screen.getAllByRole('button', { name: /^Vaulted item/ });
+        expect(tiles.map((tile) => tile.getAttribute('aria-label'))).toEqual([
+          'Vaulted item Perfect Anni',
+          'Vaulted item Low Anni',
+        ]);
+      });
     });
   });
 

@@ -20,6 +20,7 @@ import { getItemQualityTextClass } from '../ItemCard/styles';
 import { RuneImages } from '../RuneImages';
 import { BookmarkAction } from './BookmarkControls';
 import { CharacterProgressTable } from './CharacterProgressTable';
+import { ItemCopiesSection } from './ItemCopiesSection';
 import { ItemInfoSection } from './ItemInfoSection';
 import { MarkAsFoundDialog } from './MarkAsFoundDialog';
 import { ProgressStatusSection } from './ProgressStatusSection';
@@ -85,7 +86,8 @@ function ItemArtwork({ item, showItemIcons }: { item: Item; showItemIcons: boole
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
  * It reads like the in-game item tooltip: artwork, the name in its quality color, the base item
  * and found status, then the item's facts as plain text lines. Below that it lists per-character
- * progress and lets the user manually record or remove finds.
+ * progress and the copies in the user's saves and vault, and lets the user manually record or
+ * remove finds.
  */
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
@@ -165,6 +167,10 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                 />
               </div>
             )}
+
+            <div className="border-t pt-4">
+              <ItemCopiesSection item={item} />
+            </div>
           </div>
         </div>
 

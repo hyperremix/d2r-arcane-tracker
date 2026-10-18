@@ -1,3 +1,4 @@
+import { RollQualityDetails } from '@/components/inventory/RollQuality';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import type { GameItemTooltipModel, GameItemTooltipSocketEntry } from '@/lib/gameItemTooltip';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,8 @@ export function GameItemTooltipContent({ model }: GameItemTooltipContentProps) {
       {model.socketEntries.map((entry) => (
         <GameItemTooltipSocketRow key={entry.id} entry={entry} />
       ))}
+
+      {model.rollQuality && <RollQualityDetails rollQuality={model.rollQuality} />}
     </div>
   );
 }

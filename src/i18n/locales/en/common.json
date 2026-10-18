@@ -93,7 +93,14 @@
       "removeRecordLabel": "Remove {{version}} record for {{character}}",
       "removeRecordTitle": "Remove found record?",
       "removeRecordDescription": "This removes the manually added {{version}} record of {{item}} for {{character}}. This cannot be undone.",
-      "removeRecordError": "Could not remove this record. Please try again."
+      "removeRecordError": "Could not remove this record. Please try again.",
+      "copies": {
+        "title": "Your copies",
+        "description": "Copies of this item in your characters, stashes and vault, best roll first.",
+        "empty": "No copy of this item is in your characters, stashes or vault right now.",
+        "loadError": "Could not load your copies of this item.",
+        "bestRoll": "Best roll"
+      }
     },
     "itemLabels": {
       "treasureClasses": {
@@ -981,8 +988,71 @@
     },
     "filters": {
       "legend": "Filter items",
-      "scope": "Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches. Opened windows always show all items.",
-      "vaultFiltered": "Showing only vaulted items that match your filters."
+      "scope": "Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches, and the matching items are listed below. Opened windows always show all items.",
+      "vaultFiltered": "Showing only vaulted items that match your filters.",
+      "itemProperties": "Item properties",
+      "baseItem": "Base item or type",
+      "baseItemPlaceholder": "For example thresher or polearm",
+      "sockets": "Sockets",
+      "anySockets": "Any",
+      "socketMatch": "Socket count",
+      "socketMatchOptions": {
+        "exactly": "Exactly",
+        "atLeast": "At least"
+      },
+      "ethereal": "Ethereal",
+      "etherealOptions": {
+        "any": "Any",
+        "ethereal": "Ethereal only",
+        "notEthereal": "Not ethereal"
+      },
+      "minRollPercent": "Roll quality at least (%)",
+      "sortBy": "Sort by",
+      "sortOptions": {
+        "default": "Default",
+        "rollQuality": "Best roll first"
+      },
+      "stats": "Stats",
+      "stat": "Stat",
+      "statMinValue": "At least",
+      "statMinValueLabel": "{{stat}} at least",
+      "addStat": "Add stat",
+      "removeStat": "Remove {{stat}} filter",
+      "statRow": "Stat filter {{number}}",
+      "statOptions": {
+        "life": "Life",
+        "mana": "Mana",
+        "allResistances": "All resistances",
+        "fireResistance": "Fire resistance",
+        "coldResistance": "Cold resistance",
+        "lightningResistance": "Lightning resistance",
+        "poisonResistance": "Poison resistance",
+        "allSkills": "All skills",
+        "classSkills": "Class skills",
+        "skillTreeSkills": "Skill tree skills",
+        "fasterHitRecovery": "Faster hit recovery",
+        "fasterCastRate": "Faster cast rate",
+        "increasedAttackSpeed": "Increased attack speed",
+        "fasterRunWalk": "Faster run/walk",
+        "enhancedDamage": "Enhanced damage %",
+        "enhancedDefense": "Enhanced defense %",
+        "maxDamage": "Maximum damage",
+        "attackRating": "Attack rating",
+        "lifeSteal": "Life stolen per hit %",
+        "manaSteal": "Mana stolen per hit %",
+        "magicFind": "Magic find %",
+        "strength": "Strength",
+        "dexterity": "Dexterity",
+        "vitality": "Vitality",
+        "energy": "Energy"
+      }
+    },
+    "itemLocation": "{{source}}, {{location}}",
+    "matchingItems": {
+      "title": "Matching items",
+      "description": "Items in your characters and stashes that match your filters.",
+      "empty": "No items in your characters and stashes match your filters.",
+      "truncated": "Showing the first {{shown}} of {{total}} matching items."
     },
     "vaultFeedback": {
       "vaulted": "{{itemName}} was removed from its save file and is now in the vault.",
@@ -1043,6 +1113,16 @@
     "requiredDexterityLabel": "Required Dexterity:",
     "requiredLevelLabel": "Required Level:",
     "openSocketLabel": "Open Socket"
+  },
+  "rollQuality": {
+    "label": "Roll quality",
+    "percent": "{{percent}}%",
+    "perfect": "Perfect roll",
+    "statRange": "{{min}} to {{max}}",
+    "unrated_one": "{{count}} variable stat couldn't be rated.",
+    "unrated_other": "{{count}} variable stats couldn't be rated.",
+    "notRated": "Not rated",
+    "variableStat": "Variable stat"
   },
   "errorBoundary": {
     "title": "Something went wrong",

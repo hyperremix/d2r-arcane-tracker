@@ -2,6 +2,7 @@ import { materialDisplayNameByCode } from 'electron/items/materials';
 import { runeDisplayNameByCode, runeImageFilenameByCode } from 'electron/items/runes';
 import { parseRawItemJson } from 'electron/utils/rawItemJson';
 import { translations } from '@/i18n/translations';
+import { getItemRollQuality, type ItemRollQuality, type RollItemSource } from '@/lib/rollQuality';
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -32,7 +33,7 @@ interface ParsedSocketedRawItem {
   inv_file?: unknown;
 }
 
-interface ParsedRawItem {
+interface ParsedRawItem extends RollItemSource {
   runeword_name?: unknown;
   type_name?: unknown;
   type?: unknown;
@@ -71,6 +72,8 @@ export interface GameItemTooltipModel {
   coreLines: string[];
   affixLines: string[];
   socketEntries: GameItemTooltipSocketEntry[];
+  /** How well a unique or set item rolled; undefined for other items and all-fixed stats. */
+  rollQuality?: ItemRollQuality;
 }
 
 interface BuildGameItemTooltipModelArgs {
@@ -494,5 +497,6 @@ export function buildGameItemTooltipModel(
     coreLines,
     affixLines,
     socketEntries,
+    rollQuality: getItemRollQuality(raw),
   };
 }

@@ -336,4 +336,28 @@ describe('When buildGameItemTooltipModel is called', () => {
       ]);
     });
   });
+
+  describe('If the raw item is a unique with variable stats', () => {
+    it('Then the model carries its roll quality', () => {
+      // Arrange: Arachnid Mesh (unique 373) with 105% of its 90-120% enhanced defense
+      const rawItemJson = JSON.stringify({
+        type_name: 'Spiderweb Sash',
+        quality: 7,
+        unique_id: 373,
+        magic_attributes: [{ id: 16, name: 'item_armor_percent', values: [105] }],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        itemName: 'Arachnid Mesh',
+        quality: 'unique',
+        type: 'unique',
+        t,
+      });
+
+      // Assert
+      expect(result?.rollQuality).toMatchObject({ percent: 50, isPerfect: false });
+    });
+  });
 });

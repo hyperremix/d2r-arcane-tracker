@@ -1,5 +1,8 @@
 import { INVENTORY_DRAG_STATE_CHANNEL, VAULT_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
-import type { CharacterInventorySnapshot } from 'electron/types/grail';
+import type {
+  CharacterInventorySnapshot,
+  InventorySnapshotWindowTarget,
+} from 'electron/types/grail';
 import { isGrailBookmark } from 'electron/utils/vaultState';
 import { Loader2 } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +18,15 @@ import {
 } from '@/components/inventory/dragPayloads';
 import { InventoryFilterBar, type LocationFilter } from '@/components/inventory/InventoryFilterBar';
 import { getTypeValue, type TypeFilter } from '@/components/inventory/inventoryItems';
+import {
+  DEFAULT_ITEM_PROPERTY_FILTERS,
+  hasActiveItemPropertyFilters,
+  type ItemPropertyFilters,
+  type ItemSortOrder,
+  matchesItemPropertyFilters,
+  sortItems,
+} from '@/components/inventory/itemPropertyFilters';
+import { MatchingItemsList } from '@/components/inventory/MatchingItemsList';
 import { SaveWriteNotice } from '@/components/inventory/SaveWriteNotice';
 import { SelectedVaultItemPanel } from '@/components/inventory/SelectedVaultItemPanel';
 import { findSnapshotCharacter, SnapshotListRow } from '@/components/inventory/SnapshotListRow';
@@ -70,6 +82,10 @@ export function InventoryBrowserMain() {
   const [characterId, setCharacterId] = useState('all');
   const [locationContext, setLocationContext] = useState<LocationFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [propertyFilters, setPropertyFilters] = useState<ItemPropertyFilters>(
+    DEFAULT_ITEM_PROPERTY_FILTERS,
+  );
+  const [sortOrder, setSortOrder] = useState<ItemSortOrder>('default');
   // The vault drop area is only shown while an inventory item can be dropped on it: another window
   // reports its drags over IPC, and a drag that enters this window with inventory drag data counts
   // too. `hasCrossWindowInventoryDragRef` (declared below) is wider than the remote state: it is
@@ -218,15 +234,20 @@ export function InventoryBrowserMain() {
   }, [resetSnapshotHoverSession]);
 
   // Grail bookmarks are tracker bookmarks, not items: they must not show up as vault tiles. The
-  // type filter is applied here; search, character and location are part of the vault query.
+  // type and item property filters and the sort order are applied here; search, character and
+  // location are part of the vault query.
   const vaultItems = useMemo(
     () =>
-      (inventoryResponse?.vault.items ?? []).filter(
-        (item) =>
-          !isGrailBookmark(item) &&
-          (typeFilter === 'all' || getTypeValue(item.type) === typeFilter),
+      sortItems(
+        (inventoryResponse?.vault.items ?? []).filter(
+          (item) =>
+            !isGrailBookmark(item) &&
+            (typeFilter === 'all' || getTypeValue(item.type) === typeFilter) &&
+            matchesItemPropertyFilters(item, propertyFilters),
+        ),
+        sortOrder,
       ),
-    [inventoryResponse?.vault.items, typeFilter],
+    [inventoryResponse?.vault.items, typeFilter, propertyFilters, sortOrder],
   );
 
   const snapshots = useMemo(() => {
@@ -240,11 +261,23 @@ export function InventoryBrowserMain() {
             return false;
           }
 
-          return typeFilter === 'all' || getTypeValue(item.type) === typeFilter;
+          return (
+            (typeFilter === 'all' || getTypeValue(item.type) === typeFilter) &&
+            matchesItemPropertyFilters(item, propertyFilters)
+          );
         }),
       }))
       .filter((snapshot) => snapshot.items.length > 0);
-  }, [inventoryResponse?.inventory.snapshots, typeFilter]);
+  }, [inventoryResponse?.inventory.snapshots, typeFilter, propertyFilters]);
+
+  const matchingItems = useMemo(
+    () =>
+      sortItems(
+        snapshots.flatMap((snapshot) => snapshot.items),
+        sortOrder,
+      ),
+    [snapshots, sortOrder],
+  );
 
   const characterOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -287,7 +320,7 @@ export function InventoryBrowserMain() {
   );
 
   const handleOpenSnapshotWindow = useCallback(
-    async (snapshot: CharacterInventorySnapshot): Promise<void> => {
+    async (snapshot: InventorySnapshotWindowTarget): Promise<void> => {
       try {
         await window.electronAPI.inventory.openSnapshotWindow({
           sourceFilePath: snapshot.sourceFilePath,
@@ -372,7 +405,8 @@ export function InventoryBrowserMain() {
     searchText.trim() !== '' ||
     characterId !== 'all' ||
     locationContext !== 'all' ||
-    typeFilter !== 'all';
+    typeFilter !== 'all' ||
+    hasActiveItemPropertyFilters(propertyFilters);
   const isVaultDropzoneVisible = hasRemoteInventoryDrag || hasInventoryDragInWindow;
   // With filters on, an empty vault can mean "nothing matches", so say so instead of hiding it.
   // Not tied to `isLoading`, so the card stays mounted while a reload is in flight; before the
@@ -411,6 +445,12 @@ export function InventoryBrowserMain() {
             onLocationContextChange={setLocationContext}
             typeFilter={typeFilter}
             onTypeFilterChange={setTypeFilter}
+            propertyFilterProps={{
+              filters: propertyFilters,
+              onChange: setPropertyFilters,
+              sortOrder,
+              onSortOrderChange: setSortOrder,
+            }}
           />
           {isInitialLoad ? (
             <output className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
@@ -438,6 +478,14 @@ export function InventoryBrowserMain() {
                 </li>
               ))}
             </ul>
+          )}
+          {hasActiveFilters && inventoryResponse !== null && (
+            <MatchingItemsList
+              items={matchingItems}
+              onOpen={(item) => {
+                void handleOpenSnapshotWindow(item);
+              }}
+            />
           )}
         </CardContent>
       </Card>
