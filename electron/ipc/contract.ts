@@ -25,6 +25,7 @@ import type {
 } from '../types/events';
 import type {
   Character,
+  CharacterOverview,
   D2Item,
   D2SaveFile,
   GlobalHotkeyStatus,
@@ -273,6 +274,7 @@ export interface IpcInvokeContract {
   'saveFile:restoreDefaultDirectory': Invoke<[], { success: boolean; defaultDirectory: string }>;
   'saveFile:getAvailableRunes': Invoke<[], Record<string, number>>;
   'saveFile:refreshSaveFiles': Invoke<[], SuccessResult>;
+  'saveFile:getCharacterOverview': Invoke<[filePath: string], CharacterOverview | undefined>;
 
   // Vault
   'vault:addItem': Invoke<[item: VaultItemUpsertInput], VaultItem>;

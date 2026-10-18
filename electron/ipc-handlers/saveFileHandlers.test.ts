@@ -1,4 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import type { Mock, MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,6 +61,7 @@ interface MockSaveFileMonitor {
   getSaveDirectory: ReturnType<typeof vi.fn>;
   getDefaultDirectory: ReturnType<typeof vi.fn>;
   updateSaveDirectory: ReturnType<typeof vi.fn>;
+  getInventorySearchResult: ReturnType<typeof vi.fn>;
 }
 
 function createMockEventBus(): MockEventBus {
@@ -145,6 +149,9 @@ describe('When saveFileHandlers is used', () => {
       getSaveDirectory: vi.fn().mockReturnValue('/test/save/dir'),
       getDefaultDirectory: vi.fn().mockReturnValue('/default/save/dir'),
       updateSaveDirectory: vi.fn().mockResolvedValue(undefined),
+      getInventorySearchResult: vi
+        .fn()
+        .mockReturnValue({ snapshots: [], totalSnapshots: 0, totalItems: 0 }),
     };
 
     // Setup default database mocks
@@ -700,6 +707,73 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
+    });
+  });
+
+  describe('If saveFile:getCharacterOverview is called', () => {
+    let saveDirectory: string;
+    let characterSavePath: string;
+
+    const getHandler = (channel: string) =>
+      vi.mocked(ipcMain.handle).mock.calls.find((call) => call[0] === channel)?.[1] as any;
+    const scannedSnapshot = (sourceFilePath: string, sourceFileType: 'd2s' | 'd2i') => ({
+      snapshotId: sourceFilePath,
+      characterName: 'Warlock',
+      sourceFileType,
+      sourceFilePath,
+      capturedAt: new Date('2026-10-18T10:00:00.000Z'),
+      items: [],
+    });
+
+    beforeEach(() => {
+      saveDirectory = mkdtempSync(join(tmpdir(), 'save-file-handlers-'));
+      characterSavePath = join(saveDirectory, 'Warlock.d2s');
+      writeFileSync(
+        characterSavePath,
+        readFileSync(resolve(process.cwd(), 'electron/services/fixtures/WarlockV105.d2s')),
+      );
+      initializeSaveFileHandlers();
+    });
+
+    afterEach(() => {
+      rmSync(saveDirectory, { recursive: true, force: true });
+    });
+
+    it('Then the overview of a scanned character save is read from the file', async () => {
+      // Arrange
+      mockSaveFileMonitor.getInventorySearchResult.mockReturnValue({
+        snapshots: [scannedSnapshot(characterSavePath, 'd2s')],
+      });
+      const handler = getHandler('saveFile:getCharacterOverview');
+
+      // Act
+      const result = await handler(null, characterSavePath);
+
+      // Assert
+      expect(result).toMatchObject({ name: 'Warlock', characterClass: 'warlock', level: 1 });
+    });
+
+    it('If the path is not a scanned character save, then nothing is read', async () => {
+      // Arrange
+      mockSaveFileMonitor.getInventorySearchResult.mockReturnValue({
+        snapshots: [scannedSnapshot(characterSavePath, 'd2i')],
+      });
+      const handler = getHandler('saveFile:getCharacterOverview');
+
+      // Act
+      const result = await handler(null, characterSavePath);
+
+      // Assert
+      expect(result).toBeUndefined();
+    });
+
+    it('If the path is not a non-empty string, then the call is rejected', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:getCharacterOverview');
+
+      // Act & Assert
+      await expect(handler(null, '')).rejects.toThrow('Invalid save file path');
+      expect(mockSaveFileMonitor.getInventorySearchResult).not.toHaveBeenCalled();
     });
   });
 

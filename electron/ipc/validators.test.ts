@@ -27,6 +27,7 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ['grail:updateSettings', [[]], 'Invalid settings: expected an object'],
     ['grail:backup', [''], 'Invalid backup path'],
     ['saveFile:inspectDirectory', [undefined], 'Invalid save directory: expected a string'],
+    ['saveFile:getCharacterOverview', [''], 'Invalid save file path'],
     ['run-tracker:archive-session', [''], 'Invalid session ID'],
     ['run-tracker:update-session-notes', ['', 'Cows'], 'Invalid session ID'],
     ['run-tracker:update-session-notes', ['session-1', 42], 'Invalid session notes'],

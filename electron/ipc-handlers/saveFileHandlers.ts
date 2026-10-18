@@ -3,12 +3,17 @@ import { ipcMain } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
+import { readCharacterOverview } from '../services/characterOverview/characterOverview';
 import type { EventBus } from '../services/EventBus';
 import { inspectSaveDirectory } from '../services/saveDirectoryInspector';
 import type { D2SaveFile, SaveFileEvent, SaveFileMonitor } from '../services/saveFileMonitor';
 import { resolveEffectiveSaveDirectory } from '../services/saveFileMonitor/saveDirectorySettings';
 import type { SettingsService } from '../services/settingsService';
-import type { ItemDetectionEvent, SaveDirectoryInspection } from '../types/grail';
+import type {
+  CharacterOverview,
+  ItemDetectionEvent,
+  SaveDirectoryInspection,
+} from '../types/grail';
 
 /** Dependencies of the save file IPC handlers. */
 export interface SaveFileHandlerDependencies {
@@ -239,6 +244,25 @@ export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): (
     await saveFileMonitor.refreshSaveFiles();
     return { success: true };
   });
+
+  /**
+   * IPC handler for the overview of a character save. Only character saves of the last scan are
+   * read, so the renderer cannot make the main process read other files.
+   * @param _ - IPC event (unused)
+   * @param filePath - Path of a scanned .d2s file
+   * @returns The overview, or undefined for an unknown path or an unreadable file
+   */
+  handle(
+    'saveFile:getCharacterOverview',
+    async (_, filePath): Promise<CharacterOverview | undefined> => {
+      const isScannedCharacterSave = saveFileMonitor
+        .getInventorySearchResult()
+        .snapshots.some(
+          (snapshot) => snapshot.sourceFileType === 'd2s' && snapshot.sourceFilePath === filePath,
+        );
+      return isScannedCharacterSave ? readCharacterOverview(filePath) : undefined;
+    },
+  );
 
   console.log('Save file IPC handlers initialized');
 

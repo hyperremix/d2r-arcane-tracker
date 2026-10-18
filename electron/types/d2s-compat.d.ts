@@ -50,6 +50,12 @@ declare module '@dschu012/d2s' {
     userConfig?: Record<string, unknown>,
   ): Promise<Uint8Array>;
 
+  /**
+   * Whether a character save has Act V: v105 saves tell by their game mode byte, older saves by the
+   * expansion status bit.
+   */
+  export function hasExpansionSections(header: types.ID2S['header']): boolean;
+
   export function getConstantData(version: number): types.IConstantData;
   export function setConstantData(version: number, constants: types.IConstantData): void;
   export function enhanceItems(
