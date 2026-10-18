@@ -134,7 +134,7 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="default" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
-          {/* Counted from the listed save files so the badge matches "Detected characters" */}
+          {/* Counted from the listed save files so the badge count matches the summary line */}
           {saveFilesLoaded
             ? t(translations.settings.saveFileMonitor.active, { count: saveFiles.length })
             : t(translations.settings.saveFileMonitor.activeLoading)}

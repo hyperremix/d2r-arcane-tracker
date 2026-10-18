@@ -21,10 +21,10 @@ function createSession(id: string, startHour: number, durationMinutes: number): 
   };
 }
 
-function setupRunTrackerStore(sessions: Session[]) {
+function setupRunTrackerStore(sessions: Session[], sessionsLoading = false) {
   const storeState = {
     sessions,
-    loading: false,
+    sessionsLoading,
     runs: new Map(sessions.map((session) => [session.id, []])),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
     loadingSessions: new Set<string>(),
@@ -213,5 +213,44 @@ describe('When SessionsList is rendered without previous sessions', () => {
     // Assert
     expect(screen.getByText('No previous sessions')).toBeInTheDocument();
     expect(screen.getByText('Start a session to begin tracking your runs.')).toBeInTheDocument();
+  });
+});
+
+describe('When SessionsList is loading its first sessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupRunTrackerStore([], true);
+  });
+
+  it('Then the table headers are shown without session rows and the archived switch is disabled', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /^View session from .+ details$/ })).toBeNull();
+    expect(screen.queryByText('No previous sessions')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Show archived' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+});
+
+describe('When SessionsList is rendered with more sessions than fit on one page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupRunTrackerStore(
+      Array.from({ length: 12 }, (_, i) => createSession(`s-${i + 1}`, i + 1, 30)),
+    );
+  });
+
+  it('Then the first page of sessions and the visible range are shown', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getAllByRole('row', { name: /^View session from .+ details$/ })).toHaveLength(10);
+    expect(screen.getByText('Showing 1-10 of 12 sessions')).toBeInTheDocument();
   });
 });

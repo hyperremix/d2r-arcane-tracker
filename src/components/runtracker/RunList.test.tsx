@@ -346,6 +346,19 @@ describe('When RunList is rendered', () => {
       // Assert
       expect(screen.getByRole('row', { name: 'View run #1 details' })).toBeInTheDocument();
     });
+
+    it('Then the row is focusable and shows a pointer and a keyboard focus outline', () => {
+      // Arrange
+      const runs = createRuns(1);
+
+      // Act
+      render(<RunList runs={runs} />);
+
+      // Assert
+      const row = screen.getByRole('row', { name: 'View run #1 details' });
+      expect(row).toHaveAttribute('tabindex', '0');
+      expect(row).toHaveClass('cursor-pointer', 'hover:bg-muted/70', 'focus-visible:outline-2');
+    });
   });
 
   describe('If a run row shows its times', () => {
