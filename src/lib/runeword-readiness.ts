@@ -8,8 +8,8 @@ import type {
 } from 'electron/types/grail';
 import { planRuneUpgrades, type RuneUpgradeStep } from './runeword-upgrades';
 
-/** d2s qualities of the items a runeword is made in: normal (2) and superior (3). */
-const BASE_QUALITIES: ReadonlySet<number> = new Set([2, 3]);
+/** d2s qualities of the items a runeword is made in: low quality (1), normal (2) and superior (3). */
+const BASE_QUALITIES: ReadonlySet<number> = new Set([1, 2, 3]);
 
 const GEM_CODES: ReadonlySet<string> = new Set(gems.map((gem) => gem.code));
 
@@ -27,7 +27,7 @@ export type OwnedRunewordBaseLocation =
   | { kind: 'save'; item: ParsedInventoryItem }
   | { kind: 'vault'; item: VaultItem };
 
-/** An owned normal or superior item whose sockets are all empty. */
+/** An owned low quality, normal or superior item whose sockets are all empty. */
 export interface OwnedRunewordBase {
   key: string;
   itemName: string;
@@ -83,8 +83,8 @@ function readBaseFields(
 }
 
 /**
- * Collects the owned items a runeword can be made in: normal or superior items that have sockets,
- * all of them empty. Items socketed into another item are left out.
+ * Collects the owned items a runeword can be made in: low quality, normal or superior items that
+ * have sockets, all of them empty. Items socketed into another item are left out.
  * @param snapshots - Inventory snapshots of the latest save file scan
  * @param vaultItems - Vaulted items
  */

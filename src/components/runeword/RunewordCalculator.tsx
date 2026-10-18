@@ -1,4 +1,5 @@
 import type { Item, VaultItemFilter } from 'electron/types/grail';
+import i18n from 'i18next';
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +83,7 @@ async function loadOwnedItems(): Promise<OwnedItems> {
     };
   } catch (error) {
     console.error('Failed to load owned gems and bases:', error);
+    toast.error(i18n.t(translations.runeword.calculator.ownedItemsFailed));
     return { availableGems: {}, ownedBases: [] };
   }
 }

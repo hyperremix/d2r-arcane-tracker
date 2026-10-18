@@ -30,6 +30,7 @@ const infinity = createRuneword('infinity', 'Infinity', ['ber', 'mal', 'ber', 'i
 // so it is replaced by assignment rather than vi.stubGlobal, and restored after each test.
 const windowGlobals = window as unknown as Record<string, unknown>;
 let originalElectronAPI: PropertyDescriptor | undefined;
+let consoleError: { mockRestore: () => void } | undefined;
 
 function createSaveItem(
   overrides: Partial<ParsedInventoryItem>,
@@ -138,6 +139,8 @@ describe('RunewordCalculator', () => {
   });
 
   afterEach(() => {
+    consoleError?.mockRestore();
+    consoleError = undefined;
     if (originalElectronAPI && 'value' in originalElectronAPI) {
       windowGlobals.electronAPI = originalElectronAPI.value;
     } else {
@@ -313,11 +316,11 @@ describe('RunewordCalculator', () => {
       expect(getCardTitles()).toEqual(['Filter by runes', 'Steel']);
     });
 
-    it('If owned gems and bases cannot be loaded, then runewords still show from the rune counts', async () => {
+    it('If owned gems and bases cannot be loaded, then runewords still show from the rune counts and an error toast is shown', async () => {
       // Arrange
       const api = stubElectronApi();
       api.inventory.searchAll.mockRejectedValue(new Error('inventory failed'));
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       // Act
       await renderCalculator();
@@ -325,7 +328,7 @@ describe('RunewordCalculator', () => {
       // Assert
       expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
       expect(within(getCard('Steel')).getByText('No owned base')).toBeVisible();
-      consoleError.mockRestore();
+      expect(toast.error).toHaveBeenCalledWith('Failed to load owned gems and bases');
     });
   });
 
@@ -592,7 +595,7 @@ describe('RunewordCalculator', () => {
       // Arrange
       const api = stubElectronApi();
       await renderCalculator();
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       api.saveFile.refreshSaveFiles.mockRejectedValue(new Error('scan failed'));
 
       // Act
@@ -604,7 +607,6 @@ describe('RunewordCalculator', () => {
       );
       expect(screen.getByRole('button', { name: 'Refresh runes' })).toBeEnabled();
       expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
-      consoleError.mockRestore();
     });
   });
 

@@ -124,9 +124,20 @@ describe('collectOwnedRunewordBases', () => {
     expect(bases[0].ethereal).toBe(true);
   });
 
-  it('If an item is low quality, magic, rare, set, unique or crafted, then it is no base', () => {
+  it('If an item is low quality, then it is a base', () => {
     // Arrange
-    const items = [1, 4, 5, 6, 7, 8].map((quality) =>
+    const item = createInventoryItem({}, { ...phaseBladeRaw, quality: 1 });
+
+    // Act
+    const bases = collectOwnedRunewordBases([createSnapshot([item])], []);
+
+    // Assert
+    expect(bases).toHaveLength(1);
+  });
+
+  it('If an item is magic, rare, set, unique or crafted, then it is no base', () => {
+    // Arrange
+    const items = [4, 5, 6, 7, 8].map((quality) =>
       createInventoryItem({ gridX: quality }, { ...phaseBladeRaw, quality }),
     );
 
