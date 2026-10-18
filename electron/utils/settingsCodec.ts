@@ -1,5 +1,5 @@
 import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
-import { GameMode, GameVersion, type Settings } from '../types/grail';
+import { GameMode, GameVersion, ITEM_ICON_SIZES, type Settings } from '../types/grail';
 import { DEFAULT_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { DEFAULT_RUN_TRACKER_SHORTCUTS } from './runTrackerShortcuts';
 import type { WidgetSize } from './widgetDisplay';
@@ -179,6 +179,11 @@ export const SETTINGS_CODECS: { readonly [K in keyof Settings]-?: SettingCodec<K
   needsSeeding: flag(true, true),
   theme: text<Settings['theme']>('system', true),
   showItemIcons: flag(false, true),
+  itemIconSize: {
+    ...text<NonNullable<Settings['itemIconSize']>>('default'),
+    // An unknown stored preset falls back to the default
+    parse: (stored) => ITEM_ICON_SIZES.find((size) => size === stored) ?? 'default',
+  },
   d2rInstallPath: optionalText(),
   iconConversionStatus: optionalText<NonNullable<Settings['iconConversionStatus']>>(),
   iconConversionProgress:

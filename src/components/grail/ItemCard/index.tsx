@@ -1,4 +1,4 @@
-import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, ItemIconSize } from 'electron/types/grail';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
@@ -42,6 +42,8 @@ interface ItemCardProps {
   className?: string;
   viewMode?: 'grid' | 'list';
   withoutStatusIndicators?: boolean;
+  /** Size preset of the item icon; the grail page passes the chosen one */
+  iconSize?: ItemIconSize;
 }
 
 /**
@@ -59,6 +61,7 @@ export const ItemCard = memo(function ItemCard({
   className,
   viewMode = 'grid',
   withoutStatusIndicators = false,
+  iconSize = 'default',
 }: ItemCardProps) {
   const { t } = useTranslation();
   // Only subscribe to settings so unrelated store updates (filters, progress of other items, ...)
@@ -146,6 +149,7 @@ export const ItemCard = memo(function ItemCard({
         versionStatuses={versionStatuses}
         recentFindDate={recentFind}
         showItemIcons={settings.showItemIcons}
+        iconSize={iconSize}
         className={className}
         interactiveProps={interactiveProps}
       />
@@ -161,6 +165,7 @@ export const ItemCard = memo(function ItemCard({
       versionStatuses={versionStatuses}
       recentFindDate={recentFind}
       showItemIcons={settings.showItemIcons}
+      iconSize={iconSize}
       reserveVersionRow={settings.grailEthereal}
       className={className}
       interactiveProps={interactiveProps}

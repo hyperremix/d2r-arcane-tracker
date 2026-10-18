@@ -721,6 +721,13 @@
       "title": "Item icon management",
       "showItemIcons": "Show item icons",
       "showItemIconsDescription": "Display D2R item icons in cards",
+      "iconSize": "Icon size",
+      "iconSizeDescription": "Size of the item icons on the grail page",
+      "iconSizes": {
+        "default": "Default",
+        "large": "Large",
+        "extraLarge": "Extra large"
+      },
       "pathValid": "D2R installation path is valid",
       "gameFilesFoundAt": "Game files found at:",
       "pathNotConfigured": "D2R installation path is not configured",

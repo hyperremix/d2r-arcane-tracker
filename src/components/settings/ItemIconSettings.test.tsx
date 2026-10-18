@@ -20,6 +20,7 @@ function setupGrailStore(settings: Partial<Settings>) {
     }
     return storeState as unknown as ReturnType<typeof useGrailStore>;
   });
+  return storeState;
 }
 
 /** Opens the conversion warning dialog and confirms it, then waits for the conversion to end. */
@@ -113,6 +114,64 @@ describe('When a sprite conversion is started from the item icon settings', () =
 
       // Assert
       expect(isIconMissing('ber.png')).toBe(false);
+    });
+  });
+});
+
+describe('When the icon size is chosen in the item icon settings', () => {
+  beforeEach(() => {
+    windowGlobals.electronAPI = {
+      icon: { validatePath: vi.fn().mockResolvedValue({ valid: true, path: 'C:\\Games\\D2R' }) },
+    };
+  });
+
+  afterEach(() => {
+    windowGlobals.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  describe('If item icons are shown and a preset is picked', () => {
+    it('Then the preset is saved as the item icon size', async () => {
+      // Arrange
+      const { setSettings } = setupGrailStore({ showItemIcons: true });
+      render(<ItemIconSettings />);
+
+      // Act
+      fireEvent.click(screen.getByRole('combobox', { name: 'Icon size' }));
+      const option = await screen.findByRole('option', { name: 'Extra large' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+
+      // Assert
+      await waitFor(() => expect(setSettings).toHaveBeenCalledWith({ itemIconSize: 'extraLarge' }));
+    });
+  });
+
+  describe('If no preset is stored', () => {
+    it('Then the default preset is selected', async () => {
+      // Arrange
+      setupGrailStore({ showItemIcons: true });
+
+      // Act
+      render(<ItemIconSettings />);
+
+      // Assert
+      expect(await screen.findByRole('combobox', { name: 'Icon size' })).toHaveTextContent(
+        'Default',
+      );
+    });
+  });
+
+  describe('If item icons are hidden', () => {
+    it('Then the icon size cannot be changed', async () => {
+      // Arrange
+      setupGrailStore({ showItemIcons: false, itemIconSize: 'large' });
+
+      // Act
+      render(<ItemIconSettings />);
+
+      // Assert
+      expect(await screen.findByRole('combobox', { name: 'Icon size' })).toBeDisabled();
     });
   });
 });

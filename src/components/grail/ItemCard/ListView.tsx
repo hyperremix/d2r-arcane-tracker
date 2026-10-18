@@ -1,8 +1,9 @@
-import type { Character, Item } from 'electron/types/grail';
+import type { Character, Item, ItemIconSize } from 'electron/types/grail';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
+import { ITEM_ICON_PIXELS } from '@/lib/itemIconSize';
 import { cn } from '@/lib/utils';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon, RecentDiscoveryIndicator } from '../StatusIcons';
@@ -25,6 +26,7 @@ interface ListArtworkProps {
   item: Item;
   isFound: boolean;
   showItemIcons: boolean;
+  iconSize: ItemIconSize;
   focusableTriggers: boolean;
 }
 
@@ -32,8 +34,15 @@ interface ListArtworkProps {
  * Renders the item icon, rune images or, when item icons are off, the type icon for a list row.
  * Artwork is dimmed and grayscale while the item is missing.
  */
-function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListArtworkProps) {
+function ListArtwork({
+  item,
+  isFound,
+  showItemIcons,
+  iconSize,
+  focusableTriggers,
+}: ListArtworkProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
+  const iconPixels = ITEM_ICON_PIXELS[iconSize].list;
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
     return (
@@ -55,7 +64,7 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
   }
 
   return (
-    <div className="relative h-12 w-12 flex-shrink-0">
+    <div className="relative flex-shrink-0" style={{ width: iconPixels, height: iconPixels }}>
       <div
         data-testid="item-artwork"
         className={cn('h-full w-full', !isFound && missingArtworkStyles)}
@@ -94,6 +103,7 @@ export function ListView({
   versionStatuses,
   recentFindDate,
   showItemIcons,
+  iconSize,
   className,
   interactiveProps,
 }: ListViewProps) {
@@ -130,6 +140,7 @@ export function ListView({
         item={item}
         isFound={isFound}
         showItemIcons={showItemIcons}
+        iconSize={iconSize}
         focusableTriggers={focusableTriggers}
       />
 

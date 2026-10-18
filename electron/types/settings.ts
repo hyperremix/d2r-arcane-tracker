@@ -24,6 +24,16 @@ export enum GameVersion {
 }
 
 /**
+ * Size presets of the item icons on the grail page, from the default (smallest) to the largest.
+ */
+export const ITEM_ICON_SIZES = ['default', 'large', 'extraLarge'] as const;
+
+/**
+ * A size preset of the item icons on the grail page.
+ */
+export type ItemIconSize = (typeof ITEM_ICON_SIZES)[number];
+
+/**
  * Type representing all application settings.
  */
 export type Settings = {
@@ -42,6 +52,7 @@ export type Settings = {
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
   showItemIcons: boolean;
+  itemIconSize?: ItemIconSize; // Size of the item icons on the grail page (default: 'default')
   d2rInstallPath?: string; // Path to D2R installation
   iconConversionStatus?: 'not_started' | 'in_progress' | 'completed' | 'failed';
   iconConversionProgress?: { current: number; total: number };

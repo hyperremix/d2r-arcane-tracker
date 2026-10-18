@@ -236,6 +236,19 @@ describe('When getItemRowHeightEstimate is called', () => {
       expect(estimate).toBe(112 + 6 + 18 + COLUMN_GUTTER);
     });
   });
+
+  describe('If a larger icon size preset is used', () => {
+    it.each([
+      ['large', 128],
+      ['extraLarge', 144],
+    ] as const)('Then the %s tile is %ipx high plus the row gap', (iconSize, tileHeight) => {
+      // Act
+      const estimate = getItemRowHeightEstimate(false, iconSize);
+
+      // Assert
+      expect(estimate).toBe(tileHeight + COLUMN_GUTTER);
+    });
+  });
 });
 
 describe('When createGridRows is called', () => {
