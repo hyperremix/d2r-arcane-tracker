@@ -10,10 +10,12 @@ import {
   getPresenceLabel,
   getSlotLabel,
 } from '@/components/inventory/inventoryItemLabels';
+import { RollQualityDetails } from '@/components/inventory/RollQuality';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { getItemProperties } from '@/lib/itemProperties';
 
 export interface SelectedItemCardProps {
   item: ParsedInventoryItem | undefined;
@@ -23,7 +25,10 @@ export interface SelectedItemCardProps {
   onVault: (item: ParsedInventoryItem) => void;
 }
 
-/** Details of the selected inventory item and the button that vaults it. */
+/**
+ * Details of the selected inventory item, how well it rolled (unique and set items) and the button
+ * that vaults it.
+ */
 export function SelectedItemCard({
   item,
   isVaultPresent,
@@ -31,6 +36,7 @@ export function SelectedItemCard({
   onVault,
 }: SelectedItemCardProps) {
   const { t } = useTranslation();
+  const rollQuality = item ? getItemProperties(item).rollQuality : undefined;
 
   return (
     <Card>
@@ -92,6 +98,8 @@ export function SelectedItemCard({
                 {item.characterName}
               </div>
             </div>
+
+            {rollQuality && <RollQualityDetails rollQuality={rollQuality} />}
 
             <Button
               variant="outline"

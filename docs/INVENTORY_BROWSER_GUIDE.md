@@ -7,8 +7,25 @@ The **Inventory browser** (title bar → **Inventory**, route `/inventory-browse
 - One board per character (equipped items, inventory, belt, mercenary, corpse) and per shared stash, built from the last scan of your `.d2s` and `.d2i` files.
 - Shared stash tabs, plus the **Runes**, **Gems** and **Materials** tabs of the modern (v105+) shared stash. Stacks show their count.
 - **Characters & stashes** comes first: it lists each character (tracked characters show their class icon, class and level, other character saves a generic icon and the file kind) and each shared stash with its item count. Click one, or drag an item over it, to open it in a separate window, and drag items between that window and the main view. Hover or select an item in that window to see its details. Selecting a vaulted item in the main view shows its details there.
-- **Filter items** sits at the top of that list: a search box (item names, codes or quality) and filters for character, location and item type. They narrow the list to the characters and stashes that hold matching items (the count then shows the matches) and the **Vaulted items** below to matching items. While a filter is on, **Vaulted items** is shown with a note that it is filtered, even if no vaulted item matches. The windows you open always show every item.
+- **Filter items** sits at the top of that list: a search box (item names, codes or quality), filters for character, location and item type, and the [item property filters](#item-property-filters). They narrow the list to the characters and stashes that hold matching items (the count then shows the matches) and the **Vaulted items** below to matching items. While a filter is on, **Vaulted items** is shown with a note that it is filtered, even if no vaulted item matches, and **Matching items** lists the matching items of your characters and stashes with where each one is, whether it is ethereal and its [roll quality](#roll-quality). It shows the first 100 matches and says how many there are in total; click one to open the window of the character or stash that holds it. The windows you open always show every item.
 - A short notice at the top of the page and of each character window reminds you to close the game, because changes are written straight to your save files. **Details** shows the full explanation. The notice can't be dismissed.
+
+## Item property filters
+
+Below the search and the character, location and type filters, **Item properties** narrows the items further. All filters you set must match.
+
+- **Base item or type**: text the base item name (for example "thresher" finds Thresher and Giant Thresher), its item code or its item category (for example "polearm" or "charm") must contain.
+- **Sockets** and **Socket count**: an item with exactly, or at least, the chosen number of sockets (filled or open). **Any** turns the filter off.
+- **Ethereal**: ethereal items only, or items that aren't ethereal.
+- **Roll quality at least (%)**: unique and set items whose overall [roll quality](#roll-quality) is at least this value. Items without a roll quality don't match.
+- **Stats**: **Add stat** adds a row with a stat (for example life, faster hit recovery, all resistances, all skills, enhanced damage or enhanced defense) and an **At least** value; the remove button next to it takes the row away. An item matches when it has every listed stat at or above its value, or just has the stat when the value is empty. Stats count what the tooltip shows: the item's own stats, its runeword and what is socketed in it. **All resistances** counts the lowest of the four resistances, and **Class skills** and **Skill tree skills** the highest bonus of any class or skill tree.
+- **Sort by**: **Best roll first** orders **Matching items** and **Vaulted items** by roll quality, with items that have none at the end. **Default** keeps the usual order.
+
+## Roll quality
+
+Unique and set items whose stats can roll in a range show their roll quality in the item tooltip and on the selected item card of a character or stash window: each variable stat with its range and where the rolled value sits in it (the minimum is 0%, the maximum 100%), and the overall roll quality, the average of those stats. Percentages are rounded down, so only a stat at its maximum shows 100%. When every variable stat is at its maximum, the item shows **Perfect roll**. Fixed stats don't count, and items whose stats are all fixed, such as The Stone of Jordan, have no roll quality.
+
+The ranges come from the game's `uniqueitems.txt` and `setitems.txt` as converted by [d2data](https://github.com/blizzhackers/d2data) (see [Third-party licenses](THIRD_PARTY_LICENSES.md)), so they match the patch that data was taken from. A stat is shown as **Not rated** when its value can't be read from the item or told apart from other stats that add to the same value, or when the value lies outside the range, for example because a patch changed the range since the item dropped. Ranges of the base item (such as the defense of the base armor) and variable socket counts aren't rated.
 
 ## Changing your items
 
