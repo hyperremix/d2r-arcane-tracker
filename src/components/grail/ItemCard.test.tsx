@@ -216,7 +216,7 @@ describe('When ItemCard is rendered', () => {
     it.each([
       'grid',
       'list',
-    ] as const)('Then the %s card of a missing item says where to farm it', async (viewMode) => {
+    ] as const)('Then the %s card of a missing item says where it drops', async (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('shako').withName('Shako').build();
       render(
@@ -231,12 +231,12 @@ describe('When ItemCard is rendered', () => {
       // Assert
       expect(
         await screen.findByText(
-          'Farm at Mephisto in Durance of Hate Level 3 (Hell, monster level 87)',
+          'Drops at Mephisto in Durance of Hate Level 3 (Hell, monster level 87)',
         ),
       ).toBeInTheDocument();
     });
 
-    it('Then an area hint shows the monster level range', async () => {
+    it('Then a hint without an area shows the monster level range', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('ber').withName('Ber').build();
       render(
@@ -250,7 +250,7 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       expect(
-        await screen.findByText('Farm at Chaos Sanctuary (Hell, monster level 85–88)'),
+        await screen.findByText('Drops at Chaos Sanctuary (Hell, monster level 85–88)'),
       ).toBeInTheDocument();
     });
 
@@ -274,7 +274,7 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       await screen.findAllByText('Shako');
-      expect(screen.queryByText(/^Farm at/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Drops at/)).not.toBeInTheDocument();
     });
 
     it('Then a card without farming data shows no farming hint', async () => {
@@ -291,7 +291,7 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       await screen.findByText(/^Armor/);
-      expect(screen.queryByText(/^Farm at/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Drops at/)).not.toBeInTheDocument();
     });
   });
 

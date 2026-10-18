@@ -92,6 +92,34 @@ describe('When getFarmingHints picks where to farm the missing items', () => {
     expect(hints.get('harlequincrest')?.location).toBe('Many');
   });
 
+  it('If locations tie on difficulty and missing items, Then the one with the higher monster level is picked', () => {
+    // Arrange
+    const overview = overviewOf([
+      location({ id: 'Low', itemIndexes: [0], monsterLevel: { min: 80, max: 80 } }),
+      location({ id: 'High', itemIndexes: [0], monsterLevel: { min: 85, max: 90 } }),
+    ]);
+
+    // Act
+    const hints = getFarmingHints(overview, requestedItems, new Set(['harlequincrest']));
+
+    // Assert
+    expect(hints.get('harlequincrest')?.location).toBe('High');
+  });
+
+  it('If locations tie on everything else, Then the first by name is picked', () => {
+    // Arrange
+    const overview = overviewOf([
+      location({ id: 'Zebra', itemIndexes: [0] }),
+      location({ id: 'Alpha', itemIndexes: [0] }),
+    ]);
+
+    // Act
+    const hints = getFarmingHints(overview, requestedItems, new Set(['harlequincrest']));
+
+    // Assert
+    expect(hints.get('harlequincrest')?.location).toBe('Alpha');
+  });
+
   it('If found items drop at a location, Then they do not count and get no hint', () => {
     // Arrange
     const overview = overviewOf([

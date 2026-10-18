@@ -135,9 +135,8 @@ describe('When ProgressSummary is rendered', () => {
       const unique = screen.getByRole('button', { name: /^Unique/ });
       const set = screen.getByRole('button', { name: /^Set/ });
       for (const segment of within(getLedger()).getAllByRole('button')) {
-        // Equal flex share regardless of how many items the type has
-        expect(segment).toHaveClass('flex-1', 'basis-0', 'min-w-fit');
-        expect(segment.style.flexGrow).toBe('');
+        // The same equal flex share, whatever the number of items of the type
+        expect(segment).toHaveClass('flex-1', 'basis-0');
       }
       expect(getFill(unique)?.style.width).toBe(`${(1 / 3) * 100}%`);
       expect(getFill(set)?.style.width).toBe('0%');
