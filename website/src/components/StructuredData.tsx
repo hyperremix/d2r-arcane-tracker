@@ -24,9 +24,9 @@ const structuredData = {
       '@id': `${SITE_URL}#app`,
       name: 'D2R Arcane Tracker',
       description:
-        'Free Holy Grail tracker for Diablo II: Resurrected (D2R) on Windows. Reads your save files and records every unique, set item, rune and runeword you find.',
+        'Free Holy Grail tracker for Diablo II: Resurrected (D2R) on Windows and Linux. Reads your saves and records every unique, set item, rune and runeword you find.',
       applicationCategory: 'GameApplication',
-      operatingSystem: 'Windows 10 or later (64-bit)',
+      operatingSystem: 'Windows 10 or later (64-bit), Linux (x64)',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       softwareVersion: version,
       downloadUrl: links.latestRelease,

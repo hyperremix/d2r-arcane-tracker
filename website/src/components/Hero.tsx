@@ -111,7 +111,7 @@ export function Hero() {
             className={cn(buttonVariants({ size: 'lg' }), 'h-11 px-4 text-base')}
           >
             <Download aria-hidden="true" />
-            Download for Windows
+            Download for Windows and Linux
           </a>
           <a
             href={links.repository}
@@ -125,7 +125,7 @@ export function Hero() {
           </a>
         </div>
         <p className="mt-4 text-muted-foreground text-sm">
-          Version {version} for Windows 10 and later. Free and open source.
+          Version {version} for Windows 10 and later, Linux and Steam Deck. Free and open source.
         </p>
       </div>
       <GrailPreview />

@@ -205,6 +205,20 @@ function getSaveDirectoryViewState(input: SaveDirectoryViewInput): SaveDirectory
 }
 
 /**
+ * Translation key of the typical save folder location on a platform. On Linux it is inside the
+ * Wine or Proton prefix the game runs in.
+ * @param {string | undefined} platform - The Electron platform, if known
+ * @returns {string} Translation key
+ */
+function getTypicalLocationKey(platform: string | undefined): string {
+  const keys = translations.wizard.saveDirectory;
+  if (platform === 'win32') {
+    return keys.typicalLocationWindows;
+  }
+  return platform === 'linux' ? keys.typicalLocationLinux : keys.typicalLocationMac;
+}
+
+/**
  * Props for {@link DirectoryStatusBox}.
  */
 interface DirectoryStatusBoxProps {
@@ -774,9 +788,7 @@ export function SaveDirectoryStep() {
             <strong>{t(translations.wizard.saveDirectory.typicalLocation)}</strong>
           </p>
           <p className="font-mono text-info text-xs">
-            {window.electronAPI?.platform === 'win32'
-              ? t(translations.wizard.saveDirectory.typicalLocationWindows)
-              : t(translations.wizard.saveDirectory.typicalLocationMac)}
+            {t(getTypicalLocationKey(window.electronAPI?.platform))}
           </p>
         </div>
       </div>

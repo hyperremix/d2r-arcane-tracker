@@ -92,7 +92,7 @@ describe('When the FAQ is rendered', () => {
     expect(link).toHaveAttribute('href', guideUrl('COMPARISON.md'));
   });
 
-  it('Then the macOS and Linux question says the app is Windows-only and links to the tracker comparison guide', () => {
+  it('Then the macOS and Linux question names the Linux version and links to the tracker comparison guide', () => {
     // Arrange
     const { container } = render(<FAQ />);
     const details = findDetails(container, 'macOS or Linux');
@@ -101,9 +101,8 @@ describe('When the FAQ is rendered', () => {
     const link = within(details).getByRole('link', { name: 'tracker comparison' });
 
     // Assert
-    expect(details.querySelector('p')?.textContent).toContain(
-      'only released for Windows 10 or later',
-    );
+    expect(details.querySelector('p')?.textContent).toContain("There's a Linux version");
+    expect(details.querySelector('p')?.textContent).toContain("There's no macOS version.");
     expect(link).toHaveAttribute('href', guideUrl('COMPARISON.md'));
   });
 

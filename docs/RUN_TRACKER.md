@@ -67,6 +67,7 @@ Turn on **Global hotkeys** in **Settings → Run tracker settings** to use the s
 - While the app is in the background, other apps (including D2R) don't receive these key combinations. Pick combinations you don't need elsewhere.
 - Global shortcuts must use `Ctrl` or `Alt` (`Cmd` or `Option` on macOS), unless the key is a function key (`F1`–`F24`). This keeps plain typing working in other apps.
 - If a shortcut is already taken by another app, or two actions share the same shortcut, the settings show which one couldn't be registered. Choose a different shortcut.
+- On Linux, global hotkeys rely on X11. In a Wayland session they may not work, depending on your desktop.
 
 ## Run items
 

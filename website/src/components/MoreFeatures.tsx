@@ -17,7 +17,7 @@ const moreFeatures: MoreFeature[] = [
   {
     icon: Bell,
     title: 'Notifications',
-    description: 'A sound, an in-app card or a Windows notification when you find a new item.',
+    description: 'A sound, an in-app card or a desktop notification when you find a new item.',
   },
   {
     icon: MapPinned,

@@ -30,7 +30,7 @@ Common variants are the classic grail (normal uniques and sets), the ethereal gr
 
 The setup wizard opens on first launch. You can run it again from **Settings → General → Setup wizard**. It asks for:
 
-1. **Save folder** (required): usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`, the folder containing your `.d2s` files. Browse to it, or type or paste the path and click **Use this folder**. The wizard checks the folder and only continues once it finds at least one character file. If you picked the parent folder (such as `Saved Games`) or a folder inside the save folder, it offers the right folder with **Use suggested folder**. If you haven't created a character yet, tick **Continue anyway without character files**.
+1. **Save folder** (required): usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`, the folder containing your `.d2s` files. On Linux and Steam Deck it's inside the game's Proton or Wine prefix, and the app fills in the first one it finds (see [Install](../README.md#linux-and-steam-deck)). Browse to it, or type or paste the path and click **Use this folder**. The wizard checks the folder and only continues once it finds at least one character file. If you picked the parent folder (such as `Saved Games`) or a folder inside the save folder, it offers the right folder with **Use suggested folder**. If you haven't created a character yet, tick **Continue anyway without character files**.
 2. **What to track**: game mode, grail contents and game version. The defaults suit most players. See [Choosing what to track](#choosing-what-to-track).
 3. **D2R installation folder** (optional): only needed for [item icons](#item-icons) and [terror zones](TERROR_ZONE_CONFIGURATION.md). The wizard only suggests the Battle.net default, `C:\Program Files (x86)\Diablo II Resurrected`, if that folder exists.
 4. **Preferences** (optional): theme, notifications and widget.
@@ -156,7 +156,7 @@ The **Statistics** page shows overall and per-category progress, a comparison be
 
 ### Inventory Browser
 
-The **Inventory Browser** lists the items in every character and shared stash, and can move items between them or vault them. See the [Inventory Browser guide](INVENTORY_BROWSER_GUIDE.md), including its safety rules (backups, and writes refused while the game is running on Windows).
+The **Inventory Browser** lists the items in every character and shared stash, and can move items between them or vault them. See the [Inventory Browser guide](INVENTORY_BROWSER_GUIDE.md), including its safety rules (backups, and writes refused while the game is running on Windows and Linux).
 
 ### Runeword Calculator
 

@@ -58,7 +58,8 @@ export function Install() {
             Install D2R Arcane Tracker
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Needs Windows 10 or later (64-bit) and Diablo II: Resurrected.
+            Needs Windows 10 or later (64-bit), or 64-bit Linux or a Steam Deck with the game
+            running through Proton or Wine, and Diablo II: Resurrected.
           </p>
           <a href={links.latestRelease} className={cn(buttonVariants({ size: 'lg' }), 'px-4')}>
             <Download aria-hidden="true" />
@@ -82,6 +83,19 @@ export function Install() {
               </li>
             ))}
           </ol>
+          <div>
+            <h3 className="font-medium text-foreground">On Linux and Steam Deck</h3>
+            <p className="mt-1 text-muted-foreground text-sm leading-relaxed">
+              Get <code className={code}>D2R-Arcane-Tracker-Linux.AppImage</code> instead (on a
+              Steam Deck, in Desktop Mode). Make it executable under{' '}
+              <strong className="font-medium text-foreground">
+                Properties → Permissions → Is executable
+              </strong>{' '}
+              or with <code className={code}>chmod +x</code>, then start it. The app looks for your
+              save folder inside the game's Proton or Wine prefix. Run Tracker auto mode is
+              Windows-only.
+            </p>
+          </div>
           <Alert live="polite">
             <Info aria-hidden="true" />
             <AlertTitle>Updates install themselves</AlertTitle>

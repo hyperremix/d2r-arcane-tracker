@@ -65,7 +65,7 @@ describe('When the website is rendered', () => {
     render(<App />);
 
     // Assert
-    expect(screen.getByRole('link', { name: 'Download for Windows' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Download for Windows and Linux' })).toHaveAttribute(
       'href',
       links.latestRelease,
     );

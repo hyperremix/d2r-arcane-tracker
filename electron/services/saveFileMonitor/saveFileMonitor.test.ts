@@ -34,7 +34,15 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { chmodSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -261,6 +269,57 @@ describe('When SaveFileMonitor is used', () => {
       // Assert
       expect(path).toContain('Diablo II Resurrected');
       expect(app.getPath).toHaveBeenCalledWith('home');
+    });
+
+    describe('If the platform is Linux', () => {
+      const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+
+      beforeEach(() => {
+        // A WINEPREFIX of the machine running the tests must not add a prefix
+        vi.stubEnv('WINEPREFIX', '');
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+        if (platformDescriptor) {
+          Object.defineProperty(process, 'platform', platformDescriptor);
+        }
+      });
+
+      it('Then the save folder found in a Proton prefix is the default', async () => {
+        // Arrange
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        const home = realpathSync(await mkdtemp(join(tmpdir(), 'arcane-linux-home-')));
+        tempDirs.push(home);
+        const saveFolder = join(
+          home,
+          '.local/share/Steam/steamapps/compatdata/2536520/pfx/drive_c/users/steamuser',
+          'Saved Games',
+          'Diablo II Resurrected',
+        );
+        await mkdir(saveFolder, { recursive: true });
+        vi.mocked(app.getPath).mockReturnValue(home);
+
+        // Act
+        const path = monitor.getDefaultDirectory();
+
+        // Assert
+        expect(path).toBe(saveFolder);
+      });
+
+      it('If no prefix has a save folder, Then the Windows-style folder in the home folder is the default', async () => {
+        // Arrange
+        Object.defineProperty(process, 'platform', { value: 'linux' });
+        const home = await mkdtemp(join(tmpdir(), 'arcane-linux-home-'));
+        tempDirs.push(home);
+        vi.mocked(app.getPath).mockReturnValue(home);
+
+        // Act
+        const path = monitor.getDefaultDirectory();
+
+        // Assert
+        expect(path).toBe(join(home, 'Saved Games', 'Diablo II Resurrected'));
+      });
     });
   });
 

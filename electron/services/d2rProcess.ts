@@ -1,7 +1,60 @@
 import { execFile } from 'node:child_process';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 /** Image name of the Diablo II: Resurrected process. */
 export const D2R_PROCESS_NAME = 'D2R.exe';
+
+/** Mount point of the Linux process file system. */
+const LINUX_PROC_ROOT = '/proc';
+
+/**
+ * Checks whether a file name or Windows/Unix path names the D2R executable (case-insensitive).
+ * @param executable - `D2R.exe`, `C:\...\D2R.exe` or `/.../D2R.exe`
+ */
+function isD2RExecutable(executable: string): boolean {
+  const name = executable.split(/[\\/]/).pop() ?? '';
+  return name.toLowerCase() === D2R_PROCESS_NAME.toLowerCase();
+}
+
+/** The D2R executable at the start of a command line, quoted or not, with or without arguments. */
+const D2R_COMMAND_LINE = /(?:^|[\\/])D2R\.exe["']?(?:\s|$)/i;
+
+/**
+ * Checks whether one `/proc/<pid>` entry is D2R. Wine and Proton name the process after the
+ * Windows executable (`comm` is `D2R.exe`) and rewrite its command line to the Windows one, so
+ * either identifies the game; the command line covers Wine builds that leave `comm` as the loader.
+ * @param processDir - The `/proc/<pid>` directory
+ * @returns True if the process is D2R; false if not, or if it cannot be read (it may have exited)
+ */
+async function isD2RLinuxProcess(processDir: string): Promise<boolean> {
+  try {
+    const comm = await readFile(path.join(processDir, 'comm'), 'utf8');
+    if (isD2RExecutable(comm.trim())) {
+      return true;
+    }
+    const cmdline = await readFile(path.join(processDir, 'cmdline'), 'utf8');
+    return D2R_COMMAND_LINE.test(cmdline.split('\0')[0] ?? '');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Looks up D2R running under Wine or Proton on Linux by reading `/proc`, without running a command.
+ * @param procRoot - `/proc` override for tests
+ * @returns The process ID, or null if D2R is not running
+ * @throws If the process list cannot be read
+ */
+export async function findD2RProcessOnLinux(procRoot = LINUX_PROC_ROOT): Promise<number | null> {
+  const entries = await readdir(procRoot);
+  for (const entry of entries) {
+    if (/^\d+$/.test(entry) && (await isD2RLinuxProcess(path.join(procRoot, entry)))) {
+      return Number.parseInt(entry, 10);
+    }
+  }
+  return null;
+}
 
 /**
  * Reads the process ID of D2R from `tasklist /FO CSV /NH` output.

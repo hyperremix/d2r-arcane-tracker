@@ -1,4 +1,4 @@
-import { findD2RProcess } from './d2rProcess';
+import { findD2RProcess, findD2RProcessOnLinux } from './d2rProcess';
 import type { ProcessMonitor } from './processMonitor';
 
 export const GAME_RUNNING_ERROR = 'GAME_RUNNING';
@@ -7,7 +7,10 @@ export const GAME_RUNNING_ERROR = 'GAME_RUNNING';
 export interface GameProcessGuardOptions {
   /** The process monitor; while it is monitoring, its state is used instead of a new lookup. */
   processMonitor?: Pick<ProcessMonitor, 'isMonitoring' | 'isRunning'>;
-  /** Looks up the D2R process when the monitor is not monitoring. Defaults to `tasklist`. */
+  /**
+   * Looks up the D2R process when the monitor is not monitoring. Defaults to `tasklist` on
+   * Windows and to reading `/proc` on Linux.
+   */
   findProcess?: () => Promise<number | null>;
   /** Platform override for tests. Defaults to `process.platform`. */
   platform?: NodeJS.Platform;
@@ -16,15 +19,16 @@ export interface GameProcessGuardOptions {
 /**
  * True while Diablo II: Resurrected is running. The game keeps the character in memory and writes
  * it back over the save file when it saves or exits, which would silently undo (or duplicate) any
- * edit made to the file in the meantime. Detection is only available on Windows; if it cannot be
- * performed the answer is `false` so a broken `tasklist` never blocks the user for good.
+ * edit made to the file in the meantime. Detection is available on Windows and on Linux (the game
+ * running under Wine or Proton); if it cannot be performed the answer is `false` so a broken
+ * lookup never blocks the user for good.
  */
 async function isGameRunning({
   processMonitor,
-  findProcess = findD2RProcess,
   platform = process.platform,
+  findProcess = platform === 'linux' ? findD2RProcessOnLinux : findD2RProcess,
 }: GameProcessGuardOptions): Promise<boolean> {
-  if (platform !== 'win32') {
+  if (platform !== 'win32' && platform !== 'linux') {
     return false;
   }
 

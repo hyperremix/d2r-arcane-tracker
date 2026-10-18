@@ -18,12 +18,14 @@
   ],
   "type": "module",
   "main": "dist-electron/main.js",
+  "desktopName": "d2r-arcane-tracker.desktop",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "vite",
     "build": "bun run typecheck && vite build && electron-builder --win",
+    "build:linux": "bun run typecheck && vite build && electron-builder --linux",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc -b",
     "typecheck:web": "tsc -p tsconfig.web.json",
