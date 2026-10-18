@@ -1,9 +1,8 @@
 import type { FarmingDataUnavailable } from 'electron/types/grail';
-import { AlertCircle, FolderCog, Settings } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { translations } from '@/i18n/translations';
 
 /**
@@ -12,30 +11,9 @@ import { translations } from '@/i18n/translations';
  */
 export function FarmingDataNotice({ unavailable }: { unavailable: FarmingDataUnavailable }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const openSettings = (
-    <Button type="button" onClick={() => navigate('/settings')} className="mt-2">
-      <Settings aria-hidden="true" />
-      {t(translations.terrorZone.openInstallationSettings)}
-    </Button>
-  );
 
   if (unavailable.errorCode === 'pathNotConfigured') {
-    return (
-      <div
-        data-testid="farming-not-configured"
-        className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
-      >
-        <FolderCog aria-hidden="true" className="size-10 text-muted-foreground" />
-        <h2 className="font-semibold text-foreground text-lg">
-          {t(translations.farming.notConfigured.title)}
-        </h2>
-        <p className="max-w-md text-muted-foreground text-sm">
-          {t(translations.farming.notConfigured.description)}
-        </p>
-        {openSettings}
-      </div>
-    );
+    return <D2RFolderPrompt layout="page" />;
   }
 
   return (

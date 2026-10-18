@@ -2,8 +2,8 @@ import type { FarmingTerrorZone, Item, TerrorZoneScheduleSlot } from 'electron/t
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
-import { formatClockDuration } from '@/lib/date';
 import { FARMING_DIFFICULTY_ORDER } from '@/lib/farming';
+import { formatCountdown } from '../terror-zone/formatCountdown';
 import { useTerrorZoneSchedule } from '../terror-zone/useTerrorZoneSchedule';
 import { formatLevelRange } from './dropRateText';
 import { FarmingItemList } from './FarmingItemList';
@@ -106,7 +106,7 @@ export function TerrorZoneFarming({ zones, items, onSelectItem }: TerrorZoneFarm
             timing={
               current &&
               t(translations.terrorZone.schedule.endsIn, {
-                time: formatClockDuration(current.endsAt - now),
+                time: formatCountdown(current.endsAt - now),
               })
             }
             zones={zones}
@@ -120,7 +120,7 @@ export function TerrorZoneFarming({ zones, items, onSelectItem }: TerrorZoneFarm
             timing={
               next &&
               t(translations.terrorZone.schedule.startsIn, {
-                time: formatClockDuration(next.startsAt - now),
+                time: formatCountdown(next.startsAt - now),
               })
             }
             zones={zones}

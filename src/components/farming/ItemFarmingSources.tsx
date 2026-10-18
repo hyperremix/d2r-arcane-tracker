@@ -1,7 +1,9 @@
 import type { Character, FarmingItemSource, FarmingItemSources, Item } from 'electron/types/grail';
+import { AlertTriangle } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -141,13 +143,18 @@ function SourcesBody({ itemId, characters }: { itemId: string; characters: Chara
     );
   }
   if (result.status === 'unavailable') {
+    if (result.errorCode === 'pathNotConfigured') return <D2RFolderPrompt layout="inline" />;
     return (
-      <p className="text-muted-foreground text-sm">
-        {t(translations.farming.itemSources.unavailable)}{' '}
-        <Link to="/farming" className="underline underline-offset-2">
-          {t(translations.farming.itemSources.openAdvisor)}
-        </Link>
-      </p>
+      <Alert variant="warning" live="polite">
+        <AlertTriangle aria-hidden="true" />
+        <AlertDescription>
+          {result.errorCode === 'gameFilesMissing'
+            ? t(translations.farming.itemSources.gameFilesMissing, {
+                files: (result.missingFiles ?? []).join(', '),
+              })
+            : t(translations.farming.itemSources.readFailed)}
+        </AlertDescription>
+      </Alert>
     );
   }
   if (!result.known || result.sources.length === 0) {

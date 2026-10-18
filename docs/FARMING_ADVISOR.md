@@ -19,7 +19,7 @@ The tables are read once and kept in memory until one of them changes on disk (t
 
 Open it with the crosshair icon (**Farming advisor**) next to the terror zone icon on the right of the title bar.
 
-Until the files can be read, the page says what is missing: without a D2R folder it offers **Open D2R installation settings**, and when files are missing it lists them.
+Until the files can be read, the page says what is missing: without a D2R folder it asks you to set one, with an **Open D2R installation settings** button (the same prompt the terror zone pages show), and when files are missing it lists them.
 
 The page then shows:
 
@@ -30,13 +30,15 @@ The page then shows:
 
 Select an item in any list to open its details.
 
+The [terror zone schedule](TERROR_ZONE_CONFIGURATION.md#schedule) uses the same data to show how many of your missing items each upcoming zone can drop.
+
 ## Where to farm (item details)
 
 The details of a unique, set item or rune have a **Where to farm** section. It lists the monsters that drop the item, best drop rate first: each area's regular monsters, champions and unique monsters, each super unique and boss, and their terrorized versions (marked **Terror zone**) at the character level set on the farming advisor page. **Show all** lists every source.
 
 The drop rate is the average number of kills per drop, for example "1 in 1,779". Where a source groups several monster types (the regular monsters of an area), the range from the best to the worst type is shown. Set **Players** (your `/players` setting) and **Magic find** above the list; both are kept until you close the app.
 
-Without readable game files the section says so and links to the farming advisor page.
+Without a D2R folder the section shows the same prompt to set one, with an **Open D2R installation settings** button. When a folder is set but game files are missing or can't be read, a warning names the missing files, or says the files can't be read, and tells you to extract the game files again.
 
 ## How the numbers are calculated
 

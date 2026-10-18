@@ -190,7 +190,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       renderTerrorZoneConfiguration();
 
       // Assert
-      const emptyState = await screen.findByTestId('terror-zone-not-configured');
+      const emptyState = await screen.findByTestId('d2r-folder-prompt');
       expect(
         within(emptyState).getByRole('heading', {
           level: 2,
@@ -226,7 +226,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       renderTerrorZoneConfiguration();
 
       // Assert
-      await screen.findByTestId('terror-zone-not-configured');
+      await screen.findByTestId('d2r-folder-prompt');
       expectZoneControlsHidden();
       expect(screen.queryByText('Error')).not.toBeInTheDocument();
       expect(screen.queryByText('Game files must be extracted')).not.toBeInTheDocument();
@@ -248,7 +248,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
 
       // Assert
       expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
-      expect(screen.queryByTestId('terror-zone-not-configured')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
       expectZoneControlsHidden();
     });
 
@@ -286,7 +286,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       // Assert
       expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-      expect(screen.queryByTestId('terror-zone-not-configured')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
       expectZoneControlsHidden();
     });
 
@@ -325,7 +325,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       fireEvent.click(retry);
 
       // Assert
-      expect(await screen.findByTestId('terror-zone-not-configured')).toBeInTheDocument();
+      expect(await screen.findByTestId('d2r-folder-prompt')).toBeInTheDocument();
       expect(screen.queryByText('Failed to load terror zone data')).not.toBeInTheDocument();
     });
   });

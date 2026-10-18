@@ -138,7 +138,8 @@ describe('When the farming advisor page is shown', () => {
 
     // Act
     setup(getOverview);
-    fireEvent.click(await screen.findByRole('button', { name: 'Open D2R installation settings' }));
+    const prompt = await screen.findByTestId('d2r-folder-prompt');
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Open D2R installation settings' }));
 
     // Assert
     expect(await screen.findByText('Settings page')).toBeInTheDocument();
