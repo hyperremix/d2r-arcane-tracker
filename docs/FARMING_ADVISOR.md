@@ -17,7 +17,7 @@ The tables are read once and kept in memory until one of them changes on disk (t
 
 ## The farming advisor page
 
-Open it with the crosshair icon (**Farming advisor**) next to the terror zone icon on the right of the title bar.
+Open it with **Farming advisor** in the title bar. When the window is too narrow to show every page, it moves into the **More** menu at the end of the navigation.
 
 Until the files can be read, the page says what is missing: without a D2R folder it asks you to set one, with an **Open D2R installation settings** button (the same prompt the terror zone pages show), and when files are missing it lists them.
 

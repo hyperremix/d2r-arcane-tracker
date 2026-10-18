@@ -73,14 +73,65 @@ function getNavigation() {
   return screen.getByRole('navigation', { name: 'Main navigation' });
 }
 
-const originalElectronAPI = window.electronAPI;
+/** Width of every destination and of the More trigger in {@link stubTitleBarLayout}. */
+const ITEM_WIDTH = 100;
+const MORE_WIDTH = 60;
+const NAME_WIDTH = 150;
+const LOGO_WIDTH = 20;
 
-function setPlatform(platform: 'darwin' | 'win32' | 'linux') {
-  Object.defineProperty(window, 'electronAPI', {
-    value: { platform },
-    configurable: true,
-    writable: true,
+/**
+ * jsdom has no layout, so stub the widths the title bar measures (each destination 100px, the
+ * More trigger 60px, the app name 150px, the logo 20px; gaps are 0) and capture the
+ * ResizeObserver callbacks to simulate resizing the window.
+ * @returns A function that resizes the brand and navigation area
+ */
+function stubTitleBarLayout(initialRegionWidth: number) {
+  let regionWidth = initialRegionWidth;
+  const resizeCallbacks: ResizeObserverCallback[] = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(callback);
+      }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const part = this.getAttribute('data-overflow-part');
+    const widths: Record<string, number> = {
+      item: ITEM_WIDTH,
+      more: MORE_WIDTH,
+      name: NAME_WIDTH,
+      logo: LOGO_WIDTH,
+    };
+    const isRegion = this.querySelector(':scope > [data-overflow-part="logo"]') !== null;
+    const width = isRegion ? regionWidth : part ? (widths[part] ?? 0) : 0;
+    return DOMRect.fromRect({ width, height: 32 });
   });
+
+  return (width: number) => {
+    regionWidth = width;
+    act(() => {
+      for (const callback of resizeCallbacks) callback([], {} as ResizeObserver);
+    });
+  };
+}
+
+/** Returns the app name shown in the title bar, ignoring its invisible measuring copy. */
+function queryVisibleAppName() {
+  return (
+    screen
+      .queryAllByText('D2R Arcane Tracker')
+      .find((element) => !element.closest('[aria-hidden="true"]')) ?? null
+  );
+}
+
+function getLinkNames() {
+  return within(getNavigation())
+    .getAllByRole('link')
+    .map((link) => link.textContent);
 }
 
 /** Returns the visually hidden or visible label element inside a nav link. */
@@ -90,12 +141,8 @@ function getLinkLabel(name: string) {
 
 describe('When TitleBar is rendered', () => {
   afterEach(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      value: originalElectronAPI,
-      configurable: true,
-      writable: true,
-    });
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     for (const router of browserRouters.splice(0)) {
       router.dispose();
     }
@@ -121,31 +168,47 @@ describe('When TitleBar is rendered', () => {
     ]);
   });
 
-  it('Then the daily destinations come first and Farming advisor, Terror zones and Settings follow as a separate group', () => {
+  it('Then every destination comes first and Settings follows as a separate group', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
-    const [primary, secondary] = within(getNavigation()).getAllByRole('list');
+    const [destinations, utilities] = within(getNavigation()).getAllByRole('list');
     expect(
-      within(primary)
+      within(destinations)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Grail', 'Statistics', 'Runs', 'Runewords', 'Inventory']);
+    ).toEqual([
+      'Grail',
+      'Statistics',
+      'Runs',
+      'Runewords',
+      'Inventory',
+      'Farming advisor',
+      'Terror zones',
+    ]);
     expect(
-      within(secondary)
+      within(utilities)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Farming advisor', 'Terror zones', 'Settings']);
+    ).toEqual(['Settings']);
   });
 
-  it('Then primary link labels are visible from the lg breakpoint and hidden text below it', () => {
+  it('Then every destination shows its label as visible text', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
-    for (const name of ['Grail', 'Statistics', 'Runs', 'Runewords', 'Inventory']) {
-      expect(getLinkLabel(name)).toHaveClass('sr-only', 'lg:not-sr-only');
+    for (const name of [
+      'Grail',
+      'Statistics',
+      'Runs',
+      'Runewords',
+      'Inventory',
+      'Farming advisor',
+      'Terror zones',
+    ]) {
+      expect(getLinkLabel(name)).not.toHaveClass('sr-only');
     }
   });
 
@@ -161,16 +224,12 @@ describe('When TitleBar is rendered', () => {
     expect(icon).not.toHaveClass('lucide');
   });
 
-  it('Then Farming advisor, Terror zones and Settings are icon-only links with an accessible name at every width', () => {
+  it('Then Settings is an icon-only link with an accessible name', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
-    for (const name of ['Farming advisor', 'Terror zones', 'Settings']) {
-      const label = getLinkLabel(name);
-      expect(label).toHaveClass('sr-only');
-      expect(label).not.toHaveClass('lg:not-sr-only');
-    }
+    expect(getLinkLabel('Settings')).toHaveClass('sr-only');
   });
 
   it('Then the logo is always shown and the app name uses the display font', () => {
@@ -182,50 +241,120 @@ describe('When TitleBar is rendered', () => {
     const logo = banner.querySelector('img');
     expect(logo).toBeInTheDocument();
     expect(logo).not.toHaveClass('hidden');
-    expect(screen.getByText('D2R Arcane Tracker')).toHaveClass('font-display');
+    expect(queryVisibleAppName()).toHaveClass('font-display');
   });
 
-  it('If the platform is macOS, then the app name is shown from the lg breakpoint', () => {
+  it('If the window fits every destination and the app name, then nothing moves into a More menu', () => {
     // Arrange
-    setPlatform('darwin');
+    stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH);
 
     // Act
     renderTitleBar();
 
     // Assert
-    expect(screen.getByText('D2R Arcane Tracker')).toHaveClass('hidden', 'lg:block');
+    expect(getLinkNames()).toHaveLength(8);
+    expect(queryVisibleAppName()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('If the platform is Windows, then the app name waits for the xl breakpoint to leave room for the window controls', () => {
+  it('If the window fits every destination but not the app name, then only the logo is shown', () => {
     // Arrange
-    setPlatform('win32');
+    stubTitleBarLayout(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH - 1);
 
     // Act
     renderTitleBar();
 
     // Assert
-    const name = screen.getByText('D2R Arcane Tracker');
-    expect(name).toHaveClass('hidden', 'xl:block');
-    expect(name).not.toHaveClass('lg:block');
+    expect(getLinkNames()).toHaveLength(8);
+    expect(queryVisibleAppName()).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
-  it('If the platform is Linux, then the app name waits for the xl breakpoint like Windows', () => {
-    // Arrange
-    setPlatform('linux');
-
-    // Act
+  it('If the window is too narrow for every destination, then the last ones move into the More menu', async () => {
+    // Arrange - four destinations and the More trigger fit
+    stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
     renderTitleBar();
 
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+
     // Assert
-    const name = screen.getByText('D2R Arcane Tracker');
-    expect(name).toHaveClass('hidden', 'xl:block');
-    expect(name).not.toHaveClass('lg:block');
+    expect(getLinkNames()).toEqual(['Grail', 'Statistics', 'Runs', 'Runewords', 'Settings']);
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Inventory', 'Farming advisor', 'Terror zones']);
+  });
+
+  it('If the current page is in the More menu, then the trigger shows the active state and the menu marks the page as current', async () => {
+    // Arrange
+    stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
+    renderTitleBar('/terror-zones');
+    const trigger = screen.getByRole('button', { name: 'More' });
+
+    // Act
+    fireEvent.click(trigger);
+
+    // Assert
+    expect(trigger).toHaveClass('bg-accent');
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Terror zones' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(menu).getByRole('menuitem', { name: 'Inventory' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    for (const link of within(getNavigation()).getAllByRole('link')) {
+      expect(link).not.toHaveAttribute('aria-current');
+    }
+  });
+
+  it('If the current page is not in the More menu, then the trigger is not shown as active', () => {
+    // Arrange
+    stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
+
+    // Act
+    renderTitleBar('/runs');
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'More' })).not.toHaveClass('bg-accent');
+  });
+
+  it('If a destination in the More menu is chosen, then it navigates there', async () => {
+    // Arrange
+    stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
+    renderTitleBar('/');
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const menu = await screen.findByRole('menu');
+
+    // Act
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Farming advisor' }));
+
+    // Assert
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/farming'));
+  });
+
+  it('If the window grows again, then destinations move back out of the More menu', () => {
+    // Arrange
+    const resize = stubTitleBarLayout(LOGO_WIDTH + 4 * ITEM_WIDTH + MORE_WIDTH);
+    renderTitleBar();
+
+    // Act
+    resize(LOGO_WIDTH + 7 * ITEM_WIDTH + NAME_WIDTH);
+
+    // Assert
+    expect(getLinkNames()).toHaveLength(8);
+    expect(queryVisibleAppName()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
   });
 
   it('If an icon-only link receives keyboard focus, then its tooltip shows the label', async () => {
     // Arrange
     renderTitleBar();
-    const link = within(getNavigation()).getByRole('link', { name: 'Terror zones' });
+    const link = within(getNavigation()).getByRole('link', { name: 'Settings' });
 
     // Act
     act(() => {
@@ -234,7 +363,7 @@ describe('When TitleBar is rendered', () => {
 
     // Assert
     expect(
-      await screen.findByText('Terror zones', { selector: '[data-slot="tooltip-content"]' }),
+      await screen.findByText('Settings', { selector: '[data-slot="tooltip-content"]' }),
     ).toBeInTheDocument();
   });
 
