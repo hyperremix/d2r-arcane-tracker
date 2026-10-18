@@ -1,6 +1,12 @@
-import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
+import type { Character, Difficulty, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { MAX_FARMING_CHARACTER_LEVEL } from 'electron/types/grail';
 import { getProgressVersion, type ItemVersion, isVersionTracked } from '@/lib/ethereal';
+
+/** Time without a change to a farming input before the drop data is requested for it. */
+export const FARMING_INPUT_DEBOUNCE_MS = 250;
+
+/** The difficulties in the order the farming advisor lists them: the best drops first. */
+export const FARMING_DIFFICULTY_ORDER: readonly Difficulty[] = ['hell', 'nightmare', 'normal'];
 
 /** Item types that can drop from monsters; runewords are made, not found. */
 const DROPPABLE_TYPES = new Set<Item['type']>(['unique', 'set', 'rune']);

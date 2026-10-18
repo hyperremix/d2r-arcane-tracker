@@ -12,8 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { translations } from '@/i18n/translations';
-import { getDefaultFarmingCharacterLevel, isFarmableItem } from '@/lib/farming';
+import {
+  FARMING_INPUT_DEBOUNCE_MS,
+  getDefaultFarmingCharacterLevel,
+  isFarmableItem,
+} from '@/lib/farming';
 import { useFarmingSessionStore } from '@/stores/farmingSessionStore';
 import { formatDropRateRange, formatLevelRange } from './dropRateText';
 import { FarmingInputs } from './FarmingInputs';
@@ -22,13 +27,19 @@ import { FarmingInputs } from './FarmingInputs';
 const COLLAPSED_SOURCE_COUNT = 8;
 
 /**
- * Loads where an item drops for the current /players, magic find and character level.
+ * Loads where an item drops for the current /players, magic find and character level, once they
+ * have stopped changing for a moment.
  */
 function useItemSources(itemId: string, characters: Character[]) {
-  const players = useFarmingSessionStore((state) => state.players);
-  const magicFind = useFarmingSessionStore((state) => state.magicFind);
+  const storedPlayers = useFarmingSessionStore((state) => state.players);
+  const storedMagicFind = useFarmingSessionStore((state) => state.magicFind);
   const storedCharacterLevel = useFarmingSessionStore((state) => state.characterLevel);
-  const characterLevel = storedCharacterLevel ?? getDefaultFarmingCharacterLevel(characters);
+  const players = useDebouncedValue(storedPlayers, FARMING_INPUT_DEBOUNCE_MS);
+  const magicFind = useDebouncedValue(storedMagicFind, FARMING_INPUT_DEBOUNCE_MS);
+  const characterLevel = useDebouncedValue(
+    storedCharacterLevel ?? getDefaultFarmingCharacterLevel(characters),
+    FARMING_INPUT_DEBOUNCE_MS,
+  );
   const [result, setResult] = useState<FarmingItemSources | undefined>(undefined);
   const [failed, setFailed] = useState(false);
 

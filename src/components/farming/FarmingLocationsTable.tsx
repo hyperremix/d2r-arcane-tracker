@@ -12,10 +12,9 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { translations } from '@/i18n/translations';
+import { FARMING_DIFFICULTY_ORDER } from '@/lib/farming';
 import { formatLevelRange } from './dropRateText';
 import { FarmingItemList } from './FarmingItemList';
-
-const DIFFICULTIES: Difficulty[] = ['hell', 'nightmare', 'normal'];
 
 interface FarmingLocationsTableProps {
   locations: FarmingLocation[];
@@ -114,13 +113,13 @@ export function FarmingLocationsTable(props: FarmingLocationsTableProps) {
       <CardContent>
         <Tabs defaultValue="hell">
           <TabsList aria-label={t(translations.farming.locations.difficulty)}>
-            {DIFFICULTIES.map((difficulty) => (
+            {FARMING_DIFFICULTY_ORDER.map((difficulty) => (
               <TabsTrigger key={difficulty} value={difficulty}>
                 {t(translations.farming.difficulties[difficulty])}
               </TabsTrigger>
             ))}
           </TabsList>
-          {DIFFICULTIES.map((difficulty) => (
+          {FARMING_DIFFICULTY_ORDER.map((difficulty) => (
             <TabsContent key={difficulty} value={difficulty} className="pt-2">
               <DifficultyLocations {...props} difficulty={difficulty} />
             </TabsContent>

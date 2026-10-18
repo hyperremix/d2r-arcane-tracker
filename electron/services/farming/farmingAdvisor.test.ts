@@ -109,7 +109,7 @@ describe('When the farming locations are built from the game data', () => {
     });
   });
 
-  it('Then super uniques are 3 levels above the area, or above their own fixed level', () => {
+  it('If a super unique is placed in an area, Then it is 3 levels above the area, or above its own fixed level', () => {
     // Arrange & Act
     const countess = find('superUnique:The Countess:hell');
     const griswold = find('superUnique:Griswold:hell');
@@ -120,7 +120,7 @@ describe('When the farming locations are built from the game data', () => {
     expect(griswold?.spawns[0]?.level).toBe(87);
   });
 
-  it('Then bosses keep their own level and treasure class', () => {
+  it('If a boss is placed in an area, Then it keeps its own level and treasure class', () => {
     // Arrange & Act
     const andariel = find('boss:andariel:hell');
 

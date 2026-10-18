@@ -9,11 +9,13 @@
  * ...), for example `<D2R>/Data/global/excel` after extracting the game files. Without treasure
  * class names, every treasure class d2data has a file for is compared, for each difficulty, inside
  * and outside terror zones, and for the NoDrop player counts 1 and 3. The script prints the
- * treasure classes whose expected drops differ by more than 0.1% for any item, and the Hell
- * Countess rune rates for comparison with a published table.
+ * treasure classes whose expected drops differ by more than 0.1% for any item, the Hell Countess
+ * rune rates for comparison with a published table, and the levels.txt name of the area of each
+ * listed super unique and boss (electron/data/farmingLocations.ts) to check the placements by eye.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { BOSS_AREA_IDS, SUPER_UNIQUE_AREA_IDS } from '../electron/data/farmingLocations';
 import {
   type DropConditionContext,
   getActiveEntries,
@@ -122,4 +124,27 @@ if (dataset.treasureClasses.has('Countess (H)')) {
     return `${code} 1:${Math.round(1 / drops)}`;
   });
   console.log(`Countess (H) runes at /players 1: ${rates.join(', ')}`);
+}
+
+// The placements are a hand-made list, so print where each one stands to check them by eye
+console.log('Listed super unique and boss areas (levels.txt Id: Name):');
+const placements = [
+  ...Object.entries(SUPER_UNIQUE_AREA_IDS).map(([key, areaId]) => ({
+    kind: 'superUnique',
+    key,
+    areaId,
+    found: dataset.superUniques.has(key),
+  })),
+  ...Object.entries(BOSS_AREA_IDS).map(([key, areaId]) => ({
+    kind: 'boss',
+    key,
+    areaId,
+    found: dataset.monsters.has(key),
+  })),
+];
+for (const { kind, key, areaId, found } of placements) {
+  const area = dataset.areas.get(areaId);
+  console.log(
+    `${kind} ${key}${found ? '' : ' (NOT IN THE TABLES)'} -> ${areaId}: ${area?.name ?? 'NO SUCH AREA'}`,
+  );
 }

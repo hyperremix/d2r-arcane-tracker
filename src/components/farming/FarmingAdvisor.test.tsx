@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { FarmingOverview, Item, TerrorZoneSchedule } from 'electron/types/grail';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { FARMING_INPUT_DEBOUNCE_MS } from '@/lib/farming';
 import { useFarmingSessionStore } from '@/stores/farmingSessionStore';
 import { useGrailStore } from '@/stores/grailStore';
 import { FarmingAdvisor } from './FarmingAdvisor';
@@ -179,6 +180,40 @@ describe('When the farming advisor page is shown', () => {
     expect(within(next).getByText('Lut Gholein Sewers')).toBeInTheDocument();
   });
 
+  it('If a terror zone has no entry in the overview, Then its card says there is no drop data', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(readyOverview);
+
+    // Act
+    setup(getOverview);
+
+    // Assert
+    const next = await screen.findByTestId('farming-terror-zone-next');
+    expect(
+      within(next).getByText('The game files have no drop data for this terror zone.'),
+    ).toBeInTheDocument();
+    expect(within(next).queryByText(/Missing items that can drop here/)).not.toBeInTheDocument();
+    const current = screen.getByTestId('farming-terror-zone-current');
+    expect(
+      within(current).queryByText('The game files have no drop data for this terror zone.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Then the terror zones section points to the assumed monster level rules', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(readyOverview);
+
+    // Act
+    setup(getOverview);
+
+    // Assert
+    expect(
+      await screen.findByText(
+        'Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('If a location is expanded and an item selected, Then the item details open', async () => {
     // Arrange
     const getOverview = vi.fn().mockResolvedValue(readyOverview);
@@ -210,5 +245,33 @@ describe('When the farming advisor page is shown', () => {
         characterLevel: 75,
       }),
     );
+  });
+
+  it('If the character level is typed in, Then the field follows at once and the overview is requested once after a pause', async () => {
+    // Arrange
+    const getOverview = vi.fn().mockResolvedValue(readyOverview);
+    setup(getOverview);
+    const input = await screen.findByLabelText('Character level');
+    getOverview.mockClear();
+
+    // Act
+    fireEvent.change(input, { target: { value: '7' } });
+    fireEvent.change(input, { target: { value: '75' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FARMING_INPUT_DEBOUNCE_MS - 1);
+    });
+    const callsBeforePause = getOverview.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // Assert
+    expect(input).toHaveValue(75);
+    expect(callsBeforePause).toBe(0);
+    expect(getOverview).toHaveBeenCalledTimes(1);
+    expect(getOverview).toHaveBeenCalledWith({
+      itemIds: ['harlequincrest', 'ber'],
+      characterLevel: 75,
+    });
   });
 });

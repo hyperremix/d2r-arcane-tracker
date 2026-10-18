@@ -86,6 +86,8 @@
       "next": "Next terror zone",
       "none": "No terror zone",
       "unavailable": "The terror zones can't be read from the game files of your D2R installation.",
+      "zoneUnavailable": "The game files have no drop data for this terror zone.",
+      "assumption": "Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.",
       "itemsWhenTerrorized": "Missing items that can drop here when terrorized",
       "difficultyItems_one": "{{difficulty}}: {{count}} item, monster level {{level}}",
       "difficultyItems_other": "{{difficulty}}: {{count}} items, monster level {{level}}"
@@ -109,7 +111,7 @@
       "terrorized": "Terror zone",
       "showAll": "Show all {{count}}",
       "showFewer": "Show fewer",
-      "note": "Drop rates are the average number of drops per kill, from the drop tables of your game files. Whether the item drops ethereal isn't included.",
+      "note": "Drop rates are the average number of drops per kill, from the drop tables of your game files. Whether the item drops ethereal isn't included. Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.",
       "unavailable": "Drop rates need the extracted game files of your D2R installation.",
       "openAdvisor": "Open the farming advisor"
     }

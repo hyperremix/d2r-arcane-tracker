@@ -66,6 +66,8 @@ export const SUPER_UNIQUE_AREA_IDS: Readonly<Record<string, number>> = {
  * Area of each boss that isn't a super unique, by monstats.txt Id. The bosses of the Uber
  * Tristram and Pandemonium events are left out; the Colossal Summit ancients of Reign of the
  * Warlock are included because their treasure classes are the drop source of the colossal jewels.
+ * Hephasto the Armorer is in the super uniques above as The Feature Creep (monster hephasto,
+ * River of Flame, area 107).
  */
 export const BOSS_AREA_IDS: Readonly<Record<string, number>> = {
   bloodraven: 17,

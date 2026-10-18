@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { formatClockDuration } from '@/lib/date';
+import { FARMING_DIFFICULTY_ORDER } from '@/lib/farming';
 import { useTerrorZoneSchedule } from '../terror-zone/useTerrorZoneSchedule';
 import { formatLevelRange } from './dropRateText';
 import { FarmingItemList } from './FarmingItemList';
-
-const DIFFICULTY_ORDER = ['hell', 'nightmare', 'normal'] as const;
 
 interface ZoneCardProps {
   title: string;
@@ -32,28 +31,36 @@ function ZoneCard({ title, slot, timing, zones, items, onSelectItem, testId }: Z
         {slot ? (
           <>
             <p className="font-display font-semibold text-xl">{slot.zoneName}</p>
-            <p className="text-muted-foreground text-sm">
-              {t(translations.farming.terrorZones.itemsWhenTerrorized)}
-            </p>
-            {DIFFICULTY_ORDER.map((difficulty) => {
-              const zone = zoneDrops.find((drop) => drop.difficulty === difficulty);
-              if (!zone) return null;
-              const zoneItems = zone.itemIndexes.flatMap((index) =>
-                items[index] ? [items[index]] : [],
-              );
-              return (
-                <FarmingItemList
-                  key={difficulty}
-                  label={t(translations.farming.terrorZones.difficultyItems, {
-                    difficulty: t(translations.farming.difficulties[difficulty]),
-                    count: zoneItems.length,
-                    level: formatLevelRange(t, zone.monsterLevel),
-                  })}
-                  items={zoneItems}
-                  onSelectItem={onSelectItem}
-                />
-              );
-            })}
+            {zoneDrops.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {t(translations.farming.terrorZones.zoneUnavailable)}
+              </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground text-sm">
+                  {t(translations.farming.terrorZones.itemsWhenTerrorized)}
+                </p>
+                {FARMING_DIFFICULTY_ORDER.map((difficulty) => {
+                  const zone = zoneDrops.find((drop) => drop.difficulty === difficulty);
+                  if (!zone) return null;
+                  const zoneItems = zone.itemIndexes.flatMap((index) =>
+                    items[index] ? [items[index]] : [],
+                  );
+                  return (
+                    <FarmingItemList
+                      key={difficulty}
+                      label={t(translations.farming.terrorZones.difficultyItems, {
+                        difficulty: t(translations.farming.difficulties[difficulty]),
+                        count: zoneItems.length,
+                        level: formatLevelRange(t, zone.monsterLevel),
+                      })}
+                      items={zoneItems}
+                      onSelectItem={onSelectItem}
+                    />
+                  );
+                })}
+              </>
+            )}
           </>
         ) : (
           <p className="text-muted-foreground">{t(translations.farming.terrorZones.none)}</p>
@@ -121,6 +128,11 @@ export function TerrorZoneFarming({ zones, items, onSelectItem }: TerrorZoneFarm
             onSelectItem={onSelectItem}
           />
         </div>
+      )}
+      {zones.length > 0 && (
+        <p className="text-muted-foreground text-xs">
+          {t(translations.farming.terrorZones.assumption)}
+        </p>
       )}
     </section>
   );

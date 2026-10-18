@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { FarmingItemSource, FarmingItemSources } from 'electron/types/grail';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { FARMING_INPUT_DEBOUNCE_MS } from '@/lib/farming';
 import { useFarmingSessionStore } from '@/stores/farmingSessionStore';
 import { ItemFarmingSources } from './ItemFarmingSources';
 
@@ -44,6 +45,7 @@ describe('When the farming sources of an item are shown', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     window.electronAPI = originalElectronAPI;
   });
 
@@ -79,6 +81,11 @@ describe('When the farming sources of an item are shown', () => {
     expect(keep).toHaveTextContent('Terror zone');
     expect(keep).toHaveTextContent('Hell · Monsters');
     expect(keep).toHaveTextContent('1 in 120,000 to 1 in 250,000');
+    expect(
+      screen.getByText(
+        /Terror zone monster levels follow assumed rules, described in the Farming Advisor guide\./,
+      ),
+    ).toBeInTheDocument();
     expect(getItemSources).toHaveBeenCalledWith({
       itemId: 'harlequincrest',
       players: 1,
@@ -105,6 +112,38 @@ describe('When the farming sources of an item are shown', () => {
         characterLevel: 85,
       }),
     );
+  });
+
+  it('If /players and magic find are typed in, Then the inputs follow at once and the sources are requested once after a pause', async () => {
+    // Arrange
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const getItemSources = setup({ status: 'ready', known: true, sources: [source({})] });
+    await screen.findByRole('table');
+    getItemSources.mockClear();
+
+    // Act
+    fireEvent.change(screen.getByLabelText('Magic find'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Magic find'), { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText('Magic find'), { target: { value: '300' } });
+    const shownImmediately = screen.getByLabelText('Magic find');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FARMING_INPUT_DEBOUNCE_MS - 1);
+    });
+    const callsBeforePause = getItemSources.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // Assert
+    expect(shownImmediately).toHaveValue(300);
+    expect(callsBeforePause).toBe(0);
+    expect(getItemSources).toHaveBeenCalledTimes(1);
+    expect(getItemSources).toHaveBeenCalledWith({
+      itemId: 'harlequincrest',
+      players: 1,
+      magicFind: 300,
+      characterLevel: 85,
+    });
   });
 
   it('If there are many sources, Then the list can be expanded', async () => {
