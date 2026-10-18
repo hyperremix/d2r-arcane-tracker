@@ -4,7 +4,7 @@ Releases ship as a Windows NSIS installer and a Linux AppImage on [GitHub Releas
 
 ## Steps
 
-1. **Check `main`**: CI is green, and the [manual checks](#manual-checks) pass on Windows.
+1. **Check `main`**: CI is green, and the [manual checks](#manual-checks) pass on Windows and, if you can, on Linux or a Steam Deck.
 2. **Bump the version** (updates `package.json`, commits, tags `vX.Y.Z` and pushes):
 
    ```bash

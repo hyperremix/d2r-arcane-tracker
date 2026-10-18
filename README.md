@@ -49,6 +49,7 @@ For D2R running through Proton or Wine: the Steam release, Battle.net added to S
 Good to know:
 
 - If the AppImage doesn't start and mentions FUSE, install your distribution's `libfuse2` package, or start it with `--appimage-extract-and-run`.
+- On distributions that restrict unprivileged user namespaces (for example Ubuntu 24.04), the AppImage's Chromium sandbox may stop it from starting. This hasn't been tested.
 - In Game Mode, Steam shows one game at a time. Play in Desktop Mode to keep the tracker open next to D2R. You can add the AppImage to Steam with **Add a Non-Steam Game** to start it from Game Mode.
 - Run Tracker [auto mode](docs/RUN_TRACKER.md#auto-mode-windows-only) is Windows-only. Use the manual controls and shortcuts instead.
 - Linux support is new and hasn't been tested on a Steam Deck yet. If something doesn't work, please [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues).

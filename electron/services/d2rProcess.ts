@@ -17,6 +17,9 @@ function isD2RExecutable(executable: string): boolean {
   return name.toLowerCase() === D2R_PROCESS_NAME.toLowerCase();
 }
 
+/** The D2R executable at the start of a command line, with or without arguments after it. */
+const D2R_COMMAND_LINE = /(?:^|[\\/])D2R\.exe(?:\s|$)/i;
+
 /**
  * Checks whether one `/proc/<pid>` entry is D2R. Wine and Proton name the process after the
  * Windows executable (`comm` is `D2R.exe`) and rewrite its command line to the Windows one, so
@@ -31,7 +34,7 @@ async function isD2RLinuxProcess(processDir: string): Promise<boolean> {
       return true;
     }
     const cmdline = await readFile(path.join(processDir, 'cmdline'), 'utf8');
-    return isD2RExecutable(cmdline.split('\0')[0] ?? '');
+    return D2R_COMMAND_LINE.test(cmdline.split('\0')[0] ?? '');
   } catch {
     return false;
   }

@@ -67,9 +67,11 @@ describe('When D2R folders are looked up in Wine and Proton prefixes', () => {
       // Arrange
       const steamApps = createFolder('.local', 'share', 'Steam', 'steamapps');
       const sdCard = createFolder('run', 'media', 'deck', 'SD');
+      // Steam writes a backslash in a path as two, so Windows paths (CI) are escaped like that
+      const vdfSdCard = sdCard.replace(/\\/g, '\\\\');
       writeFileSync(
         path.join(steamApps, 'libraryfolders.vdf'),
-        `"libraryfolders"\n{\n\t"1"\n\t{\n\t\t"path"\t\t"${sdCard}"\n\t}\n}\n`,
+        `"libraryfolders"\n{\n\t"1"\n\t{\n\t\t"path"\t\t"${vdfSdCard}"\n\t}\n}\n`,
       );
       const sdSaves = createSaveFolder(
         path.join('run', 'media', 'deck', 'SD', 'steamapps', 'compatdata', '2536520', 'pfx'),
@@ -92,6 +94,21 @@ describe('When D2R folders are looked up in Wine and Proton prefixes', () => {
       // Assert
       expect(saves).toEqual([sdSaves]);
       expect(installs).toEqual([sdInstall]);
+    });
+
+    it('Then the Steam release is found even when compatdata has more entries than are read', () => {
+      // Arrange
+      const compatdata = path.join('.local', 'share', 'Steam', 'steamapps', 'compatdata');
+      for (let id = 1000000; id < 1000600; id++) {
+        createFolder(compatdata, String(id));
+      }
+      const steamRelease = createSaveFolder(path.join(compatdata, '2536520', 'pfx'), 'steamuser');
+
+      // Act
+      const saves = findWineSaveDirectories(home, {});
+
+      // Assert
+      expect(saves).toEqual([steamRelease]);
     });
 
     it('Then a Steam folder reached through the ~/.steam/steam link is found once', () => {
@@ -121,6 +138,10 @@ describe('When D2R folders are looked up in Wine and Proton prefixes', () => {
         path.join('Games', 'Heroic', 'Prefixes', 'default'),
         'steamuser',
       );
+      const heroicGame = createSaveFolder(
+        path.join('Games', 'Heroic', 'Prefixes', 'default', 'Diablo II Resurrected'),
+        'steamuser',
+      );
       const bottles = createSaveFolder(
         path.join('.local', 'share', 'bottles', 'bottles', 'Battle.net'),
         'deck',
@@ -131,7 +152,7 @@ describe('When D2R folders are looked up in Wine and Proton prefixes', () => {
       const saves = findWineSaveDirectories(home, {});
 
       // Assert
-      expect(saves).toEqual([wine, lutris, heroic, bottles]);
+      expect(saves).toEqual([wine, lutris, heroic, heroicGame, bottles]);
     });
 
     it('Then the prefix in WINEPREFIX is searched first and the Public profile is skipped', () => {

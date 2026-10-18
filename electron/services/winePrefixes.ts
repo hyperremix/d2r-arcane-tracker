@@ -1,18 +1,18 @@
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import { D2R_SAVE_FOLDER_NAME } from './saveDirectoryInspector';
+import { CHARACTER_SAVE_EXTENSION, D2R_SAVE_FOLDER_NAME } from './saveDirectoryInspector';
 
 /**
  * Finds Diablo II: Resurrected save and install folders inside the Wine prefixes Linux players run
  * the game in: Steam's Proton prefixes (the Steam release and Battle.net added as a non-Steam
- * game), Lutris, Heroic, Bottles and plain Wine. Only fixed, well-known locations are checked, one
- * folder level of prefixes deep, and unreadable folders are skipped.
+ * game), Lutris, Heroic, Bottles and plain Wine. Well-known locations and `$WINEPREFIX` are
+ * checked, one folder level of prefixes deep, and unreadable folders are skipped.
  */
 
 /** Steam app ID of the Steam release of Diablo II: Resurrected. */
-export const D2R_STEAM_APP_ID = '2536520';
+const D2R_STEAM_APP_ID = '2536520';
 
-/** At most this many entries are read from a folder that holds prefixes (e.g. `compatdata`). */
+/** Only the first this many entries (by name) of a folder that holds prefixes are used. */
 const MAX_FOLDER_ENTRIES = 500;
 
 /** Steam installation folders, relative to the home folder (native, Debian package, Flatpak). */
@@ -28,11 +28,13 @@ const STEAM_ROOTS = [
 /**
  * Folders whose subfolders are Wine prefixes, relative to the home folder: Lutris installs into
  * `~/Games/<game>` (Battle.net in `~/Games/battlenet`), Heroic into `~/Games/Heroic/Prefixes/<game>`
- * and Bottles into `bottles/bottles/<bottle>` (native and Flatpak).
+ * or, in its default prefix folder, `~/Games/Heroic/Prefixes/default/<game>`, and Bottles into
+ * `bottles/bottles/<bottle>` (native and Flatpak).
  */
 const PREFIX_PARENTS = [
   'Games',
   'Games/Heroic/Prefixes',
+  'Games/Heroic/Prefixes/default',
   '.local/share/bottles/bottles',
   '.var/app/com.usebottles.bottles/data/bottles/bottles',
 ];
@@ -105,15 +107,14 @@ function findSteamLibraries(home: string): string[] {
 }
 
 /**
- * Lists the Proton prefixes of a Steam library, the Steam release of D2R first.
+ * Lists the Proton prefixes of a Steam library, the Steam release of D2R first. That one is added
+ * directly, so the cap on the listed entries can't cut it; prefixes that don't exist are dropped
+ * later.
  */
 function listProtonPrefixes(library: string): string[] {
   const compatdata = path.join(library, 'steamapps', 'compatdata');
-  const appIds = listFolderNames(compatdata);
-  const ordered = appIds.includes(D2R_STEAM_APP_ID)
-    ? [D2R_STEAM_APP_ID, ...appIds.filter((appId) => appId !== D2R_STEAM_APP_ID)]
-    : appIds;
-  return ordered.map((appId) => path.join(compatdata, appId, 'pfx'));
+  const appIds = listFolderNames(compatdata).filter((appId) => appId !== D2R_STEAM_APP_ID);
+  return [D2R_STEAM_APP_ID, ...appIds].map((appId) => path.join(compatdata, appId, 'pfx'));
 }
 
 /**
@@ -140,7 +141,9 @@ function findWinePrefixes(home: string, winePrefix: string | undefined): string[
 /** Checks whether a folder directly contains a `.d2s` character save file. */
 function hasCharacterSaveFiles(folder: string): boolean {
   try {
-    return readdirSync(folder).some((name) => path.extname(name).toLowerCase() === '.d2s');
+    return readdirSync(folder).some(
+      (name) => path.extname(name).toLowerCase() === CHARACTER_SAVE_EXTENSION,
+    );
   } catch {
     return false;
   }

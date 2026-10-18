@@ -18,7 +18,7 @@ export const MAX_SAVE_DIRECTORY_PATH_LENGTH = 4096;
  */
 const MAX_ANCESTOR_DEPTH = 8;
 
-const CHARACTER_SAVE_EXTENSION = '.d2s';
+export const CHARACTER_SAVE_EXTENSION = '.d2s';
 
 /**
  * Checks whether a folder name is the D2R save folder name (case-insensitive).

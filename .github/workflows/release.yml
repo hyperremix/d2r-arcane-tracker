@@ -8,26 +8,36 @@ on:
   push:
     tags: ["v*.*.*"]
 
+# Nothing gets write access unless a job asks for it: every job below needs `contents: write` (to
+# create the draft or to upload to it), so it is granted per job
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Created once up front, so the parallel builds upload to the same draft instead of racing to
   # create one each
   draft:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # `gh release view <tag>` doesn't find drafts, so a re-run would create a second draft;
+        # `gh release list` includes them
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+          existing=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
+            | jq -r --arg tag "$GITHUB_REF_NAME" '.[] | select(.tagName == $tag) | .tagName')
+          if [ -z "$existing" ]; then
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --draft --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
           fi
 
   build:
     needs: draft
+    permissions:
+      contents: write
     strategy:
       # One platform failing must not cancel the other's upload
       fail-fast: false

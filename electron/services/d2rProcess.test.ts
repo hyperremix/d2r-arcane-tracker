@@ -132,6 +132,19 @@ describe('When the D2R process is looked up on Linux', () => {
       // Assert
       expect(processId).toBe(77);
     });
+
+    it('Then it is found when the command line is one space-separated string', async () => {
+      // Arrange
+      addProcess('88', 'wine64-preloader', [
+        'C:\\Program Files (x86)\\Diablo II Resurrected\\D2R.exe -w',
+      ]);
+
+      // Act
+      const processId = await findD2RProcessOnLinux(procRoot);
+
+      // Assert
+      expect(processId).toBe(88);
+    });
   });
 
   describe('If only other processes run', () => {
@@ -141,6 +154,7 @@ describe('When the D2R process is looked up on Linux', () => {
         'C:\\Program Files (x86)\\Diablo II Resurrected\\Diablo II Resurrected Launcher.exe',
       ]);
       addProcess('13', 'vim', ['vim', 'D2R.exe']);
+      addProcess('14', 'sh', ['vim D2R.exe']);
       mkdirSync(path.join(procRoot, 'self'));
       writeFileSync(path.join(procRoot, 'uptime'), '1.0 1.0');
 
