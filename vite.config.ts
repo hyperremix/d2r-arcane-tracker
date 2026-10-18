@@ -35,12 +35,30 @@ function copyMigrations(): Plugin {
   };
 }
 
+/**
+ * Empties `dist-electron` before a build. vite-plugin-electron builds the main process and preload
+ * into it with `emptyOutDir: false` (they share the folder), so hashed chunks of earlier builds
+ * would pile up and electron-builder would pack them all into the app archive. The plugin builds
+ * them after the renderer bundle closes, so emptying the folder when the renderer build starts
+ * runs first.
+ */
+function emptyElectronOutDir(): Plugin {
+  return {
+    name: 'empty-electron-out-dir',
+    apply: 'build',
+    buildStart() {
+      rmSync(path.resolve(__dirname, 'dist-electron'), { recursive: true, force: true });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
     alias: [...getSourceAliases(__dirname), ...d2sSourceAliases],
   },
   plugins: [
+    emptyElectronOutDir(),
     tailwindcss(),
     react(),
     electron({
