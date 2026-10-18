@@ -4,6 +4,7 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
+  Crosshair,
   PackageSearch,
   Settings,
   Skull,
@@ -47,12 +48,14 @@ const PRIMARY_NAVIGATION_ITEMS: NavigationItem[] = [
 ];
 
 /**
- * Secondary destinations (Terror zones and Settings) shown as icon-only links after the
- * primary navigation.
+ * Secondary destinations (Farming advisor, Terror zones and Settings) shown as icon-only links
+ * after the primary navigation.
+ * The farming advisor uses `Crosshair`, for picking a target to hunt.
  * Terror Zones uses `Skull`, which reads as the dangerous, empowered zones of D2R. A map pin
  * reads as a profile avatar at icon size, and a warning icon would read as an error state.
  */
 const SECONDARY_NAVIGATION_ITEMS: NavigationItem[] = [
+  { to: '/farming', labelKey: translations.titleBar.farming, icon: Crosshair },
   { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: Skull },
   { to: '/settings', labelKey: translations.titleBar.settings, icon: Settings },
 ];

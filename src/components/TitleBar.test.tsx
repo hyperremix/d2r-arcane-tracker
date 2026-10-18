@@ -36,6 +36,7 @@ function renderTitleBar(initialPath = '/') {
       '/runs/:id',
       '/runewords',
       '/inventory-browser',
+      '/farming',
       '/terror-zones',
       '/settings',
     ].map((path) => ({
@@ -114,12 +115,13 @@ describe('When TitleBar is rendered', () => {
       'Runs',
       'Runewords',
       'Inventory',
+      'Farming advisor',
       'Terror zones',
       'Settings',
     ]);
   });
 
-  it('Then the daily destinations come first and Terror zones and Settings follow as a separate group', () => {
+  it('Then the daily destinations come first and Farming advisor, Terror zones and Settings follow as a separate group', () => {
     // Arrange & Act
     renderTitleBar();
 
@@ -134,7 +136,7 @@ describe('When TitleBar is rendered', () => {
       within(secondary)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Terror zones', 'Settings']);
+    ).toEqual(['Farming advisor', 'Terror zones', 'Settings']);
   });
 
   it('Then primary link labels are visible from the lg breakpoint and hidden text below it', () => {
@@ -157,12 +159,12 @@ describe('When TitleBar is rendered', () => {
     expect(link.querySelector('svg.lucide-map-pinned')).toBeNull();
   });
 
-  it('Then Terror zones and Settings are icon-only links with an accessible name at every width', () => {
+  it('Then Farming advisor, Terror zones and Settings are icon-only links with an accessible name at every width', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
-    for (const name of ['Terror zones', 'Settings']) {
+    for (const name of ['Farming advisor', 'Terror zones', 'Settings']) {
       const label = getLinkLabel(name);
       expect(label).toHaveClass('sr-only');
       expect(label).not.toHaveClass('lg:not-sr-only');

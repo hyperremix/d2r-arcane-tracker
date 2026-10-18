@@ -1,6 +1,7 @@
 import type { Item } from 'electron/types/grail';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ItemFarmingSources } from '@/components/farming/ItemFarmingSources';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -156,6 +157,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         <div className="-mx-6 min-h-0 flex-1 overflow-y-auto">
           <div className="grid gap-6 px-6">
             <ItemInfoSection item={item} />
+
+            <ItemFarmingSources item={item} characters={characters} />
 
             {characters.length > 0 && (
               <div className="border-t pt-4">
