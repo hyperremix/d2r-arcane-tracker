@@ -1097,12 +1097,16 @@
       "adjustFilters": "Try adjusting your filters or search term",
       "availabilityLegend": "Show runewords",
       "availability": {
+        "ready": "Ready now",
         "craftable": "Craftable now",
+        "upgradable": "With upgrades",
         "missingOne": "Missing ≤ 1"
       },
       "refreshRunes": "Refresh runes",
       "refreshFailed": "Failed to refresh runes from save files",
       "noCraftable": "You can't craft any runeword with your current runes",
+      "showCraftable": "Show craftable runewords",
+      "showUpgradable": "Show runewords you can make with upgrades",
       "showMissingOne": "Show runewords missing at most 1 rune",
       "showAll": "Show all runewords"
     },
@@ -1111,7 +1115,17 @@
       "sockets_other": "{{count}} sockets",
       "runesOwned": "{{available}}/{{total}} runes",
       "runesOwnedLabel": "{{available}} of {{total}} runes available",
-      "missingRuneTooltip": "{{rune}} (missing)"
+      "missingRuneTooltip": "{{rune}} (missing)",
+      "makeableWithUpgrades": "Makeable with upgrades",
+      "upgradePlanLabel": "Horadric Cube rune upgrades",
+      "upgradeStepWithGem": "Cube {{count}} {{rune}} + {{gem}} → {{result}}",
+      "upgradeStepWithoutGem": "Cube {{count}} {{rune}} → {{result}}",
+      "upgradeStepRepeat_one": "{{step}}",
+      "upgradeStepRepeat_other": "{{step}}, {{count}} times",
+      "ownedBases_one": "{{count}} owned base",
+      "ownedBases_other": "{{count}} owned bases",
+      "noOwnedBase": "No owned base",
+      "baseLocation": "{{source}}, {{location}}"
     },
     "filters": {
       "matchAllHint": "Shows runewords that use all selected runes",

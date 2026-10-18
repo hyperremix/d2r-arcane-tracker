@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RunewordReadiness } from '@/lib/runeword-readiness';
 import { RunewordCard } from './RunewordCard';
 
 function createRuneword(runes: string[] | undefined, link = ''): Item {
@@ -138,5 +139,62 @@ describe('RunewordCard', () => {
 
     // Assert
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('When upgrades make the missing runes, Then each step names the runes and gem it takes and how often', () => {
+    // Arrange
+    stubElectronApi();
+    const readiness: RunewordReadiness = {
+      upgradePlan: [
+        { runeId: 'nef', runeCount: 3, resultRuneId: 'eth', times: 1 },
+        { runeId: 'lem', runeCount: 3, gemCode: 'gfg', resultRuneId: 'pul', times: 2 },
+      ],
+      bases: [],
+    };
+
+    // Act
+    render(
+      <RunewordCard
+        runeword={createRuneword(['eth', 'pul', 'pul'])}
+        availableRunes={{}}
+        readiness={readiness}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByText('Makeable with upgrades')).toBeInTheDocument();
+    const plan = screen.getByRole('list', { name: 'Horadric Cube rune upgrades' });
+    expect(
+      within(plan)
+        .getAllByRole('listitem')
+        .map((step) => step.textContent),
+    ).toEqual(['Cube 3 Nef → Eth', 'Cube 3 Lem + Flawed Emerald → Pul, 2 times']);
+  });
+
+  it('If every rune is owned, Then no upgrade plan or upgrade badge is shown', () => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(
+      <RunewordCard
+        runeword={createRuneword(['tir', 'el'])}
+        availableRunes={{ tir: 1, el: 1 }}
+        readiness={{ upgradePlan: [], bases: [] }}
+      />,
+    );
+
+    // Assert
+    expect(screen.queryByText('Makeable with upgrades')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('If the card has no readiness, Then it shows neither an upgrade plan nor owned bases', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el']);
+
+    // Assert
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByText('No owned base')).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { Item } from 'electron/types/grail';
+import type { CharacterInventorySnapshot, Item, ParsedInventoryItem } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunewordCalculator } from './RunewordCalculator';
@@ -31,14 +31,66 @@ const infinity = createRuneword('infinity', 'Infinity', ['ber', 'mal', 'ber', 'i
 const windowGlobals = window as unknown as Record<string, unknown>;
 let originalElectronAPI: PropertyDescriptor | undefined;
 
+function createSaveItem(
+  overrides: Partial<ParsedInventoryItem>,
+  raw: Record<string, unknown> = {},
+): ParsedInventoryItem {
+  return {
+    fingerprint: `fp-${overrides.itemName}-${overrides.gridX ?? 0}`,
+    characterName: 'Sorc',
+    sourceFileType: 'd2s',
+    sourceFilePath: '/saves/Sorc.d2s',
+    locationContext: 'inventory',
+    itemName: 'Item',
+    quality: 'normal',
+    ethereal: false,
+    socketCount: 0,
+    rawItemJson: JSON.stringify(raw),
+    seenAt: new Date('2026-10-18T10:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+/** An empty two-socket normal sword in the shared stash: a base for Steel. */
+const crystalSword = createSaveItem(
+  {
+    itemName: 'Crystal Sword',
+    itemCode: 'crs',
+    sourceFileType: 'd2i',
+    sourceFilePath: '/saves/SharedStashSoftCoreV2.d2i',
+    locationContext: 'stash',
+    stashTab: 2,
+    ethereal: true,
+  },
+  {
+    quality: 2,
+    total_nr_of_sockets: 2,
+    nr_of_items_in_sockets: 0,
+    categories: ['Sword', 'Swords and Knives', 'Melee Weapon', 'Weapon'],
+  },
+);
+
+function createSnapshot(items: ParsedInventoryItem[]): CharacterInventorySnapshot {
+  return {
+    snapshotId: 'snapshot-1',
+    characterName: 'Sorc',
+    sourceFileType: 'd2s',
+    sourceFilePath: '/saves/Sorc.d2s',
+    capturedAt: new Date('2026-10-18T10:00:00.000Z'),
+    items,
+  };
+}
+
 interface ElectronApiOptions {
   runewords?: Item[];
   availableRunes?: Record<string, number>;
+  inventoryItems?: ParsedInventoryItem[];
 }
 
 function stubElectronApi({
   runewords = [infinity, enigma, steel, stealth],
   availableRunes = { tir: 1, el: 1, tal: 1, eth: 1, jah: 1, ith: 1 },
+  inventoryItems = [],
 }: ElectronApiOptions = {}) {
   const api = {
     grail: { getAllRunewords: vi.fn().mockResolvedValue(runewords) },
@@ -46,6 +98,17 @@ function stubElectronApi({
       refreshSaveFiles: vi.fn().mockResolvedValue({ success: true }),
       getAvailableRunes: vi.fn().mockResolvedValue(availableRunes),
     },
+    inventory: {
+      searchAll: vi.fn().mockResolvedValue({
+        inventory: {
+          snapshots: [createSnapshot(inventoryItems)],
+          totalSnapshots: 1,
+          totalItems: inventoryItems.length,
+        },
+        vault: { items: [], total: 0, page: 1, pageSize: 200 },
+      }),
+    },
+    vault: { search: vi.fn() },
     icon: { getByFilename: vi.fn().mockResolvedValue(undefined) },
     shell: { openExternal: vi.fn() },
   };
@@ -172,6 +235,97 @@ describe('RunewordCalculator', () => {
       // Assert
       expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByText('Showing 4 of 4 runewords')).toBeInTheDocument();
+    });
+  });
+
+  describe('readiness', () => {
+    it('When Ready now is selected, then only craftable runewords with an owned base show', async () => {
+      // Arrange
+      stubElectronApi({ inventoryItems: [crystalSword] });
+      await renderCalculator();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Ready now' }));
+
+      // Assert
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Steel']);
+      expect(within(getCard('Steel')).getByRole('button', { name: '1 owned base' })).toBeVisible();
+    });
+
+    it('When an owned base is expanded, then it shows its name, ethereal flag and location', async () => {
+      // Arrange
+      stubElectronApi({ inventoryItems: [crystalSword] });
+      await renderCalculator();
+      const steelCard = getCard('Steel');
+
+      // Act
+      fireEvent.click(within(steelCard).getByRole('button', { name: '1 owned base' }));
+
+      // Assert
+      await waitFor(() => expect(within(steelCard).getByText('Crystal Sword')).toBeVisible());
+      expect(within(steelCard).getByText('Ethereal')).toBeVisible();
+      expect(within(steelCard).getByText('Shared stash, Stash tab 3')).toBeVisible();
+    });
+
+    it('If no owned base fits a runeword, then its card says so', async () => {
+      // Arrange
+      stubElectronApi({ inventoryItems: [crystalSword] });
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      expect(within(getCard('Stealth')).getByText('No owned base')).toBeVisible();
+    });
+
+    it('When With upgrades is selected, then runewords the owned runes and gems can be cubed into show with their plan', async () => {
+      // Arrange
+      stubElectronApi({
+        availableRunes: { tir: 1, el: 1, jah: 1, ith: 1, sur: 2 },
+        inventoryItems: [createSaveItem({ itemName: 'Flawless Amethyst', itemCode: 'gzv' })],
+      });
+      await renderCalculator();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'With upgrades' }));
+
+      // Assert
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Steel', 'Enigma']);
+      const enigmaCard = getCard('Enigma');
+      expect(within(enigmaCard).getByText('Makeable with upgrades')).toBeVisible();
+      const plan = within(enigmaCard).getByRole('list', { name: 'Horadric Cube rune upgrades' });
+      expect(
+        within(plan)
+          .getAllByRole('listitem')
+          .map((step) => step.textContent),
+      ).toEqual(['Cube 2 Sur + Flawless Amethyst → Ber']);
+    });
+
+    it('If the gem an upgrade needs is not owned, then the runeword is not makeable with upgrades', async () => {
+      // Arrange
+      stubElectronApi({ availableRunes: { tir: 1, el: 1, jah: 1, ith: 1, sur: 2 } });
+      await renderCalculator();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'With upgrades' }));
+
+      // Assert
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Steel']);
+    });
+
+    it('If owned gems and bases cannot be loaded, then runewords still show from the rune counts', async () => {
+      // Arrange
+      const api = stubElectronApi();
+      api.inventory.searchAll.mockRejectedValue(new Error('inventory failed'));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      expect(getCardTitles()).toEqual(['Filter by runes', 'Stealth', 'Steel']);
+      expect(within(getCard('Steel')).getByText('No owned base')).toBeVisible();
+      consoleError.mockRestore();
     });
   });
 
@@ -368,7 +522,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       const steelCard = getCard('Steel');
-      expect(steelCard).toHaveClass('row-span-3', 'grid-rows-subgrid');
+      expect(steelCard).toHaveClass('row-span-4', 'grid-rows-subgrid');
     });
   });
 
@@ -498,7 +652,7 @@ describe('RunewordCalculator', () => {
       await renderCalculator();
 
       // Assert
-      for (const name of ['Craftable now', 'Missing ≤ 1', 'All']) {
+      for (const name of ['Ready now', 'Craftable now', 'With upgrades', 'Missing ≤ 1', 'All']) {
         expect(screen.getByRole('button', { name })).toHaveClass('whitespace-nowrap');
       }
     });
