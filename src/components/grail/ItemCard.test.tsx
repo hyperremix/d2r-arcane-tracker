@@ -419,11 +419,11 @@ describe('When ItemCard is rendered', () => {
   describe('If an icon size preset is passed', () => {
     it.each([
       ['default', 'grid', '40px'],
-      ['large', 'grid', '56px'],
-      ['extraLarge', 'grid', '72px'],
+      ['large', 'grid', '80px'],
+      ['extraLarge', 'grid', '120px'],
       ['default', 'list', '48px'],
-      ['large', 'list', '64px'],
-      ['extraLarge', 'list', '80px'],
+      ['large', 'list', '96px'],
+      ['extraLarge', 'list', '144px'],
     ] as const)('Then the %s icon in the %s view is %s wide and high', (iconSize, viewMode, pixels) => {
       // Arrange
       setupStoreMock({ showItemIcons: true });
@@ -436,6 +436,18 @@ describe('When ItemCard is rendered', () => {
       const artwork = screen.getByRole('img').parentElement;
       const slot = viewMode === 'grid' ? artwork : artwork?.parentElement;
       expect(slot).toHaveStyle({ width: pixels, height: pixels });
+    });
+
+    it('Then the grid icon shrinks to fit a tile narrower than the icon', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+      // Act
+      render(<ItemCard item={item} iconSize="extraLarge" />);
+
+      // Assert
+      expect(screen.getByTestId('item-artwork')).toHaveClass('max-w-full');
     });
 
     it('Then the runeword artwork slot of a grid tile is as high as the icon', () => {
@@ -451,7 +463,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} iconSize="extraLarge" />);
 
       // Assert
-      expect(screen.getByTestId('item-artwork')).toHaveStyle({ height: '72px' });
+      expect(screen.getByTestId('item-artwork')).toHaveStyle({ height: '120px' });
     });
   });
 
@@ -470,7 +482,7 @@ describe('When ItemCard is rendered', () => {
       // Assert
       const slot = container.querySelector('[data-slot="card-content"]')?.firstElementChild;
       expect(slot).toHaveAttribute('aria-hidden', 'true');
-      expect(slot).toHaveStyle({ height: '56px' });
+      expect(slot).toHaveStyle({ height: '80px' });
     });
   });
 

@@ -240,8 +240,8 @@ describe('When getItemRowHeightEstimate is called', () => {
 
   describe('If a larger icon size preset is used', () => {
     it.each([
-      ['large', 128],
-      ['extraLarge', 144],
+      ['large', 152],
+      ['extraLarge', 192],
     ] as const)('Then the %s tile is %ipx high plus the row gap', (iconSize, tileHeight) => {
       // Act
       const estimate = getItemRowHeightEstimate(false, iconSize);
@@ -819,8 +819,8 @@ describe('When VirtualItemGrid estimates the height of rows it has not measured 
 
   describe.each([
     [true, 'default', 112],
-    [true, 'large', 128],
-    [true, 'extraLarge', 144],
+    [true, 'large', 152],
+    [true, 'extraLarge', 192],
     [false, 'extraLarge', 112],
   ] as const)('If item icons are shown is %s and the preset is %s', (showItemIcons, itemIconSize, tileHeight) => {
     it(`Then a row is estimated as a ${tileHeight}px tile plus the row gap`, () => {

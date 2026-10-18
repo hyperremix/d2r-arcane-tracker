@@ -112,10 +112,11 @@ function GridArtwork({
     return <div aria-hidden="true" style={{ height: iconPixels }} />;
   }
 
+  // In the narrowest columns the extra large icon is wider than the tile, so it shrinks to fit
   return (
     <div
       data-testid="item-artwork"
-      className={cn('relative mx-auto', !isFound && missingArtworkStyles)}
+      className={cn('relative mx-auto max-w-full', !isFound && missingArtworkStyles)}
       style={{ width: iconPixels, height: iconPixels }}
     >
       <img

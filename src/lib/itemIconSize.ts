@@ -5,8 +5,8 @@ import type { ItemIconSize, Settings } from 'electron/types/grail';
  */
 export const ITEM_ICON_PIXELS: Record<ItemIconSize, { grid: number; list: number }> = {
   default: { grid: 40, list: 48 },
-  large: { grid: 56, list: 64 },
-  extraLarge: { grid: 72, list: 80 },
+  large: { grid: 80, list: 96 },
+  extraLarge: { grid: 120, list: 144 },
 };
 
 /**

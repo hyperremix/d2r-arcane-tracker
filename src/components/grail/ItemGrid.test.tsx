@@ -873,8 +873,8 @@ describe('When ItemGrid component is rendered', () => {
   describe('If viewMode "list" and an icon size preset is chosen', () => {
     it.each([
       ['default', 80],
-      ['large', 96],
-      ['extraLarge', 112],
+      ['large', 128],
+      ['extraLarge', 176],
     ] as const)('Then the %s preset estimates a list row of %ipx', (itemIconSize, rowHeight) => {
       // Arrange
       const items = HolyGrailItemBuilder.new().buildMany(3);
