@@ -328,8 +328,8 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       const value = screen.getByText(label);
       expect(screen.getByText('Ethereal type:').nextElementSibling).toBe(value);
-      expect(value).not.toHaveClass('text-ethereal');
-      expect(value).not.toHaveClass('text-destructive');
+      expect(value.tagName).toBe('DD');
+      expect(value.className).not.toMatch(/(^|\s)text-/);
     });
 
     it('Then the item facts are a left-aligned two-column definition list', () => {
