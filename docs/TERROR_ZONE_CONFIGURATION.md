@@ -13,7 +13,7 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 
 ## Schedule
 
-Open **Terror zone schedule** with the horned demon head icon (**Terror zones**) next to the settings icon on the right of the title bar. It shows the offline (single-player) rotation in your local time:
+Open **Terror zone schedule** with **Terror zones** in the title bar (in the **More** menu when the window is too narrow to show every page). It shows the offline (single-player) rotation in your local time:
 
 - **Current terror zone**, with the time left in its window, such as *Ends in 12 min* or *Ends in 1 hr 20 min*. The last minute counts down in seconds.
 - **Next terror zone**, with the time until it starts.
