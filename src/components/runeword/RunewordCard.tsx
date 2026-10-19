@@ -157,7 +157,7 @@ export function RunewordCard({
   return (
     <Card
       className={cn(
-        'relative row-span-3 grid grid-rows-subgrid gap-2 px-4 py-3 transition-all hover:shadow-md',
+        'relative row-span-3 grid grid-rows-subgrid gap-1.5 px-4 py-2.5 transition-all hover:shadow-md',
         className,
       )}
     >
