@@ -80,10 +80,15 @@ const readyOverview: FarmingOverviewData = {
   unknownItemIndexes: [],
 };
 
-function setup(getOverview: ReturnType<typeof vi.fn>) {
+function setup(getOverview: ReturnType<typeof vi.fn>, suggestedD2RPath?: string) {
+  const icon = {
+    getSuggestedD2RPath: vi.fn().mockResolvedValue(suggestedD2RPath),
+    setD2RPath: vi.fn().mockResolvedValue(undefined),
+  };
   window.electronAPI = {
     farming: { getOverview },
     terrorZone: { getSchedule: vi.fn().mockResolvedValue(schedule) },
+    icon,
   } as unknown as typeof window.electronAPI;
   render(
     <MemoryRouter initialEntries={['/farming']}>
@@ -143,6 +148,50 @@ describe('When the farming advisor page is shown', () => {
 
     // Assert
     expect(await screen.findByText('Settings page')).toBeInTheDocument();
+  });
+
+  it('If no D2R installation is set, Then the prompt is about drop rates and the missing items are listed', async () => {
+    // Arrange
+    const getOverview = vi
+      .fn()
+      .mockResolvedValue({ status: 'unavailable', errorCode: 'pathNotConfigured' });
+
+    // Act
+    setup(getOverview);
+
+    // Assert
+    const prompt = await screen.findByTestId('d2r-folder-prompt');
+    expect(
+      within(prompt).getByText(/^Drop rates are read from the drop tables/),
+    ).toBeInTheDocument();
+    const missingItems = screen.getByRole('region', { name: 'Missing items' });
+    expect(
+      within(missingItems).getByRole('button', { name: /2 missing items are tracked/ }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(missingItems).getByRole('button', { name: 'Harlequin Crest' }));
+    expect(await screen.findByText('Details of harlequincrest')).toBeInTheDocument();
+    expect(within(missingItems).getByRole('button', { name: 'Ber' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Terror zones' })).not.toBeInTheDocument();
+  });
+
+  it('If a found D2R installation is used, Then the farming data is read again', async () => {
+    // Arrange
+    const getOverview = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'unavailable', errorCode: 'pathNotConfigured' })
+      .mockResolvedValue(readyOverview);
+    setup(getOverview, 'C:\\Program Files (x86)\\Diablo II Resurrected');
+    const useFolder = await screen.findByRole('button', {
+      name: 'Use C:\\Program Files (x86)\\Diablo II Resurrected',
+    });
+
+    // Act
+    fireEvent.click(useFolder);
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'Terror zones' })).toBeInTheDocument();
+    expect(getOverview).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
   });
 
   it('If game files are missing, Then it lists them', async () => {

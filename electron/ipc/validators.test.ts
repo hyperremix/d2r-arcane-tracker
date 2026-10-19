@@ -217,6 +217,16 @@ describe('When renderer arguments are validated against the IPC contract', () =>
   });
 });
 
+describe('When the renderer asks for a suggested D2R installation folder', () => {
+  it('If it sends a folder, Then the folder is dropped so it cannot choose where to look', () => {
+    // Arrange & Act
+    const result = validate('icon:getSuggestedD2RPath', 'C:\\Windows\\System32');
+
+    // Assert
+    expect(result).toEqual([]);
+  });
+});
+
 describe('When the renderer sends a grail progress record, save directory or export path', () => {
   it('If the progress record has unknown fields, Then only the record fields are passed on', () => {
     // Arrange

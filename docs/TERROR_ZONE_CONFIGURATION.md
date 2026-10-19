@@ -25,7 +25,7 @@ The app calculates the schedule itself, with the same algorithm as the game ([ho
 
 When the schedule falls back to the retail default, the page checks your D2R folder with the same validation as the configuration page, which backs up `desecratedzones.json` the first time it finds the file.
 
-- If no D2R folder is set, the page shows the retail schedule with a prompt to set the folder and an **Open D2R installation settings** button. The farming advisor, the **Where to farm** section of the item details and the configuration page show the same prompt.
+- If no D2R folder is set, the page shows the retail schedule with a one-line hint to set the folder and an **Open D2R installation settings** button. If the app finds D2R in a [well-known folder](EXTRACTING_GAME_FILES.md#where-the-app-looks-for-d2r), a **Use** button with the folder's path saves that folder and reads the schedule again.
 - If a D2R folder is set but the page can't use its game file, it shows the retail schedule with a warning that says why: the folder doesn't exist or `desecratedzones.json` isn't in it (both with a button to the D2R installation setting), or the file can't be read. [Extract the game files](EXTRACTING_GAME_FILES.md) to fix the last two, then reopen the page.
 - If the check of the folder fails or gives no reason, the retail schedule is shown without an explanation.
 - If the game file is from an older version of D2R (before patch 3.x), D2R can't run a rotation from it. The page says so and shows the retail schedule. [Extract the game files](EXTRACTING_GAME_FILES.md) again, delete `desecratedzones.json.original` from the app's data folder and reopen the configuration page, so the app backs up the current file. **Restore original** puts back the backup, so an outdated backup brings the outdated file back.
@@ -43,7 +43,7 @@ Open **Terror Zone Configuration** with **Configure zones** on the schedule page
 
 Until the zones can be read, the page shows one of these instead of the zone list:
 
-- **No D2R installation folder is set yet:** the page only asks you to set it, with an **Open D2R installation settings** button. It is the same prompt the schedule and the farming advisor show.
+- **No D2R installation folder is set yet:** the page only asks you to set it, with an **Open D2R installation settings** button, and a **Use** button with the folder's path when the app finds D2R in a [well-known folder](EXTRACTING_GAME_FILES.md#where-the-app-looks-for-d2r).
 - **The folder is set but the game file can't be used:** the page shows what went wrong. A missing folder gets a button to the D2R installation setting, and a missing game file gets the extraction steps.
 - **Reading the zones failed:** the page shows *Failed to load terror zone data* with a **Retry** button.
 
@@ -67,7 +67,7 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 
 | Problem | Fix |
 | --- | --- |
-| *Set your D2R installation folder* | Click **Open D2R installation settings** and set **Settings → D2R installation** to the main D2R folder, not a subfolder. |
+| *Set your D2R installation folder* | Click **Use** with the found folder, or click **Open D2R installation settings** and set **Settings → D2R installation** to the main D2R folder, not a subfolder. |
 | *Failed to load terror zone data* | The app couldn't read the zones. Click **Retry**, or reopen the page. |
 | *D2R installation directory does not exist* | Click **Open D2R installation settings** and choose the main D2R folder again. |
 | *Game Files Must Be Extracted*, or *desecratedzones.json file not found in D2R installation* | [Extract all game files](EXTRACTING_GAME_FILES.md) and check that `Data/hd/global/excel/desecratedzones.json` exists. |

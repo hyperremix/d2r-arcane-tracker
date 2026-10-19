@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +26,45 @@ vi.mock('node:os', async (importOriginal) => {
   return { ...actual, default: { ...actual, platform, homedir }, platform, homedir };
 });
 
+// The files the install path detection sees; unset means the real file system
+const fsOverrides = vi.hoisted(() => ({
+  statSync: undefined as ((file: string) => { isFile: () => boolean }) | undefined,
+}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const statSync = ((file: string, ...rest: unknown[]) =>
+    fsOverrides.statSync
+      ? fsOverrides.statSync(file)
+      : (actual.statSync as (...args: unknown[]) => unknown)(
+          file,
+          ...rest,
+        )) as typeof actual.statSync;
+  return { ...actual, default: { ...actual, statSync }, statSync };
+});
+
+/**
+ * Fakes a Windows file system holding the given files. Paths are compared with backslashes, as
+ * `path.join` on the machine running the tests may join a Windows folder with a slash.
+ * @param files - Windows paths of the files that exist
+ * @param unreadable - Windows paths whose lookup fails with a permission error
+ */
+function fakeWindowsFiles(files: string[], unreadable: string[] = []) {
+  fsOverrides.statSync = (file) => {
+    const windowsPath = file.replace(/\//g, '\\');
+    if (unreadable.includes(windowsPath)) {
+      throw Object.assign(new Error(`EACCES: permission denied, stat '${windowsPath}'`), {
+        code: 'EACCES',
+      });
+    }
+    if (!files.includes(windowsPath)) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, stat '${windowsPath}'`), {
+        code: 'ENOENT',
+      });
+    }
+    return { isFile: () => true };
+  };
+}
+
 describe('IconService', () => {
   let tempDir: string;
   let forwarder: ReturnType<typeof vi.fn<(payload: ServiceErrorPayload) => void>>;
@@ -44,6 +83,7 @@ describe('IconService', () => {
     vi.unstubAllEnvs();
     osOverrides.platform = undefined;
     osOverrides.home = undefined;
+    fsOverrides.statSync = undefined;
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -64,6 +104,7 @@ describe('IconService', () => {
         'Diablo II Resurrected',
       );
       mkdirSync(install, { recursive: true });
+      writeFileSync(path.join(install, 'D2R.exe'), '');
       const service = new IconService();
 
       // Act
@@ -73,6 +114,28 @@ describe('IconService', () => {
       // Assert
       expect(suggested).toBe(install);
       expect(detected).toBe(install);
+    });
+
+    it('If the folder in the Proton prefix has no D2R.exe, Then nothing is suggested or detected', () => {
+      // Arrange
+      mkdirSync(
+        path.join(
+          realpathSync(tempDir),
+          '.local/share/Steam/steamapps/compatdata/2426010261/pfx/drive_c',
+          'Program Files (x86)',
+          'Diablo II Resurrected',
+        ),
+        { recursive: true },
+      );
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+      const detected = service.findD2RInstallation();
+
+      // Assert
+      expect(suggested).toBeUndefined();
+      expect(detected).toBeNull();
     });
 
     it('If no installation is found, Then nothing is suggested or detected', () => {
@@ -86,6 +149,95 @@ describe('IconService', () => {
       // Assert
       expect(suggested).toBeUndefined();
       expect(detected).toBeNull();
+    });
+  });
+
+  describe('When the D2R installation is looked up on Windows', () => {
+    const battleNetDefault = 'C:\\Program Files (x86)\\Diablo II Resurrected';
+    const programFiles = 'C:\\Program Files\\Diablo II Resurrected';
+
+    beforeEach(() => {
+      osOverrides.platform = 'win32';
+      osOverrides.home = 'C:\\Users\\player';
+    });
+
+    it('If D2R.exe is in the Battle.net default folder, Then that folder is suggested', () => {
+      // Arrange
+      fakeWindowsFiles([`${battleNetDefault}\\D2R.exe`, `${programFiles}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+
+      // Assert
+      expect(suggested).toBe(battleNetDefault);
+    });
+
+    it('If D2R.exe is only in Program Files, Then that folder is suggested', () => {
+      // Arrange
+      fakeWindowsFiles([`${programFiles}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+
+      // Assert
+      expect(suggested).toBe(programFiles);
+    });
+
+    it('If no well-known folder has D2R.exe, Then nothing is suggested or detected', () => {
+      // Arrange
+      fakeWindowsFiles([`${battleNetDefault}\\Data\\data.000`]);
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+      const detected = service.findD2RInstallation();
+
+      // Assert
+      expect(suggested).toBeUndefined();
+      expect(detected).toBeNull();
+    });
+
+    it('If D2R.exe is a folder, Then that folder is not suggested', () => {
+      // Arrange
+      fsOverrides.statSync = (file) => {
+        if (file.replace(/\//g, '\\') === `${battleNetDefault}\\D2R.exe`) {
+          return { isFile: () => false };
+        }
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      };
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+
+      // Assert
+      expect(suggested).toBeUndefined();
+    });
+
+    it('If a folder cannot be read, Then it is skipped and the next one is suggested', () => {
+      // Arrange
+      fakeWindowsFiles([`${programFiles}\\D2R.exe`], [`${battleNetDefault}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      const suggested = service.getSuggestedD2RPath();
+
+      // Assert
+      expect(suggested).toBe(programFiles);
+    });
+
+    it('If a folder is suggested, Then the configured path is not changed', () => {
+      // Arrange
+      fakeWindowsFiles([`${battleNetDefault}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      service.getSuggestedD2RPath();
+
+      // Assert
+      expect(service.getD2RPath()).toBeNull();
     });
   });
 

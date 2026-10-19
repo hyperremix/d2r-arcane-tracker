@@ -55,16 +55,20 @@ function getRetailScheduleReason(
 
 /**
  * Finds out why the schedule fell back to the retail defaults, by validating the D2R folder. Only
- * checked when the schedule is the retail default, and again each time it becomes the default.
+ * checked when the schedule is the retail default, again each time it becomes the default, and
+ * when the folder was set here.
  * @param source - Where the schedule was calculated from
+ * @param folderSetCount - How often the D2R folder was set here
  * @returns The reason once known, otherwise undefined
  */
 function useRetailScheduleReason(
   source: TerrorZoneScheduleSource | undefined,
+  folderSetCount: number,
 ): RetailScheduleReason | undefined {
   const [reason, setReason] = useState<RetailScheduleReason | undefined>(undefined);
   const isRetailDefault = source === 'retailDefault';
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: folderSetCount asks to check again
   useEffect(() => {
     setReason(undefined);
     if (!isRetailDefault) return;
@@ -81,7 +85,7 @@ function useRetailScheduleReason(
     return () => {
       cancelled = true;
     };
-  }, [isRetailDefault]);
+  }, [isRetailDefault, folderSetCount]);
 
   return isRetailDefault ? reason : undefined;
 }
@@ -204,12 +208,20 @@ function MissingItemsBadge({ count }: { count: number | undefined }) {
 }
 
 /**
- * Explains a schedule that isn't calculated from the player's game file: a calm prompt with a note
- * when no D2R folder is set, or a warning that says what is wrong with the folder that is set.
+ * Explains a schedule that isn't calculated from the player's game file: a one-line prompt when no
+ * D2R folder is set, or a warning that says what is wrong with the folder that is set.
  */
-function ScheduleSourceNotice({ source }: { source: TerrorZoneScheduleSource | undefined }) {
+function ScheduleSourceNotice({
+  source,
+  onFolderSet,
+}: {
+  source: TerrorZoneScheduleSource | undefined;
+  /** Called after a found D2R folder was saved, so the schedule can be read again */
+  onFolderSet: () => void;
+}) {
   const { t } = useTranslation();
-  const retailReason = useRetailScheduleReason(source);
+  const [folderSetCount, setFolderSetCount] = useState(0);
+  const retailReason = useRetailScheduleReason(source, folderSetCount);
 
   if (source === 'unusableGameFile') {
     return (
@@ -222,11 +234,14 @@ function ScheduleSourceNotice({ source }: { source: TerrorZoneScheduleSource | u
   if (retailReason === undefined) return null;
   if (retailReason === 'pathNotConfigured') {
     return (
-      <D2RFolderPrompt layout="inline">
-        <p className="mt-2 text-muted-foreground text-xs">
-          {t(translations.terrorZone.schedule.retailNote)}
-        </p>
-      </D2RFolderPrompt>
+      <D2RFolderPrompt
+        layout="inline"
+        description={t(translations.terrorZone.schedule.retailNote)}
+        onFolderSet={() => {
+          setFolderSetCount((count) => count + 1);
+          onFolderSet();
+        }}
+      />
     );
   }
   return (
@@ -295,7 +310,7 @@ function UpcomingZones({ slots, now, missingItemCounts }: UpcomingZonesProps) {
  */
 export function TerrorZoneSchedule() {
   const { t } = useTranslation();
-  const { schedule, error, now } = useTerrorZoneSchedule();
+  const { schedule, error, now, reload } = useTerrorZoneSchedule();
   const hasChangesToApply = useTerrorZoneSessionStore((state) => state.hasChangesToApply);
   const missingItemCounts = useTerrorZoneMissingItemCounts();
 
@@ -327,7 +342,7 @@ export function TerrorZoneSchedule() {
         </Alert>
       )}
 
-      <ScheduleSourceNotice source={schedule?.source} />
+      <ScheduleSourceNotice source={schedule?.source} onFolderSet={() => void reload()} />
 
       {schedule === undefined && !error && (
         <Card>

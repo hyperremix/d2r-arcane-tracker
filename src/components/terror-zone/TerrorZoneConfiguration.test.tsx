@@ -3,6 +3,7 @@ import type { TerrorZoneValidationResult } from 'electron/types/grail';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import { useTerrorZoneSessionStore } from '@/stores/terrorZoneSessionStore';
 import { TerrorZoneConfiguration } from './TerrorZoneConfiguration';
 
@@ -14,6 +15,7 @@ vi.mock('sonner', () => ({
 }));
 
 const originalElectronAPI = window.electronAPI;
+const originalSettings = useGrailStore.getState().settings;
 
 // The restart reminder lasts for the app session, so every test starts without saved changes
 beforeEach(() => {
@@ -34,14 +36,18 @@ function renderTerrorZoneConfiguration() {
   );
 }
 
-function setupTerrorZoneApi(validation: TerrorZoneValidationResult) {
-  window.electronAPI = {
-    terrorZone: {
-      validatePath: vi.fn().mockResolvedValue(validation),
-      getZones: vi.fn().mockResolvedValue([]),
-      getConfig: vi.fn().mockResolvedValue({}),
-    },
-  } as unknown as typeof window.electronAPI;
+function setupTerrorZoneApi(validation: TerrorZoneValidationResult, suggestedD2RPath?: string) {
+  const terrorZone = {
+    validatePath: vi.fn().mockResolvedValue(validation),
+    getZones: vi.fn().mockResolvedValue([]),
+    getConfig: vi.fn().mockResolvedValue({}),
+  };
+  const icon = {
+    getSuggestedD2RPath: vi.fn().mockResolvedValue(suggestedD2RPath),
+    setD2RPath: vi.fn().mockResolvedValue(undefined),
+  };
+  window.electronAPI = { terrorZone, icon } as unknown as typeof window.electronAPI;
+  return { ...terrorZone, icon };
 }
 
 const zones = [
@@ -98,6 +104,7 @@ function expectZoneControlsHidden() {
 describe('When TerrorZoneConfiguration validates the game installation', () => {
   afterEach(() => {
     window.electronAPI = originalElectronAPI;
+    useGrailStore.setState({ settings: originalSettings });
   });
 
   describe('If the game file is missing', () => {
@@ -198,9 +205,34 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
         }),
       ).toBeInTheDocument();
       expect(
-        within(emptyState).getByText(/Choose your D2R folder in Settings/),
+        within(emptyState).getByText(/Set your D2R folder to choose which zones can appear/),
       ).toBeInTheDocument();
       expect(within(emptyState).getAllByRole('button')).toHaveLength(1);
+    });
+
+    it('Then using a found installation folder checks the installation again', async () => {
+      // Arrange
+      const { validatePath, icon } = setupTerrorZoneApi(
+        { valid: false, errorCode: 'pathNotConfigured' },
+        'C:\\Program Files (x86)\\Diablo II Resurrected',
+      );
+      renderTerrorZoneConfiguration();
+      const useFolder = await screen.findByRole('button', {
+        name: 'Use C:\\Program Files (x86)\\Diablo II Resurrected',
+      });
+      validatePath.mockResolvedValue({ valid: false, errorCode: 'gameFileNotFound' });
+
+      // Act
+      fireEvent.click(useFolder);
+
+      // Assert
+      await waitFor(() => expect(validatePath).toHaveBeenCalledTimes(2));
+      expect(icon.setD2RPath).toHaveBeenCalledWith(
+        'C:\\Program Files (x86)\\Diablo II Resurrected',
+      );
+      await waitFor(() =>
+        expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument(),
+      );
     });
 
     it('Then the empty state button opens the D2R installation settings', async () => {

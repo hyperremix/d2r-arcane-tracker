@@ -58,17 +58,23 @@ function terrorZone(zoneId: string, difficulty: 'normal' | 'hell', itemIndexes: 
 interface ApiOptions {
   validation?: TerrorZoneValidationResult;
   overview?: FarmingOverview;
+  suggestedD2RPath?: string;
 }
 
 function setupApi(
   getSchedule: ReturnType<typeof vi.fn>,
-  { validation = { valid: true }, overview = notConfigured }: ApiOptions = {},
+  { validation = { valid: true }, overview = notConfigured, suggestedD2RPath }: ApiOptions = {},
 ) {
   const validatePath = vi.fn().mockResolvedValue(validation);
   const getOverview = vi.fn().mockResolvedValue(overview);
+  const icon = {
+    getSuggestedD2RPath: vi.fn().mockResolvedValue(suggestedD2RPath),
+    setD2RPath: vi.fn().mockResolvedValue(undefined),
+  };
   window.electronAPI = {
     terrorZone: { getSchedule, validatePath },
     farming: { getOverview },
+    icon,
   } as unknown as typeof window.electronAPI;
   return { validatePath, getOverview };
 }
@@ -241,7 +247,7 @@ describe('When the TerrorZoneSchedule page is shown', () => {
       expect(await screen.findByText('Settings page')).toBeInTheDocument();
     });
 
-    it('Then the retail schedule is shown with a note and no warning', async () => {
+    it('Then the retail schedule is shown with a one-line note and no warning', async () => {
       // Arrange
       setupApi(vi.fn().mockResolvedValue({ ...schedule, source: 'retailDefault' }), {
         validation: { valid: false, errorCode: 'pathNotConfigured' },
@@ -251,14 +257,43 @@ describe('When the TerrorZoneSchedule page is shown', () => {
       renderSchedule();
 
       // Assert
-      const note = await screen.findByText(/^This is the retail schedule\./);
+      const note = await screen.findByText(
+        'This is the retail schedule. Set your D2R folder to follow the zone schedule from your game files.',
+      );
       expect(screen.getByTestId('d2r-folder-prompt')).toContainElement(note);
-      expect(screen.getByText('Set your D2R installation folder')).toBeInTheDocument();
+      expect(screen.queryByText('Set your D2R installation folder')).not.toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.queryByText(/Calculated from desecratedzones\.json/)).not.toBeInTheDocument();
       expect(
         within(screen.getByTestId('terror-zone-current')).getByText('Spider Forest'),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('If a found D2R installation is used', () => {
+    it('Then the schedule and the folder are checked again', async () => {
+      // Arrange
+      const getSchedule = vi.fn().mockResolvedValue({ ...schedule, source: 'retailDefault' });
+      const { validatePath } = setupApi(getSchedule, {
+        validation: { valid: false, errorCode: 'pathNotConfigured' },
+        suggestedD2RPath: 'C:\\Program Files (x86)\\Diablo II Resurrected',
+      });
+      renderSchedule();
+      const useFolder = await screen.findByRole('button', {
+        name: 'Use C:\\Program Files (x86)\\Diablo II Resurrected',
+      });
+      validatePath.mockResolvedValue({ valid: false, errorCode: 'gameFileNotFound' });
+
+      // Act
+      fireEvent.click(useFolder);
+
+      // Assert
+      expect(
+        await screen.findByText(/^desecratedzones\.json isn't in your D2R folder/),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
+      expect(getSchedule).toHaveBeenCalledTimes(2);
+      expect(validatePath).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -1,5 +1,5 @@
 import type { FarmingOverview, Item } from 'electron/types/grail';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { translations } from '@/i18n/translations';
@@ -11,18 +11,21 @@ import { FARMING_INPUT_DEBOUNCE_MS } from '@/lib/farming';
  * the meantime.
  * @param items - The items to look for
  * @param characterLevel - The character level for terror zones
- * @returns The overview once loaded, and an error message if loading failed
+ * @returns The overview once loaded, an error message if loading failed, and a function that
+ * loads it again (after the D2R folder was set, say)
  */
 export function useFarmingOverview(items: Item[], characterLevel: number) {
   const { t } = useTranslation();
   const requestedCharacterLevel = useDebouncedValue(characterLevel, FARMING_INPUT_DEBOUNCE_MS);
   const [overview, setOverview] = useState<FarmingOverview | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
+  // Incremented to load again with the same items and character level
+  const [reloadCount, setReloadCount] = useState(0);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
   // A stable key, so a new array with the same items doesn't load again
   const requestKey = itemIds.join('|');
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: requestKey stands for itemIds
+  // biome-ignore lint/correctness/useExhaustiveDependencies: requestKey stands for itemIds, and reloadCount asks to load again
   useEffect(() => {
     let cancelled = false;
     window.electronAPI.farming
@@ -40,7 +43,9 @@ export function useFarmingOverview(items: Item[], characterLevel: number) {
     return () => {
       cancelled = true;
     };
-  }, [requestKey, requestedCharacterLevel, t]);
+  }, [requestKey, requestedCharacterLevel, reloadCount, t]);
 
-  return { overview, error };
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
+
+  return { overview, error, reload };
 }

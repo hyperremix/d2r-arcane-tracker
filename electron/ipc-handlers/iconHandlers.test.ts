@@ -14,6 +14,7 @@ const iconService = {
   getD2RPath: vi.fn(),
   setD2RPath: vi.fn(),
   findD2RInstallation: vi.fn(),
+  getSuggestedD2RPath: vi.fn(),
   convertAllSprites: vi.fn(),
 };
 const settings = {
@@ -108,5 +109,45 @@ describe('When the icon:getD2RPath handler is invoked', () => {
     expect(result).toBe('/games/d2r');
     expect(iconService.setD2RPath).toHaveBeenCalledWith('/games/d2r');
     expect(iconService.findD2RInstallation).not.toHaveBeenCalled();
+  });
+});
+
+describe('When the icon:getSuggestedD2RPath handler is invoked', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    initializeIconHandlers({
+      iconService: iconService as unknown as IconService,
+      settings: settings as unknown as SettingsService,
+    });
+  });
+
+  it('If an installation is found, Then it is returned without being saved', async () => {
+    // Arrange
+    iconService.getSuggestedD2RPath.mockReturnValue('C:\\Program Files\\Diablo II Resurrected');
+    const handler = getHandler('icon:getSuggestedD2RPath');
+
+    // Act
+    const result = await handler({});
+
+    // Assert
+    expect(result).toBe('C:\\Program Files\\Diablo II Resurrected');
+    expect(settings.update).not.toHaveBeenCalled();
+    expect(iconService.setD2RPath).not.toHaveBeenCalled();
+  });
+
+  it('If detection throws, Then nothing is suggested', async () => {
+    // Arrange
+    iconService.getSuggestedD2RPath.mockImplementation(() => {
+      throw new Error('EPERM');
+    });
+    const handler = getHandler('icon:getSuggestedD2RPath');
+
+    // Act
+    const result = await handler({});
+
+    // Assert
+    expect(result).toBeUndefined();
   });
 });

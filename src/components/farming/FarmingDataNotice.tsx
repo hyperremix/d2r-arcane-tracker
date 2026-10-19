@@ -5,15 +5,27 @@ import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { translations } from '@/i18n/translations';
 
+interface FarmingDataNoticeProps {
+  unavailable: FarmingDataUnavailable;
+  /** Called after a found D2R folder was saved, so the farming data can be read again */
+  onFolderSet: () => void;
+}
+
 /**
  * Explains why the farming data can't be read, with the action that fixes it: setting the D2R
  * installation folder, or extracting the game files.
  */
-export function FarmingDataNotice({ unavailable }: { unavailable: FarmingDataUnavailable }) {
+export function FarmingDataNotice({ unavailable, onFolderSet }: FarmingDataNoticeProps) {
   const { t } = useTranslation();
 
   if (unavailable.errorCode === 'pathNotConfigured') {
-    return <D2RFolderPrompt layout="page" />;
+    return (
+      <D2RFolderPrompt
+        layout="page"
+        description={t(translations.farming.notConfigured)}
+        onFolderSet={onFolderSet}
+      />
+    );
   }
 
   return (

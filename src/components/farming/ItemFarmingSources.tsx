@@ -1,6 +1,6 @@
 import type { Character, FarmingItemSource, FarmingItemSources, Item } from 'electron/types/grail';
 import { AlertTriangle, Settings } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 import { D2RFolderPrompt } from '@/components/terror-zone/D2RFolderPrompt';
@@ -45,7 +45,10 @@ function useItemSources(itemId: string, characters: Character[]) {
   );
   const [result, setResult] = useState<FarmingItemSources | undefined>(undefined);
   const [failed, setFailed] = useState(false);
+  // Incremented to load again with the same inputs
+  const [reloadCount, setReloadCount] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadCount asks to load again
   useEffect(() => {
     let cancelled = false;
     window.electronAPI.farming
@@ -63,9 +66,11 @@ function useItemSources(itemId: string, characters: Character[]) {
     return () => {
       cancelled = true;
     };
-  }, [itemId, players, magicFind, characterLevel]);
+  }, [itemId, players, magicFind, characterLevel, reloadCount]);
 
-  return { result, failed };
+  const reload = useCallback(() => setReloadCount((count) => count + 1), []);
+
+  return { result, failed, reload };
 }
 
 function SourceRow({ source }: { source: FarmingItemSource }) {
@@ -135,7 +140,7 @@ function SourcesTable({ sources }: { sources: FarmingItemSource[] }) {
 function SourcesBody({ itemId, characters }: { itemId: string; characters: Character[] }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { result, failed } = useItemSources(itemId, characters);
+  const { result, failed, reload } = useItemSources(itemId, characters);
 
   if (failed)
     return <p className="text-destructive text-sm">{t(translations.farming.loadFailed)}</p>;
@@ -145,7 +150,15 @@ function SourcesBody({ itemId, characters }: { itemId: string; characters: Chara
     );
   }
   if (result.status === 'unavailable') {
-    if (result.errorCode === 'pathNotConfigured') return <D2RFolderPrompt layout="inline" />;
+    if (result.errorCode === 'pathNotConfigured') {
+      return (
+        <D2RFolderPrompt
+          layout="inline"
+          description={t(translations.farming.itemSources.notConfigured)}
+          onFolderSet={reload}
+        />
+      );
+    }
     return (
       <Alert variant="warning" live="polite">
         <AlertTriangle aria-hidden="true" />

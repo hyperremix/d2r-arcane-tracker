@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { FARMING_INPUT_DEBOUNCE_MS } from '@/lib/farming';
 import { useFarmingSessionStore } from '@/stores/farmingSessionStore';
+import { useGrailStore } from '@/stores/grailStore';
 import { ItemFarmingSources } from './ItemFarmingSources';
 
 const originalElectronAPI = window.electronAPI;
+const originalSettings = useGrailStore.getState().settings;
 
 const shako = HolyGrailItemBuilder.new()
   .withId('harlequincrest')
@@ -28,9 +30,16 @@ const source = (overrides: Partial<FarmingItemSource>): FarmingItemSource => ({
   ...overrides,
 });
 
-function setup(result: FarmingItemSources, item = shako) {
+function setup(result: FarmingItemSources, item = shako, suggestedD2RPath?: string) {
   const getItemSources = vi.fn().mockResolvedValue(result);
-  window.electronAPI = { farming: { getItemSources } } as unknown as typeof window.electronAPI;
+  const icon = {
+    getSuggestedD2RPath: vi.fn().mockResolvedValue(suggestedD2RPath),
+    setD2RPath: vi.fn().mockResolvedValue(undefined),
+  };
+  window.electronAPI = {
+    farming: { getItemSources },
+    icon,
+  } as unknown as typeof window.electronAPI;
   render(
     <MemoryRouter>
       <Routes>
@@ -51,6 +60,7 @@ describe('When the farming sources of an item are shown', () => {
     useFarmingSessionStore.getState().reset();
     vi.useRealTimers();
     window.electronAPI = originalElectronAPI;
+    useGrailStore.setState({ settings: originalSettings });
   });
 
   it('If the sources are loaded, Then each source shows its location, monster kind, level and drop rate', async () => {
@@ -177,6 +187,37 @@ describe('When the farming sources of an item are shown', () => {
 
     // Assert
     expect(await screen.findByText('Settings page')).toBeInTheDocument();
+  });
+
+  it('If no D2R installation folder is set, Then a one-line hint is about this item', async () => {
+    // Arrange & Act
+    setup({ status: 'unavailable', errorCode: 'pathNotConfigured' });
+
+    // Assert
+    const prompt = await screen.findByTestId('d2r-folder-prompt');
+    expect(prompt).toHaveTextContent('Set your D2R folder to see where this item drops.');
+    expect(within(prompt).queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  it('If a found D2R installation is used, Then the drop sources are read again', async () => {
+    // Arrange
+    const getItemSources = setup(
+      { status: 'unavailable', errorCode: 'pathNotConfigured' },
+      shako,
+      'C:\\Program Files\\Diablo II Resurrected',
+    );
+    getItemSources.mockResolvedValue({ status: 'ready', known: true, sources: [source({})] });
+    const useFolder = await screen.findByRole('button', {
+      name: 'Use C:\\Program Files\\Diablo II Resurrected',
+    });
+
+    // Act
+    fireEvent.click(useFolder);
+
+    // Assert
+    expect(await screen.findByText('Mephisto')).toBeInTheDocument();
+    expect(getItemSources).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
   });
 
   it('If game files are missing, Then a warning lists them and says to extract them', async () => {

@@ -12,14 +12,21 @@ interface FarmingItemListProps {
   label: string;
   items: Item[];
   onSelectItem: (itemId: string) => void;
+  /** Whether the list starts expanded */
+  defaultOpen?: boolean;
 }
 
 /**
  * A toggle that shows a list of items; each item opens its details.
  */
-export function FarmingItemList({ label, items, onSelectItem }: FarmingItemListProps) {
+export function FarmingItemList({
+  label,
+  items,
+  onSelectItem,
+  defaultOpen = false,
+}: FarmingItemListProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const listId = useId();
   const Icon = open ? ChevronDown : ChevronRight;
 
