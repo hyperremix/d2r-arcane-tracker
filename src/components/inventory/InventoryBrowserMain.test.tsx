@@ -253,9 +253,27 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(
         listTitle.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-      expect(filters).toHaveAccessibleDescription(
-        'Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches, and the matching items are listed below. Opened windows always show all items.',
-      );
+      expect(
+        screen.getByText('Open a character or stash in its own window to move its items.'),
+      ).toBeInTheDocument();
+    });
+
+    it('Then the item property filters are collapsed behind More filters and no chips are shown', async () => {
+      // Arrange
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const toggle = await screen.findByRole('button', { name: 'More filters' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      const panelId = toggle.getAttribute('aria-controls');
+      expect(panelId).toBeTruthy();
+      expect(document.getElementById(panelId as string)).not.toBeVisible();
+      expect(screen.queryByRole('group', { name: 'Item properties' })).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toBeVisible();
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
     });
 
     it('Then each filter dropdown has a label and shows the selected option', async () => {
@@ -281,6 +299,95 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Assert
       await screen.findByText('Characters & stashes');
       expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If More filters is opened', () => {
+    it('Then the item property filters are shown and the toggle says it is expanded', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const toggle = await screen.findByRole('button', { name: 'More filters' });
+
+      // Act
+      fireEvent.click(toggle);
+
+      // Assert
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('group', { name: 'Item properties' })).toBeVisible();
+      expect(screen.getByRole('textbox', { name: 'Base item or type' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Add stat' })).toBeVisible();
+    });
+  });
+
+  describe('If the search and type filters are set', () => {
+    async function setSearchAndTypeFilters(): Promise<void> {
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+        target: { value: 'shako' },
+      });
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Unique' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+    }
+
+    it('Then each shows as a chip', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+
+      // Act
+      await setSearchAndTypeFilters();
+
+      // Assert
+      const chips = await screen.findByRole('list', { name: 'Active filters' });
+      await waitFor(() => {
+        expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
+      });
+      expect(within(chips).getByText('Search: shako')).toBeInTheDocument();
+    });
+
+    it('Then removing the Search chip clears the search, keeps the Type chip and moves the focus to the search box', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+      await setSearchAndTypeFilters();
+      const chips = await screen.findByRole('list', { name: 'Active filters' });
+      await waitFor(() => {
+        expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Search: shako' }));
+
+      // Assert
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveValue('');
+      expect(within(chips).queryByText('Search: shako')).not.toBeInTheDocument();
+      expect(within(chips).getByText('Type: Unique')).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+    });
+
+    it('Then removing the Type chip sets the type back to all types and moves the focus to the search box', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique' })]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Unique' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+      const removeButton = await screen.findByRole('button', {
+        name: 'Remove filter: Type: Unique',
+      });
+      removeButton.focus();
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All types');
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
     });
   });
 
@@ -1212,6 +1319,198 @@ describe('When InventoryBrowserMain is rendered', () => {
       fireEvent.click(option);
     }
 
+    function openMoreFilters(): void {
+      fireEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    }
+
+    it('Then the hidden filters stay visible as chips and in the toggle count once More filters is closed', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+      await chooseOption('Ethereal', 'Ethereal only');
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Life at least' }), {
+        target: { value: '15' },
+      });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'More filters (3 active)' }));
+
+      // Assert
+      const toggle = screen.getByRole('button', { name: 'More filters (3 active)' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle).toHaveAccessibleName('More filters (3 active)');
+      expect(toggle).toHaveTextContent(/^More filters\s*3$/);
+      expect(screen.queryByRole('group', { name: 'Item properties' })).not.toBeInTheDocument();
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Sockets: exactly 4')).toBeInTheDocument();
+      expect(within(chips).getByText('Ethereal: Ethereal only')).toBeInTheDocument();
+      expect(within(chips).getByText('Life at least 15')).toBeInTheDocument();
+    });
+
+    it('Then removing a stat chip removes that stat row', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Stat: Life' }));
+
+      // Assert
+      expect(screen.queryByRole('group', { name: 'Stat filter 1' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
+    });
+
+    it('Then removing a hidden filter chip while More filters is closed removes the chip and moves the focus to the search box', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+      fireEvent.click(screen.getByRole('button', { name: 'More filters (1 active)' }));
+      const removeButton = screen.getByRole('button', {
+        name: 'Remove filter: Sockets: exactly 4',
+      });
+      removeButton.focus();
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+    });
+
+    it('Then the sockets filter is off when More filters is opened again after its hidden chip was removed', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+      fireEvent.click(screen.getByRole('button', { name: 'More filters (1 active)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Sockets: exactly 4' }));
+
+      // Act
+      openMoreFilters();
+
+      // Assert
+      expect(screen.getByRole('combobox', { name: 'Sockets' })).toHaveTextContent('Any');
+    });
+
+    it('Then the sockets chip says the socket count is exact by default', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+
+      // Act
+      await chooseOption('Sockets', '4');
+
+      // Assert
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Sockets: exactly 4')).toBeInTheDocument();
+    });
+
+    it('If the socket count is set to at least, Then the sockets chip says it is a minimum', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      await chooseOption('Sockets', '4');
+
+      // Act
+      await chooseOption('Socket count', 'At least');
+
+      // Assert
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Sockets: at least 4')).toBeInTheDocument();
+      expect(within(chips).queryByText('Sockets: exactly 4')).not.toBeInTheDocument();
+    });
+
+    it('Then the minimum roll quality shows as a chip', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+
+      // Act
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' }), {
+        target: { value: '80' },
+      });
+
+      // Assert
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Roll quality at least 80%')).toBeInTheDocument();
+    });
+
+    it('Then removing the minimum roll quality chip clears the roll quality filter', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' }), {
+        target: { value: '80' },
+      });
+
+      // Act
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Remove filter: Roll quality at least 80%' }),
+      );
+
+      // Assert
+      expect(screen.getByRole('spinbutton', { name: 'Roll quality at least (%)' })).toHaveValue(
+        null,
+      );
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+    });
+
+    it('Then Clear all turns every filter off, keeps the sort order and moves the focus to the search box', async () => {
+      // Arrange
+      mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: /^Shared stash/ });
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+        target: { value: 'charm' },
+      });
+      openMoreFilters();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Base item or type' }), {
+        target: { value: 'charm' },
+      });
+      await chooseOption('Ethereal', 'Not ethereal');
+      await chooseOption('Sockets', '4');
+      await chooseOption('Sort by', 'Best roll first');
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+
+      // Assert
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveValue('');
+      expect(screen.getByRole('textbox', { name: 'Search' })).toHaveFocus();
+      expect(screen.getByRole('textbox', { name: 'Base item or type' })).toHaveValue('');
+      expect(screen.getByRole('combobox', { name: 'Ethereal' })).toHaveTextContent('Any');
+      expect(screen.getByRole('combobox', { name: 'Sockets' })).toHaveTextContent('Any');
+      expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveTextContent(
+        'Best roll first',
+      );
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'More filters' })).toBeInTheDocument();
+    });
+
     it('Then ethereal and socket filters narrow the list and the matching items are listed', async () => {
       // Arrange
       mockStash([
@@ -1229,6 +1528,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       ]);
       render(<InventoryBrowserMain />);
       await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
 
       // Act
       fireEvent.change(screen.getByRole('textbox', { name: 'Base item or type' }), {
@@ -1263,6 +1563,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       ]);
       render(<InventoryBrowserMain />);
       await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
@@ -1283,6 +1584,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
       await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
@@ -1299,6 +1601,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       mockStash([createInventoryItem('fp-life', 'Small Charm of Life', {})]);
       render(<InventoryBrowserMain />);
       await screen.findByRole('button', { name: /^Shared stash/ });
+      openMoreFilters();
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Add stat' }));
@@ -1347,6 +1650,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       );
       render(<InventoryBrowserMain />);
       await screen.findByRole('button', { name: 'Vaulted item Low Anni' });
+      openMoreFilters();
 
       // Act
       await chooseOption('Sort by', 'Best roll first');

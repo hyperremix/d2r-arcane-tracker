@@ -1,15 +1,19 @@
 import type { VaultLocationContext } from 'electron/types/grail';
-import { Plus, X } from 'lucide-react';
+import type { TFunction } from 'i18next';
+import { ChevronDown, Plus, RotateCcw, X } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ActiveFilterChips } from '@/components/grail/search/ActiveFilterChips';
 import type { TypeFilter } from '@/components/inventory/inventoryItems';
-import type {
-  EtherealFilter,
-  ItemPropertyFilters,
-  ItemSortOrder,
-  SocketMatch,
-  StatCondition,
+import {
+  DEFAULT_ITEM_PROPERTY_FILTERS,
+  type EtherealFilter,
+  type ItemPropertyFilters,
+  type ItemSortOrder,
+  type SocketMatch,
+  type StatCondition,
 } from '@/components/inventory/itemPropertyFilters';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
 import { ITEM_STAT_FILTER_KEYS, type ItemStatFilterKey } from '@/lib/itemProperties';
+import { cn } from '@/lib/utils';
 
 export type LocationFilter = 'all' | VaultLocationContext;
 
@@ -44,7 +49,7 @@ export interface InventoryFilterBarProps {
   onLocationContextChange: (locationContext: LocationFilter) => void;
   typeFilter: TypeFilter;
   onTypeFilterChange: (typeFilter: TypeFilter) => void;
-  /** Item property filters and sort order; their fields are shown only when this is given. */
+  /** Item property filters and sort order; when given, their fields sit behind "More filters". */
   propertyFilterProps?: ItemPropertyFilterFieldsProps;
 }
 
@@ -53,12 +58,84 @@ interface FilterOption {
   label: string;
 }
 
+/** A removable chip for one active filter. */
+interface FilterChip {
+  key: string;
+  label: string;
+  onRemove: () => void;
+}
+
+/** One chip per active item property filter; each stat row gets its own chip. */
+function buildPropertyFilterChips(
+  { filters, onChange }: ItemPropertyFilterFieldsProps,
+  t: TFunction,
+): FilterChip[] {
+  const labels = translations.inventoryBrowser.filters;
+  const chips: FilterChip[] = [];
+  const baseText = filters.baseText.trim();
+
+  if (baseText) {
+    chips.push({
+      key: 'baseItem',
+      label: t(labels.chips.value, { filter: t(labels.baseItem), value: baseText }),
+      onRemove: () => onChange({ ...filters, baseText: '' }),
+    });
+  }
+  if (filters.socketCount !== undefined) {
+    chips.push({
+      key: 'sockets',
+      label: t(
+        filters.socketMatch === 'atLeast'
+          ? labels.chips.socketsAtLeast
+          : labels.chips.socketsExactly,
+        { count: filters.socketCount },
+      ),
+      onRemove: () => onChange({ ...filters, socketCount: undefined }),
+    });
+  }
+  if (filters.ethereal !== 'any') {
+    chips.push({
+      key: 'ethereal',
+      label: t(labels.chips.value, {
+        filter: t(labels.ethereal),
+        value: t(labels.etherealOptions[filters.ethereal]),
+      }),
+      onRemove: () => onChange({ ...filters, ethereal: 'any' }),
+    });
+  }
+  if (filters.minRollPercent !== undefined) {
+    chips.push({
+      key: 'minRollPercent',
+      label: t(labels.chips.minRollPercent, { value: filters.minRollPercent }),
+      onRemove: () => onChange({ ...filters, minRollPercent: undefined }),
+    });
+  }
+  for (const condition of filters.statConditions) {
+    const stat = t(labels.statOptions[condition.stat]);
+    chips.push({
+      key: `stat-${condition.id}`,
+      label:
+        condition.minValue === undefined
+          ? t(labels.chips.value, { filter: t(labels.stat), value: stat })
+          : t(labels.chips.statAtLeast, { stat, value: condition.minValue }),
+      onRemove: () =>
+        onChange({
+          ...filters,
+          statConditions: filters.statConditions.filter(({ id }) => id !== condition.id),
+        }),
+    });
+  }
+
+  return chips;
+}
+
 /**
  * Search box, character, location and type filters of the inventory browser and, when given, the
  * item property filters (base item, sockets, ethereal, roll quality, stats) and the sort order of
- * the matching and vaulted items. The filters narrow the characters and stashes list and the vaulted
- * items of the main view; the windows opened from the list always show every item. Grouped in a
- * fieldset whose legend and description name that scope.
+ * the matching and vaulted items behind a "More filters" toggle that counts the active ones. Every
+ * active filter, hidden or not, shows as a removable chip next to a "Clear all" action. The filters
+ * narrow the characters and stashes list and the vaulted items of the main view; the windows opened
+ * from the list always show every item.
  */
 export function InventoryFilterBar({
   searchText,
@@ -77,7 +154,9 @@ export function InventoryFilterBar({
   const characterSelectId = useId();
   const locationSelectId = useId();
   const typeSelectId = useId();
-  const scopeId = useId();
+  const moreFiltersId = useId();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const labels = translations.inventoryBrowser.filters;
 
   // Base UI renders the selected label in the trigger only when it gets the options as `items`.
   const characterItems: FilterOption[] = [
@@ -99,14 +178,71 @@ export function InventoryFilterBar({
     })),
   ];
 
+  const primaryChips: FilterChip[] = [];
+  const addSelectChip = (
+    key: string,
+    filter: string,
+    items: FilterOption[],
+    value: string,
+    onRemove: () => void,
+  ) => {
+    if (value !== 'all') {
+      const label = items.find((item) => item.value === value)?.label ?? value;
+      primaryChips.push({ key, label: t(labels.chips.value, { filter, value: label }), onRemove });
+    }
+  };
+  const trimmedSearchText = searchText.trim();
+  if (trimmedSearchText) {
+    primaryChips.push({
+      key: 'search',
+      label: t(labels.chips.value, {
+        filter: t(translations.common.search),
+        value: trimmedSearchText,
+      }),
+      onRemove: () => onSearchTextChange(''),
+    });
+  }
+  addSelectChip(
+    'character',
+    t(translations.inventoryBrowser.character),
+    characterItems,
+    characterId,
+    () => onCharacterIdChange('all'),
+  );
+  addSelectChip(
+    'location',
+    t(translations.inventoryBrowser.locationFilter),
+    locationItems,
+    locationContext,
+    () => onLocationContextChange('all'),
+  );
+  addSelectChip('type', t(translations.inventoryBrowser.type), typeItems, typeFilter, () =>
+    onTypeFilterChange('all'),
+  );
+  const propertyChips = propertyFilterProps ? buildPropertyFilterChips(propertyFilterProps, t) : [];
+  // The removed chip and its button go away, so keyboard focus moves to the search box, which is
+  // always on the page
+  const focusSearch = () => document.getElementById(searchId)?.focus();
+  const chips = [...primaryChips, ...propertyChips].map((chip) => ({
+    ...chip,
+    onRemove: () => {
+      chip.onRemove();
+      focusSearch();
+    },
+  }));
+
+  const clearAll = () => {
+    onSearchTextChange('');
+    onCharacterIdChange('all');
+    onLocationContextChange('all');
+    onTypeFilterChange('all');
+    propertyFilterProps?.onChange(DEFAULT_ITEM_PROPERTY_FILTERS);
+    focusSearch();
+  };
+
   return (
-    <fieldset aria-describedby={scopeId} className="rounded-md border border-border/60 p-3">
-      <legend className="px-1 font-medium text-sm">
-        {t(translations.inventoryBrowser.filters.legend)}
-      </legend>
-      <p id={scopeId} className="mb-3 text-muted-foreground text-xs">
-        {t(translations.inventoryBrowser.filters.scope)}
-      </p>
+    <fieldset className="rounded-md border border-border/60 p-3">
+      <legend className="px-1 font-medium text-sm">{t(labels.legend)}</legend>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div className="grid gap-2 md:col-span-2">
           <Label htmlFor={searchId}>{t(translations.common.search)}</Label>
@@ -139,7 +275,53 @@ export function InventoryFilterBar({
           onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
         />
       </div>
-      {propertyFilterProps && <ItemPropertyFilterFields {...propertyFilterProps} />}
+      {(propertyFilterProps || chips.length > 0) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {propertyFilterProps && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-expanded={isExpanded}
+              aria-controls={moreFiltersId}
+              aria-label={
+                propertyChips.length > 0
+                  ? t(labels.moreFiltersWithCount, { count: propertyChips.length })
+                  : undefined
+              }
+              onClick={() => setIsExpanded((current) => !current)}
+            >
+              {t(labels.moreFilters)}
+              {propertyChips.length > 0 && (
+                <Badge variant="secondary" className="tabular-nums" aria-hidden="true">
+                  {propertyChips.length}
+                </Badge>
+              )}
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  'transition-transform motion-reduce:transition-none',
+                  isExpanded && 'rotate-180',
+                )}
+              />
+            </Button>
+          )}
+          {chips.length > 0 && (
+            <>
+              <ActiveFilterChips chips={chips} />
+              <Button type="button" variant="ghost" size="sm" className="h-7" onClick={clearAll}>
+                <RotateCcw aria-hidden="true" />
+                {t(translations.grail.advancedSearch.clearAll)}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {propertyFilterProps && (
+        <div id={moreFiltersId} hidden={!isExpanded}>
+          <ItemPropertyFilterFields {...propertyFilterProps} />
+        </div>
+      )}
     </fieldset>
   );
 }
