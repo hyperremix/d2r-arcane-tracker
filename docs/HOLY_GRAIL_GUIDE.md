@@ -99,7 +99,7 @@ An item that is already recorded keeps its found date. The app reads the Chronic
 
 ### Manual entry
 
-In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found**, and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there. To add many finds at once, [import](#import-and-export) them from a file.
+In **Manual entry** mode, or for finds the app can't see (another PC, older finds), open an item, select **Mark as found** (**Add another find** once every version you track is found), and choose the character, the found date and, if you track both versions of the item, the version. To undo a manual find, use the remove button in its row of the item's character progress table. Finds detected from save files can't be removed there. To add many finds at once, [import](#import-and-export) them from a file.
 
 ## Browsing your grail
 

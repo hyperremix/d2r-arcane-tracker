@@ -1,4 +1,4 @@
-import type { GrailProgress, Item, Settings } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { type FormEvent, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,12 @@ import {
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
 import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/date';
-import { canItemBeNormal, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
+import {
+  canItemBeNormal,
+  getVersionFindStatuses,
+  shouldShowEtherealStatus,
+  shouldShowNormalStatus,
+} from '@/lib/ethereal';
 import { useGrailStore } from '@/stores/grailStore';
 
 export type ItemVersion = 'normal' | 'ethereal';
@@ -37,6 +42,22 @@ function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
   if (shouldShowEtherealStatus(item, settings)) versions.push('ethereal');
   if (versions.length === 0) versions.push(canItemBeNormal(item) ? 'normal' : 'ethereal');
   return versions;
+}
+
+/**
+ * Checks whether every tracked version was already found, so recording a find adds another find
+ * rather than marking the item as found. An item with no tracked version is never complete: a
+ * find of its untracked version doesn't count as found (see ProgressStatusSection).
+ */
+export function isFoundInEveryTrackedVersion(
+  item: Item,
+  itemProgress: GrailProgress[],
+  settings: Settings,
+): boolean {
+  const trackedStatuses = getVersionFindStatuses(item, itemProgress, settings).filter(
+    (status) => status.tracked,
+  );
+  return trackedStatuses.length > 0 && trackedStatuses.every((status) => status.found);
 }
 
 /**
@@ -115,12 +136,34 @@ function isVersionRecorded(
   );
 }
 
+/**
+ * Picks the character and version the prompt starts on: the first combination that isn't
+ * recorded yet, so a prompt that adds another find isn't opened on one that can't be saved.
+ * Falls back to the first character and version when all are recorded.
+ */
+function getInitialSelection(
+  characters: Character[],
+  versions: ItemVersion[],
+  progress: GrailProgress[],
+  itemId: string,
+): { characterId: string | undefined; version: ItemVersion } {
+  for (const character of characters) {
+    for (const version of versions) {
+      if (!isVersionRecorded(progress, itemId, character.id, version === 'ethereal')) {
+        return { characterId: character.id, version };
+      }
+    }
+  }
+  return { characterId: characters[0]?.id, version: versions[0] };
+}
+
 interface MarkAsFoundFormProps {
   item: Item;
+  actionLabel: string;
   onDone: () => void;
 }
 
-function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
+function MarkAsFoundForm({ item, actionLabel, onDone }: MarkAsFoundFormProps) {
   const { t } = useTranslation();
   const characters = useGrailStore((state) => state.characters);
   const progress = useGrailStore((state) => state.progress);
@@ -133,8 +176,11 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
   const versions = useMemo(() => getRecordableVersions(item, settings), [item, settings]);
   const today = toLocalIsoDate();
 
-  const [characterId, setCharacterId] = useState<string | undefined>(characters[0]?.id);
-  const [version, setVersion] = useState<ItemVersion>(versions[0]);
+  const [initialSelection] = useState(() =>
+    getInitialSelection(characters, versions, progress, item.id),
+  );
+  const [characterId, setCharacterId] = useState<string | undefined>(initialSelection.characterId);
+  const [version, setVersion] = useState<ItemVersion>(initialSelection.version);
   const [foundDate, setFoundDate] = useState(today);
   const [submitting, setSubmitting] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -245,7 +291,7 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
           disabled={!canSubmit || submitting}
           aria-describedby={idIf(message !== undefined, messageId)}
         >
-          {t(translations.grail.itemDetails.markAsFound)}
+          {actionLabel}
         </Button>
       </DialogFooter>
     </form>
@@ -254,6 +300,8 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
 
 interface MarkAsFoundDialogProps {
   item: Item;
+  /** Whether the item was already found, so the prompt records another find. */
+  anotherFind: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -261,20 +309,36 @@ interface MarkAsFoundDialogProps {
 /**
  * Dialog that prompts the user for the information needed to manually record an item as found:
  * the character who found it, the version (normal/ethereal) when ambiguous, and the found date.
+ * For an item that was already found it is named after recording another find.
  */
-export function MarkAsFoundDialog({ item, open, onOpenChange }: MarkAsFoundDialogProps) {
+export function MarkAsFoundDialog({
+  item,
+  anotherFind,
+  open,
+  onOpenChange,
+}: MarkAsFoundDialogProps) {
   const { t } = useTranslation();
+  const actionLabel = anotherFind
+    ? t(translations.grail.itemDetails.addAnotherFind)
+    : t(translations.grail.itemDetails.markAsFound);
+  const description = anotherFind
+    ? t(translations.grail.itemDetails.addAnotherFindDescription, { item: item.name })
+    : t(translations.grail.itemDetails.markAsFoundDescription, { item: item.name });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t(translations.grail.itemDetails.markAsFound)}</DialogTitle>
-          <DialogDescription>
-            {t(translations.grail.itemDetails.markAsFoundDescription, { item: item.name })}
-          </DialogDescription>
+          <DialogTitle>{actionLabel}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {open && <MarkAsFoundForm item={item} onDone={() => onOpenChange(false)} />}
+        {open && (
+          <MarkAsFoundForm
+            item={item}
+            actionLabel={actionLabel}
+            onDone={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
