@@ -69,10 +69,7 @@ export function Statistics() {
       <PageShell padded={false}>
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="space-y-6 px-6 pt-6">
-            <PageHeader
-              title={t(translations.titleBar.statistics)}
-              description={t(translations.statistics.description)}
-            />
+            <PageHeader title={t(translations.titleBar.statistics)} />
             <TabsList>
               <TabsTrigger value="grail">{t(translations.statistics.grailStatistics)}</TabsTrigger>
               <TabsTrigger value="runs">{t(translations.statistics.runStatistics)}</TabsTrigger>

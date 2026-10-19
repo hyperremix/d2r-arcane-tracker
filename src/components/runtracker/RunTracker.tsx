@@ -46,12 +46,7 @@ export function RunTracker() {
     })),
   );
 
-  const pageHeader = (
-    <PageHeader
-      title={t(translations.runTracker.title)}
-      description={t(translations.runTracker.description)}
-    />
-  );
+  const pageHeader = <PageHeader title={t(translations.runTracker.title)} />;
 
   // Navigation state
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);

@@ -523,7 +523,7 @@ describe('RunewordCalculator', () => {
 
       // Assert
       const steelCard = getCard('Steel');
-      expect(steelCard).toHaveClass('row-span-4', 'grid-rows-subgrid');
+      expect(steelCard).toHaveClass('row-span-3', 'grid-rows-subgrid');
     });
   });
 

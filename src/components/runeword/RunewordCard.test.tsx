@@ -184,6 +184,21 @@ describe('RunewordCard', () => {
     expect(screen.getByText(text)).toBeInTheDocument();
   });
 
+  it('If runes are missing, Then the missing runes line follows the runes in the same card row', () => {
+    // Arrange
+    stubElectronApi();
+
+    // Act
+    render(<RunewordCard runeword={createRuneword(['tir', 'el'])} availableRunes={{ tir: 1 }} />);
+
+    // Assert
+    const card = screen.getByRole('heading', { name: 'Steel' }).closest('[data-slot="card"]');
+    const missingLine = screen.getByText('Missing 1 rune: El');
+    const row = [...(card?.children ?? [])].find((child) => child.contains(missingLine));
+    // Each rune is a tooltip trigger, whether its icon is still loading or not
+    expect(row?.querySelectorAll('[data-slot="tooltip-trigger"]')).toHaveLength(2);
+  });
+
   it.each([
     [
       'd2runewizard',
@@ -218,6 +233,22 @@ describe('RunewordCard', () => {
     expect(sockets).toHaveClass('whitespace-nowrap');
     expect(link).toHaveClass('whitespace-nowrap');
     expect(sockets.parentElement).toHaveClass('flex-wrap');
+  });
+
+  it('When the runeword has a link, Then it uses the shared text link style instead of the accent color', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el'], 'https://d2runewizard.com/runewords/Steel');
+
+    // Assert
+    const link = screen.getByRole('link', { name: 'View on d2runewizard' });
+    expect(link).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+    expect(link).not.toHaveClass('text-primary');
   });
 
   it('If the runeword has no link, Then no external link is shown', () => {
