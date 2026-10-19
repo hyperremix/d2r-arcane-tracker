@@ -183,8 +183,6 @@ describe('When the characters and stashes list is grouped', () => {
   });
 
   it('If there are no snapshots, Then there are no groups', () => {
-    // Arrange
-
     // Act
     const groups = groupSnapshotList([], []);
 

@@ -956,8 +956,6 @@ describe('When InventoryBrowserMain is rendered', () => {
       });
 
       it('Then shared stashes come first, ordered by name, and characters follow under their own heading by level', async () => {
-        // Arrange
-
         // Act
         render(<InventoryBrowserMain />);
 
@@ -987,8 +985,6 @@ describe('When InventoryBrowserMain is rendered', () => {
       });
 
       it('Then the list title is a page heading and not a card title', async () => {
-        // Arrange
-
         // Act
         render(<InventoryBrowserMain />);
 
@@ -1021,8 +1017,8 @@ describe('When InventoryBrowserMain is rendered', () => {
         await waitFor(() => {
           expect(screen.queryByRole('region', { name: 'Shared stashes' })).not.toBeInTheDocument();
         });
-        expect(screen.getByRole('region', { name: 'Characters' })).toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: 'Shared stashes' })).not.toBeInTheDocument();
+        const characters = screen.getByRole('region', { name: 'Characters' });
+        expect(within(characters).getByRole('button', { name: /Sinsin/ })).toBeInTheDocument();
       });
     });
   });
