@@ -92,7 +92,8 @@ export function GroupHeader({ title, foundCount, itemCount, className }: GroupHe
             percentage: percentage.toFixed(1),
           })
         }
-        className="w-24"
+        // Neutral fill: a group mixes item qualities, so neither a quality color nor the accent fits
+        className="w-24 [&_[data-slot=progress-indicator]]:bg-muted-foreground"
       />
     </div>
   );
@@ -130,24 +131,31 @@ const HEADER_ROW_HEIGHT_ESTIMATE = 60;
 
 /**
  * Height of a grid tile in pixels without its artwork slot and the version pill row: 72px, so a
- * tile with the default 40px icon is 112px high. While ethereal tracking is on, every tile also
- * reserves the pill row (6px margin + 18px row, see GridView).
+ * tile with the default 40px icon is 112px high. The compact tile of a missing item needs 50px
+ * (2px border, 12px padding, 4px gap and the one-line name and subtitle), so with its default
+ * 16px icon it is 66px high. While ethereal tracking is on, every tile also reserves the pill row
+ * (6px margin + 18px row, see GridView).
  */
 const TILE_HEIGHT_WITHOUT_ARTWORK = 72;
+const MISSING_TILE_HEIGHT_WITHOUT_ARTWORK = 50;
 const VERSION_ROW_HEIGHT = 6 + 18;
 
 /**
  * Estimated height of a row of grid tiles in pixels, including the row gap (refined by measuring
- * rendered rows). The artwork slot is as high as the icon size preset; with ethereal tracking on,
- * the tile reserves the version pill row.
+ * rendered rows). The artwork slot is as high as the icon size preset; a row of only missing items
+ * (`compact`) holds the compact tiles with their smaller icon. With ethereal tracking on, the tile
+ * reserves the version pill row.
  */
 export function getItemRowHeightEstimate(
   reserveVersionRow: boolean,
   iconSize: ItemIconSize = 'default',
+  compact = false,
 ): number {
+  const iconPixels = ITEM_ICON_PIXELS[iconSize];
   return (
-    TILE_HEIGHT_WITHOUT_ARTWORK +
-    ITEM_ICON_PIXELS[iconSize].grid +
+    (compact
+      ? MISSING_TILE_HEIGHT_WITHOUT_ARTWORK + iconPixels.missingGrid
+      : TILE_HEIGHT_WITHOUT_ARTWORK + iconPixels.grid) +
     (reserveVersionRow ? VERSION_ROW_HEIGHT : 0) +
     COLUMN_GUTTER
   );
@@ -164,7 +172,8 @@ export interface ItemGridGroup {
 }
 
 /**
- * A virtual row of the grid: either a group header or a row of up to `columnCount` items.
+ * A virtual row of the grid: either a group header or a row of up to `columnCount` items. A row of
+ * only missing items is `compact`: its tiles are the lower missing-item tiles.
  */
 export type GridRow =
   | {
@@ -175,20 +184,23 @@ export type GridRow =
       foundCount: number;
       isFirstGroup: boolean;
     }
-  | { type: 'items'; key: string; items: Item[] };
+  | { type: 'items'; key: string; items: Item[]; compact: boolean };
 
 /**
  * Flattens grouped items into virtual rows: one header row per group (unless `showGroupHeaders`
- * is false) followed by rows of at most `columnCount` items.
+ * is false) followed by rows of at most `columnCount` items. A row is compact when `isItemFound`
+ * is false for every item in it; a row with any found item keeps the full tile height.
  *
- * Row keys identify what a row shows (its group, column count and item ids) rather than its
- * position. The virtualizer caches measured heights by key, so a row whose content or column count
- * changes gets a new key and is measured again instead of inheriting a stale height.
+ * Row keys identify what a row shows (its group, column count, item ids and whether it is compact)
+ * rather than its position. The virtualizer caches measured heights by key, so a row whose content,
+ * column count or height class changes gets a new key and is measured again instead of inheriting
+ * a stale height.
  */
 export function createGridRows(
   groupedItems: ItemGridGroup[],
   columnCount: number,
   showGroupHeaders = true,
+  isItemFound: (item: Item) => boolean = () => true,
 ): GridRow[] {
   const itemsPerRow = Number.isFinite(columnCount) ? Math.max(1, Math.floor(columnCount)) : 1;
   const rows: GridRow[] = [];
@@ -207,10 +219,12 @@ export function createGridRows(
 
     for (let start = 0; start < group.items.length; start += itemsPerRow) {
       const rowItems = group.items.slice(start, start + itemsPerRow);
+      const compact = !rowItems.some(isItemFound);
       rows.push({
         type: 'items',
-        key: `items-${groupIndex}-${itemsPerRow}-${rowItems.map((item) => item.id).join(',')}`,
+        key: `items-${groupIndex}-${itemsPerRow}-${compact ? 'compact-' : ''}${rowItems.map((item) => item.id).join(',')}`,
         items: rowItems,
+        compact,
       });
     }
   }
@@ -257,8 +271,9 @@ interface VirtualItemGridProps {
  * VirtualItemGrid component that renders items in a virtualized, responsive card grid.
  * Groups are flattened into optional header rows and rows of cards, with as many equally wide
  * columns as fit into the grid width (see {@link getColumnCount}). Only rows near the viewport are
- * mounted. Tiles have a fixed height (taller while ethereal tracking reserves the version pill row),
- * so item rows are equally tall; rows are still measured after rendering to refine the estimate.
+ * mounted. Tiles have a fixed height (taller while ethereal tracking reserves the version pill row;
+ * lower for missing items), so a row of only missing items and a row with a found item each have a
+ * known height; rows are still measured after rendering to refine the estimate.
  */
 export const VirtualItemGrid = memo(function VirtualItemGrid({
   groupedItems,
@@ -274,17 +289,25 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
   const iconSize = useGrailStore((state) => getGrailItemIconSize(state.settings));
 
   const rows = useMemo(
-    () => createGridRows(groupedItems, columnCount, showGroupHeaders),
-    [groupedItems, columnCount, showGroupHeaders],
+    () =>
+      createGridRows(
+        groupedItems,
+        columnCount,
+        showGroupHeaders,
+        (item) => progressLookup.get(item.id)?.overallFound ?? false,
+      ),
+    [groupedItems, columnCount, showGroupHeaders, progressLookup],
   );
 
   // Stable callbacks: the virtualizer recomputes its measurements when these options change
   const getScrollElement = useCallback(() => scrollRef.current, []);
   const estimateSize = useCallback(
-    (index: number) =>
-      rows[index]?.type === 'header'
+    (index: number) => {
+      const row = rows[index];
+      return row?.type === 'header'
         ? HEADER_ROW_HEIGHT_ESTIMATE
-        : getItemRowHeightEstimate(reserveVersionRow, iconSize),
+        : getItemRowHeightEstimate(reserveVersionRow, iconSize, row?.compact);
+    },
     [rows, reserveVersionRow, iconSize],
   );
   const getItemKey = useCallback((index: number) => rows[index].key, [rows]);

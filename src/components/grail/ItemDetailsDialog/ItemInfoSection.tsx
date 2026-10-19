@@ -11,10 +11,9 @@ import {
   itemTypeLabelKeys,
 } from '@/lib/labelKeys';
 import { getExternalLinkLabelKey } from '@/lib/links';
-import { cn } from '@/lib/utils';
 
 /**
- * One "Label: value" line of the item facts, laid out like a line of an in-game item tooltip.
+ * One label / value row of the item facts: the label in the first column, the value in the second.
  */
 function FactLine({
   label,
@@ -26,10 +25,10 @@ function FactLine({
   children: ReactNode;
 }) {
   return (
-    <div>
-      <dt className="inline text-muted-foreground">{label}</dt>{' '}
-      <dd className={cn('inline', valueClassName)}>{children}</dd>
-    </div>
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={valueClassName}>{children}</dd>
+    </>
   );
 }
 
@@ -38,8 +37,9 @@ function getRuneNames(runeIds: string[]): string {
 }
 
 /**
- * The item's facts (type, category, treasure class, set, runes, ethereal type) as plain centered
- * text lines, followed by the link to the item's page on diablo2.io or d2runewizard.
+ * The item's facts (type, category, treasure class, set, runes, ethereal type) as a left-aligned
+ * two-column definition list, followed by the link to the item's page on diablo2.io or
+ * d2runewizard.
  */
 export function ItemInfoSection({ item }: { item: Item }) {
   const { t } = useTranslation();
@@ -47,8 +47,8 @@ export function ItemInfoSection({ item }: { item: Item }) {
   const hasRunes = item.type === 'runeword' && item.runes && item.runes.length > 0;
 
   return (
-    <div className="grid gap-3 text-center">
-      <dl className="grid gap-1">
+    <div className="grid gap-3">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-left">
         <FactLine label={t(keys.type)}>{t(itemTypeLabelKeys[item.type])}</FactLine>
         <FactLine label={t(keys.category)}>{t(itemCategoryLabelKeys[item.category])}</FactLine>
         <FactLine label={t(keys.treasureClass)}>
@@ -64,10 +64,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
             {getRuneNames(item.runes)}
           </FactLine>
         )}
-        <FactLine
-          label={t(keys.etherealType)}
-          valueClassName={item.etherealType === 'none' ? undefined : 'text-ethereal'}
-        >
+        <FactLine label={t(keys.etherealType)}>
           {t(etherealTypeLabelKeys[item.etherealType])}
         </FactLine>
       </dl>
@@ -78,7 +75,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-primary underline underline-offset-4 hover:text-primary/90"
+            className="inline-flex items-center gap-1 text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground"
           >
             {t(getExternalLinkLabelKey(item.link))}
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />

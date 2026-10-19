@@ -308,13 +308,12 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
 
     it.each([
-      { etherealType: 'none', label: 'Cannot be ethereal', isEtherealColored: false },
-      { etherealType: 'optional', label: 'Can be ethereal', isEtherealColored: true },
-      { etherealType: 'only', label: 'Ethereal only', isEtherealColored: true },
-    ] as const)('Then renders the $etherealType ethereal type as $label without destructive styling', ({
+      { etherealType: 'none', label: 'Cannot be ethereal' },
+      { etherealType: 'optional', label: 'Can be ethereal' },
+      { etherealType: 'only', label: 'Ethereal only' },
+    ] as const)('Then renders the $etherealType ethereal type as $label in the normal text color', ({
       etherealType,
       label,
-      isEtherealColored,
     }) => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
@@ -329,8 +328,57 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       const value = screen.getByText(label);
       expect(screen.getByText('Ethereal type:').nextElementSibling).toBe(value);
-      expect(value.classList.contains('text-ethereal')).toBe(isEtherealColored);
-      expect(value).not.toHaveClass('text-destructive');
+      expect(value.tagName).toBe('DD');
+      expect(value.className).not.toMatch(/(^|\s)text-/);
+    });
+
+    it('Then the item facts are a left-aligned two-column definition list', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const label = screen.getByText('Treasure class:');
+      const list = label.parentElement;
+      expect(list?.tagName).toBe('DL');
+      expect(list).toHaveClass('grid-cols-[auto_1fr]', 'text-left');
+      expect(list).not.toHaveClass('text-center');
+      expect(list?.closest('.text-center')).toBeNull();
+      expect(label.nextElementSibling?.tagName).toBe('DD');
+    });
+
+    it('Then initial focus is on the dialog, not on the external link', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      item.link = 'https://diablo2.io/item/windforce';
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const dialog = screen.getByRole('dialog', { name: 'Windforce' });
+      await waitFor(() => expect(dialog).toHaveFocus());
+      expect(screen.getByRole('link', { name: /View on diablo2.io/ })).not.toHaveFocus();
+    });
+
+    it('Then pressing Escape on the initially focused dialog closes it', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const onOpenChange = vi.fn();
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={onOpenChange} />);
+      const dialog = screen.getByRole('dialog', { name: 'Windforce' });
+      await waitFor(() => expect(dialog).toHaveFocus());
+
+      // Act
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+
+      // Assert
+      expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything());
     });
   });
 
@@ -420,6 +468,27 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByText('View on diablo2.io')).toBeInTheDocument();
+    });
+
+    it('Then the link uses the neutral underlined link style instead of the accent color', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      item.link = 'https://diablo2.io/item/windforce';
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const link = screen.getByRole('link', { name: /View on diablo2.io/ });
+      expect(link).toHaveClass(
+        'text-foreground',
+        'underline',
+        'decoration-muted-foreground',
+        'underline-offset-4',
+        'hover:decoration-foreground',
+      );
+      expect(link).not.toHaveClass('text-primary');
     });
   });
 
@@ -550,7 +619,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If the item was not found', () => {
-    it('Then shows a Not Found status line', () => {
+    it('Then shows a neutral Not Found status line, not an error color', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
       setupStoreMock({ items: [item] });
@@ -559,13 +628,14 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-muted-foreground');
+      expect(screen.getByText('Not found')).not.toHaveClass('text-missing');
     });
   });
 
   describe('If ethereal tracking is on and an item with optional ethereal type has per-version progress', () => {
-    const found = { text: 'Found', present: 'text-found', absent: 'text-missing' };
-    const missing = { text: 'Not found', present: 'text-missing', absent: 'text-found' };
+    const found = { text: 'Found', present: 'text-found', absent: 'text-muted-foreground' };
+    const missing = { text: 'Not found', present: 'text-muted-foreground', absent: 'text-found' };
 
     it.each([
       { normalFound: true, etherealFound: false, normal: found, ethereal: missing },
@@ -668,7 +738,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-muted-foreground');
       expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
     });
@@ -985,7 +1055,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not found')).toHaveClass('text-missing');
+      expect(screen.getByText('Not found')).toHaveClass('text-muted-foreground');
       expect(screen.queryByText('Normal:')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal:')).not.toBeInTheDocument();
     });

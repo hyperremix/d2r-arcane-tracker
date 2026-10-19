@@ -43,9 +43,22 @@ const foundFrameStyles: Record<ItemType, { border: string; hover: string }> = {
 };
 
 /**
+ * Quality hint of a missing card: a thin left edge in a soft shade of the quality color, so the
+ * kind of item that is still missing reads at a glance while the card stays dim. It turns solid on
+ * hover for clickable cards.
+ */
+const missingEdgeStyles: Record<ItemType, { edge: string; hover: string }> = {
+  unique: { edge: 'border-l-item-unique/50', hover: 'hover:border-l-item-unique' },
+  set: { edge: 'border-l-item-set/50', hover: 'hover:border-l-item-set' },
+  rune: { edge: 'border-l-item-rune/50', hover: 'hover:border-l-item-rune' },
+  runeword: { edge: 'border-l-item-runeword/50', hover: 'hover:border-l-item-runeword' },
+};
+
+/**
  * Card surface styles depending on whether the item has been found.
  * - Found: card surface with a quality-colored hairline border and a subtle elevation.
- * - Missing: muted neutral surface with a neutral hairline border, so the card recedes.
+ * - Missing: muted neutral surface with a neutral hairline border, so the card recedes; only its
+ *   left edge hints at the quality color.
  * Opacity is never applied to the whole card so text keeps full contrast.
  */
 const foundStateStyles = {
@@ -71,17 +84,18 @@ export function getCardStateClasses(
   isInteractive = false,
 ): string {
   const frame = foundFrameStyles[itemType];
+  const missingEdge = missingEdgeStyles[itemType];
   const classes: string[] = [];
   if (isFound) {
     classes.push(frame.border, foundStateStyles.found);
   } else {
-    classes.push(foundStateStyles.missing);
+    classes.push(foundStateStyles.missing, 'border-l-2', missingEdge.edge);
   }
   if (isInteractive) {
     if (isFound) {
       classes.push(frame.hover, 'hover:shadow-md');
     } else {
-      classes.push('hover:border-muted-foreground/50');
+      classes.push('hover:border-muted-foreground/50', missingEdge.hover);
     }
     classes.push(cardTransitionStyles);
   }

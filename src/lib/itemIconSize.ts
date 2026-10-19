@@ -2,11 +2,15 @@ import type { ItemIconSize, Settings } from 'electron/types/grail';
 
 /**
  * Edge length in pixels of an item icon on the grail page, per size preset and view mode.
+ * `missingGrid` is the smaller icon of the compact grid tile of a missing item.
  */
-export const ITEM_ICON_PIXELS: Record<ItemIconSize, { grid: number; list: number }> = {
-  default: { grid: 40, list: 48 },
-  large: { grid: 80, list: 96 },
-  extraLarge: { grid: 120, list: 144 },
+export const ITEM_ICON_PIXELS: Record<
+  ItemIconSize,
+  { grid: number; missingGrid: number; list: number }
+> = {
+  default: { grid: 40, missingGrid: 16, list: 48 },
+  large: { grid: 80, missingGrid: 32, list: 96 },
+  extraLarge: { grid: 120, missingGrid: 48, list: 144 },
 };
 
 /**

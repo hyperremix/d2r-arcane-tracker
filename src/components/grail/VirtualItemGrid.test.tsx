@@ -250,6 +250,21 @@ describe('When getItemRowHeightEstimate is called', () => {
       expect(estimate).toBe(tileHeight + COLUMN_GUTTER);
     });
   });
+
+  describe('If the row only holds missing items', () => {
+    it.each([
+      ['default', false, 66],
+      ['large', false, 82],
+      ['extraLarge', false, 98],
+      ['default', true, 66 + 6 + 18],
+    ] as const)('Then the compact %s tile (version row reserved: %s) is %ipx high plus the row gap', (iconSize, reserveVersionRow, tileHeight) => {
+      // Act
+      const estimate = getItemRowHeightEstimate(reserveVersionRow, iconSize, true);
+
+      // Assert
+      expect(estimate).toBe(tileHeight + COLUMN_GUTTER);
+    });
+  });
 });
 
 describe('When createGridRows is called', () => {
@@ -316,6 +331,47 @@ describe('When createGridRows is called', () => {
 
       // Assert
       expect(rows[0]).toMatchObject({ type: 'header', itemCount: 2, foundCount: 0 });
+    });
+  });
+
+  describe('If found and missing items are told apart', () => {
+    it('Then only rows holding nothing but missing items are compact', () => {
+      // Arrange
+      const items = [1, 2, 3, 4, 5].map((n) => createMockItem({ id: `item-${n}` }));
+      const foundIds = new Set(['item-4']);
+
+      // Act
+      const rows = createGridRows([{ title: 'Helms', items }], 2, true, (item) =>
+        foundIds.has(item.id),
+      );
+
+      // Assert
+      const itemRows = rows.filter((row) => row.type === 'items');
+      expect(itemRows.map((row) => row.compact)).toEqual([true, false, true]);
+    });
+
+    it('Then a row that turns from missing to found gets a new key, so it is measured again', () => {
+      // Arrange
+      const items = [createMockItem({ id: 'a' }), createMockItem({ id: 'b' })];
+      const groups = [{ title: 'Helms', items }];
+
+      // Act
+      const [missingRow] = createGridRows(groups, 2, false, () => false);
+      const [foundRow] = createGridRows(groups, 2, false, (item) => item.id === 'b');
+
+      // Assert
+      expect(missingRow.key).not.toBe(foundRow.key);
+    });
+
+    it('Then rows are not compact when no found check is given', () => {
+      // Arrange
+      const items = [createMockItem({ id: 'a' })];
+
+      // Act
+      const rows = createGridRows([{ title: 'Helms', items }], 2, false);
+
+      // Assert
+      expect(rows).toEqual([expect.objectContaining({ type: 'items', compact: false })]);
     });
   });
 
@@ -823,7 +879,7 @@ describe('When VirtualItemGrid estimates the height of rows it has not measured 
     [true, 'extraLarge', 192],
     [false, 'extraLarge', 112],
   ] as const)('If item icons are shown is %s and the preset is %s', (showItemIcons, itemIconSize, tileHeight) => {
-    it(`Then a row is estimated as a ${tileHeight}px tile plus the row gap`, () => {
+    it(`Then a row of a found item is estimated as a ${tileHeight}px tile plus the row gap`, () => {
       // Arrange
       stubLayout({ height: 0, width: widthForColumns(1) });
       useGrailStore.setState({
@@ -838,9 +894,9 @@ describe('When VirtualItemGrid estimates the height of rows it has not measured 
       // Act
       const { container } = render(
         <VirtualItemGrid
-          groupedItems={[{ title: 'Unique Armor', items: [createMockItem()], foundCount: 0 }]}
+          groupedItems={[{ title: 'Unique Armor', items: [createMockItem()], foundCount: 1 }]}
           showGroupHeaders={false}
-          progressLookup={createMockProgressLookup()}
+          progressLookup={createMockProgressLookup([{ itemId: 'test-item-1', normalFound: true }])}
           characters={[]}
           onItemClick={vi.fn()}
         />,
@@ -849,6 +905,42 @@ describe('When VirtualItemGrid estimates the height of rows it has not measured 
       // Assert
       const content = container.firstElementChild?.firstElementChild as HTMLElement;
       expect(content.style.height).toBe(`${tileHeight + COLUMN_GUTTER}px`);
+    });
+  });
+
+  describe.each([
+    ['default', 66],
+    ['large', 82],
+    ['extraLarge', 98],
+  ] as const)('If the items are missing and the preset is %s', (itemIconSize, compactTileHeight) => {
+    it(`Then a row of only missing items is estimated as a ${compactTileHeight}px compact tile and a row with a found item as a full tile`, () => {
+      // Arrange
+      stubLayout({ height: 0, width: widthForColumns(2) });
+      useGrailStore.setState({
+        settings: {
+          ...initialGrailState.settings,
+          showItemIcons: true,
+          itemIconSize,
+          grailEthereal: false,
+        },
+      });
+      const items = ['a', 'b', 'c', 'd'].map((id) => createMockItem({ id, name: id }));
+
+      // Act
+      const { container } = render(
+        <VirtualItemGrid
+          groupedItems={[{ title: 'Unique Armor', items, foundCount: 1 }]}
+          showGroupHeaders={false}
+          progressLookup={createMockProgressLookup([{ itemId: 'd', normalFound: true }])}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const content = container.firstElementChild?.firstElementChild as HTMLElement;
+      const foundRowHeight = getItemRowHeightEstimate(false, itemIconSize);
+      expect(content.style.height).toBe(`${compactTileHeight + COLUMN_GUTTER + foundRowHeight}px`);
     });
   });
 });
@@ -1123,6 +1215,15 @@ describe('When GroupHeader is rendered', () => {
       expect(screen.getByRole('heading', { name: 'Armor' })).toBeInTheDocument();
       expect(screen.getByText('12/40')).toBeInTheDocument();
       expect(screen.getByRole('progressbar', { name: 'Armor progress' })).toBeInTheDocument();
+    });
+
+    it('Then the progress bar is filled in a neutral color instead of the accent color', () => {
+      // Arrange & Act
+      render(<GroupHeader title="Armor" foundCount={12} itemCount={40} />);
+
+      // Assert
+      const progressBar = screen.getByRole('progressbar', { name: 'Armor progress' });
+      expect(progressBar).toHaveClass('[&_[data-slot=progress-indicator]]:bg-muted-foreground');
     });
   });
 });
