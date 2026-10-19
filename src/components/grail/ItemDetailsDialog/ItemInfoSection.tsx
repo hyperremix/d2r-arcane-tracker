@@ -78,7 +78,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-primary underline underline-offset-4 hover:text-primary/80"
+            className="inline-flex items-center gap-1 text-primary underline underline-offset-4 hover:text-primary/90"
           >
             {t(getExternalLinkLabelKey(item.link))}
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
