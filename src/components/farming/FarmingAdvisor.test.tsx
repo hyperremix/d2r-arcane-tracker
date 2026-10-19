@@ -138,7 +138,8 @@ describe('When the farming advisor page is shown', () => {
 
     // Act
     setup(getOverview);
-    fireEvent.click(await screen.findByRole('button', { name: 'Open D2R installation settings' }));
+    const prompt = await screen.findByTestId('d2r-folder-prompt');
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Open D2R installation settings' }));
 
     // Assert
     expect(await screen.findByText('Settings page')).toBeInTheDocument();
@@ -158,6 +159,8 @@ describe('When the farming advisor page is shown', () => {
     // Assert
     expect(await screen.findByText('Game files must be extracted')).toBeInTheDocument();
     expect(screen.getByText(/treasureclassex\.txt, levels\.txt/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveClass('text-warning');
+    expect(screen.getByRole('alert')).not.toHaveClass('text-destructive');
   });
 
   it('If the page is shown, Then the missing items are requested for the highest character level', async () => {

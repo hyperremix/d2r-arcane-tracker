@@ -15,13 +15,19 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 
 Open **Terror zone schedule** with the horned demon head icon (**Terror zones**) next to the settings icon on the right of the title bar. It shows the offline (single-player) rotation in your local time:
 
-- **Current terror zone**, with a countdown to the end of its window.
-- **Next terror zone**, with a countdown to its start.
-- **Upcoming terror zones** for roughly the next 12 hours.
+- **Current terror zone**, with the time left in its window, such as *Ends in 12 min* or *Ends in 1 hr 20 min*. The last minute counts down in seconds.
+- **Next terror zone**, with the time until it starts.
+- **Upcoming terror zones** for roughly the next 12 hours: a compact list of start times and zones, grouped under *Today*, *Tomorrow* or the weekday. Next to the current and next cards on wide windows, below them on narrower ones.
+
+When the [farming advisor](FARMING_ADVISOR.md) can read your game files, each zone also shows how many of your missing grail items its terrorized monsters can drop in any difficulty, for example *12 missing items can drop here*. The count follows the character level set on the farming advisor page. Without the farming data, nothing extra is shown.
 
 The app calculates the schedule itself, with the same algorithm as the game ([how it works](TERROR_ZONE_FINDINGS_2026.md)), so it needs no internet connection. It reads `desecratedzones.json` in your D2R folder, so the schedule follows the zones you turned off on the configuration page: it is recalculated every time you open the page, and the page reloads it when a zone's window ends.
 
-- If no D2R folder is set, or the game file can't be read, the page shows the retail schedule and says so. Set **Settings → D2R installation** to follow your own file.
+When the schedule falls back to the retail default, the page checks your D2R folder with the same validation as the configuration page, which backs up `desecratedzones.json` the first time it finds the file.
+
+- If no D2R folder is set, the page shows the retail schedule with a prompt to set the folder and an **Open D2R installation settings** button. The farming advisor, the **Where to farm** section of the item details and the configuration page show the same prompt.
+- If a D2R folder is set but the page can't use its game file, it shows the retail schedule with a warning that says why: the folder doesn't exist or `desecratedzones.json` isn't in it (both with a button to the D2R installation setting), or the file can't be read. [Extract the game files](EXTRACTING_GAME_FILES.md) to fix the last two, then reopen the page.
+- If the check of the folder fails or gives no reason, the retail schedule is shown without an explanation.
 - If the game file is from an older version of D2R (before patch 3.x), D2R can't run a rotation from it. The page says so and shows the retail schedule. [Extract the game files](EXTRACTING_GAME_FILES.md) again, delete `desecratedzones.json.original` from the app's data folder and reopen the configuration page, so the app backs up the current file. **Restore original** puts back the backup, so an outdated backup brings the outdated file back.
 - If the game file has no zones, the page says that no terror zone is scheduled.
 - D2R only uses the game file when started with `-direct -txt`. Without the flags your game follows the retail schedule, which differs from the page whenever the file has been changed.
@@ -37,7 +43,7 @@ Open **Terror Zone Configuration** with **Configure zones** on the schedule page
 
 Until the zones can be read, the page shows one of these instead of the zone list:
 
-- **No D2R installation folder is set yet:** the page only asks you to set it, with an **Open D2R installation settings** button.
+- **No D2R installation folder is set yet:** the page only asks you to set it, with an **Open D2R installation settings** button. It is the same prompt the schedule and the farming advisor show.
 - **The folder is set but the game file can't be used:** the page shows what went wrong. A missing folder gets a button to the D2R installation setting, and a missing game file gets the extraction steps.
 - **Reading the zones failed:** the page shows *Failed to load terror zone data* with a **Retry** button.
 
@@ -70,5 +76,7 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 | *Failed to update terror zone configuration*, *Failed to enable all zones*, *Failed to disable all zones* or *Failed to restore original file* | The change wasn't made, and any switches you changed go back to their previous state. Close D2R, check that the app has write access to the D2R folder (see [Requirements](#requirements)) and try again. |
 | Changes have no effect in game | Start D2R with `-direct -txt` and restart it after each change. |
 | D2R won't start after you changed zones | If the zone list is shown, click **Restore original**. If the page shows a problem with the game file instead, follow the fix for that message above. If it still fails, repair D2R through Battle.net and extract the files again. |
+| *The D2R installation folder set in Settings doesn't exist* (schedule page) | Click **Open D2R installation settings** and choose the main D2R folder again. |
+| *desecratedzones.json isn't in your D2R folder* or *desecratedzones.json in your D2R folder can't be read* (schedule page) | [Extract the game files](EXTRACTING_GAME_FILES.md) again and reopen the page. |
 | The schedule page doesn't match the zone shown in game | Check that D2R was started with `-direct -txt` and restarted after the last change. A game started without the flags follows the retail schedule. |
 | Zones are wrong after a D2R patch | The backup is from the old version. Extract the game files again, delete `desecratedzones.json.original` from the app's data folder, reopen the page so the app backs up the new file, then set your zones again. |

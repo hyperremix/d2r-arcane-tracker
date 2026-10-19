@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { FarmingItemSource, FarmingItemSources } from 'electron/types/grail';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { FARMING_INPUT_DEBOUNCE_MS } from '@/lib/farming';
@@ -33,7 +33,10 @@ function setup(result: FarmingItemSources, item = shako) {
   window.electronAPI = { farming: { getItemSources } } as unknown as typeof window.electronAPI;
   render(
     <MemoryRouter>
-      <ItemFarmingSources item={item} characters={characters} />
+      <Routes>
+        <Route path="/" element={<ItemFarmingSources item={item} characters={characters} />} />
+        <Route path="/settings" element={<div>Settings page</div>} />
+      </Routes>
     </MemoryRouter>,
   );
   return getItemSources;
@@ -164,15 +167,53 @@ describe('When the farming sources of an item are shown', () => {
     expect(screen.getAllByRole('row')).toHaveLength(11);
   });
 
-  it('If the game files are not available, Then it links to the farming advisor', async () => {
-    // Arrange & Act
-    setup({ status: 'unavailable', errorCode: 'gameFilesMissing', missingFiles: [] });
+  it('If no D2R installation folder is set, Then the shared prompt opens the D2R installation settings', async () => {
+    // Arrange
+    setup({ status: 'unavailable', errorCode: 'pathNotConfigured' });
+    const prompt = await screen.findByTestId('d2r-folder-prompt');
+
+    // Act
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Open D2R installation settings' }));
 
     // Assert
-    expect(await screen.findByRole('link', { name: 'Open the farming advisor' })).toHaveAttribute(
-      'href',
-      '/farming',
+    expect(await screen.findByText('Settings page')).toBeInTheDocument();
+  });
+
+  it('If game files are missing, Then a warning lists them and says to extract them', async () => {
+    // Arrange & Act
+    setup({
+      status: 'unavailable',
+      errorCode: 'gameFilesMissing',
+      missingFiles: ['treasureclassex.txt', 'levels.txt'],
+    });
+
+    // Assert
+    const warning = await screen.findByRole('status');
+    expect(warning).toHaveTextContent(/treasureclassex\.txt, levels\.txt/);
+    expect(warning).toHaveTextContent(/Extract the game files/);
+    expect(screen.queryByTestId('d2r-folder-prompt')).not.toBeInTheDocument();
+  });
+
+  it('If game files are missing, Then the warning links to the D2R installation settings', async () => {
+    // Arrange
+    setup({ status: 'unavailable', errorCode: 'gameFilesMissing', missingFiles: ['levels.txt'] });
+    const warning = await screen.findByRole('status');
+
+    // Act
+    fireEvent.click(
+      within(warning).getByRole('button', { name: 'Open D2R installation settings' }),
     );
+
+    // Assert
+    expect(await screen.findByText('Settings page')).toBeInTheDocument();
+  });
+
+  it('If the game files cannot be read, Then a warning says to extract them again', async () => {
+    // Arrange & Act
+    setup({ status: 'unavailable', errorCode: 'readFailed' });
+
+    // Assert
+    expect(await screen.findByRole('status')).toHaveTextContent(/could not be read/);
   });
 
   it('If no monster drops the item, Then it says so', async () => {

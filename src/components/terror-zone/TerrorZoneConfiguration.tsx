@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   CalendarClock,
   ExternalLink,
-  FolderCog,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -41,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { D2RFolderPrompt } from './D2RFolderPrompt';
 import { groupTerrorZonesByAct } from './terrorZoneActs';
 import { useTerrorZoneConfig } from './useTerrorZoneConfig';
 
@@ -112,32 +112,6 @@ function DestructiveAlert({ icon: Icon, title, children }: DestructiveAlertProps
  */
 interface InstallationStateProps {
   onOpenInstallationSettings: () => void;
-}
-
-/**
- * Empty state shown when no D2R installation folder is set: says what is needed and offers the
- * one action that fixes it.
- */
-function InstallationPathNotConfigured({ onOpenInstallationSettings }: InstallationStateProps) {
-  const { t } = useTranslation();
-  return (
-    <div
-      data-testid="terror-zone-not-configured"
-      className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
-    >
-      <FolderCog aria-hidden="true" className="size-10 text-muted-foreground" />
-      <h2 className="font-semibold text-foreground text-lg">
-        {t(translations.terrorZone.notConfigured.title)}
-      </h2>
-      <p className="max-w-md text-muted-foreground text-sm">
-        {t(translations.terrorZone.notConfigured.description)}
-      </p>
-      <Button type="button" onClick={onOpenInstallationSettings} className="mt-2">
-        <Settings aria-hidden="true" />
-        {t(translations.terrorZone.openInstallationSettings)}
-      </Button>
-    </div>
-  );
 }
 
 /**
@@ -364,9 +338,7 @@ export function TerrorZoneConfiguration() {
           {pageHeader}
           <Card>
             <CardContent>
-              <InstallationPathNotConfigured
-                onOpenInstallationSettings={openInstallationSettings}
-              />
+              <D2RFolderPrompt layout="page" />
             </CardContent>
           </Card>
         </PageShell>
