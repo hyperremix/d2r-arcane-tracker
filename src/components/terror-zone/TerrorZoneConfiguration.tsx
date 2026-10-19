@@ -337,7 +337,11 @@ export function TerrorZoneConfiguration() {
           {pageHeader}
           <Card>
             <CardContent>
-              <D2RFolderPrompt layout="page" />
+              <D2RFolderPrompt
+                layout="page"
+                description={t(translations.terrorZone.notConfigured.description)}
+                onFolderSet={() => void reload()}
+              />
             </CardContent>
           </Card>
         </PageShell>

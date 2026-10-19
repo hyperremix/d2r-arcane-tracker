@@ -19,7 +19,7 @@ The tables are read once and kept in memory until one of them changes on disk (t
 
 Open it with **Farming advisor** in the title bar. When the window is too narrow to show every page, it moves into the **More** menu at the end of the navigation.
 
-Until the files can be read, the page says what is missing: without a D2R folder it asks you to set one, with an **Open D2R installation settings** button (the same prompt the terror zone pages show), and when files are missing it lists them.
+Until the files can be read, the page says what is missing and lists your missing items by name; select one to open its details. Without a D2R folder it asks you to set one, with an **Open D2R installation settings** button. If the app finds D2R in a [well-known folder](EXTRACTING_GAME_FILES.md#where-the-app-looks-for-d2r), a **Use** button with the folder's path saves that folder and reads the drop tables right away. When files are missing, the page lists them.
 
 The page then shows:
 
@@ -38,7 +38,7 @@ The details of a unique, set item or rune have a **Where to farm** section. It l
 
 The drop rate is the average number of kills per drop, for example "1 in 1,779". Where a source groups several monster types (the regular monsters of an area), the range from the best to the worst type is shown. Set **Players** (your `/players` setting) and **Magic find** above the list; both are kept until you close the app.
 
-Without a D2R folder the section shows the same prompt to set one, with an **Open D2R installation settings** button. When a folder is set but game files are missing or can't be read, a warning names the missing files, or says the files can't be read, and tells you to extract the game files again, with an **Open D2R installation settings** button in case the folder is wrong.
+Without a D2R folder the section shows a one-line hint with the same buttons as the farming advisor page. When a folder is set but game files are missing or can't be read, a warning names the missing files, or says the files can't be read, and tells you to extract the game files again, with an **Open D2R installation settings** button in case the folder is wrong.
 
 ## How the numbers are calculated
 

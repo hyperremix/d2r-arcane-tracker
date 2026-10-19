@@ -13,7 +13,8 @@ import { getDefaultD2RPath } from '@/lib/d2rInstallPath';
  * This setting is shared between item icon management and terror zone configuration.
  * The field only ever shows the path stored in the settings, which is also what Terror Zones reads.
  * When none is saved, the field stays empty (no example path as placeholder, so it cannot be
- * mistaken for a saved value) and a notice says so, offering the default location if it exists.
+ * mistaken for a saved value) and a notice says so, offering an installation found in a
+ * well-known folder (see IconService.getSuggestedD2RPath).
  * The path is persisted on blur, Enter, Browse or when accepting the suggestion - never per keystroke.
  * @returns {JSX.Element} A settings card with D2R installation path configuration
  */
@@ -28,7 +29,7 @@ export function D2RInstallationSettings() {
   // The saved path was read successfully; the "not saved" notice must not show before that
   const [hasLoaded, setHasLoaded] = useState(false);
   const [hasSavedPath, setHasSavedPath] = useState(false);
-  // Default install path, only set if the main process confirmed it exists on disk
+  // Installation folder the main process found in a well-known location, if any
   const [suggestedPath, setSuggestedPath] = useState<string | undefined>(undefined);
   const [saveFailed, setSaveFailed] = useState(false);
   // Last path known to be persisted, restored when a save fails

@@ -39,6 +39,8 @@
       "description": "The farming advisor reads these files from Data/global/excel in your D2R folder, and they are missing: {{files}}. Extract the game files once, then reopen this page."
     },
     "readFailed": "The game files could not be read. Extract them again, then reopen this page.",
+    "notConfigured": "Drop rates are read from the drop tables of your D2R installation. Set your D2R folder to see where your missing items drop.",
+    "missingItems": "Missing items",
     "characterLevel": "Character level",
     "characterLevelDescription": "Sets the monster level in terror zones",
     "players": "Players",
@@ -112,7 +114,8 @@
       "showFewer": "Show fewer",
       "note": "Drop rates are the average number of drops per kill, from the drop tables of your game files. Whether the item drops ethereal isn't included. Terror zone monster levels follow assumed rules, described in the Farming Advisor guide.",
       "gameFilesMissing": "Drop rates need game files that are missing from Data/global/excel in your D2R folder: {{files}}. Extract the game files once, then reopen this item.",
-      "readFailed": "The game files in your D2R folder could not be read. Extract them again, then reopen this item."
+      "readFailed": "The game files in your D2R folder could not be read. Extract them again, then reopen this item.",
+      "notConfigured": "Set your D2R folder to see where this item drops."
     }
   },
   "grail": {
@@ -989,7 +992,7 @@
       "dialogTitle": "Select D2R installation directory",
       "notDetectedTitle": "Installation not detected",
       "notDetectedHint": "Browse to your Diablo II: Resurrected folder, or skip this optional step and set it later in Settings.",
-      "suggestion": "Diablo II: Resurrected was found at the default location:",
+      "suggestion": "Diablo II: Resurrected was found in this folder:",
       "useSuggestion": "Use this",
       "validating": "Checking installation path...",
       "valid": "Game files found at this location",
@@ -1571,7 +1574,8 @@
     "openInstallationSettings": "Open D2R installation settings",
     "notConfigured": {
       "title": "Set your D2R installation folder",
-      "description": "Terror zones and drop rates are read from the game files of your D2R installation. Choose your D2R folder in Settings to use them."
+      "description": "Terror zones are changed in the game files of your D2R installation. Set your D2R folder to choose which zones can appear.",
+      "useFolder": "Use {{path}}"
     },
     "gameFilesMustBeExtracted": "Game files must be extracted",
     "cascDescription": "D2R stores game files in CASC (Content Addressable Storage Container) format.",
@@ -1624,7 +1628,7 @@
       "missingItemsShort_one": "{{count}} missing item",
       "missingItemsShort_other": "{{count}} missing items",
       "empty": "Your game file schedules no terror zone. Enable a zone on the configuration page.",
-      "retailNote": "This is the retail schedule. Once your D2R folder is set, it follows the zones of your game file.",
+      "retailNote": "This is the retail schedule. Set your D2R folder to follow the zone schedule from your game files.",
       "folderNotFound": "The D2R installation folder set in Settings doesn't exist, so this is the retail schedule. Choose your D2R folder again.",
       "gameFileNotFound": "desecratedzones.json isn't in your D2R folder, so this is the retail schedule. Extract the game files, then reopen this page.",
       "gameFileUnreadable": "desecratedzones.json in your D2R folder can't be read, so this is the retail schedule. Extract the game files again, then reopen this page.",

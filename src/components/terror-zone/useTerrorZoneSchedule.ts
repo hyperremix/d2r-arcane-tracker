@@ -25,7 +25,8 @@ interface UseTerrorZoneScheduleOptions {
  * window that was running ends, every time the view is opened and, if asked, at an interval, so it
  * reflects the game file as saved by the terror zone configuration page.
  * @param options - How much of the schedule to load, and how often to read it again
- * @returns The schedule, the current time, and a load error if the schedule could not be read
+ * @returns The schedule, the current time, a load error if the schedule could not be read, and a
+ * function that reads it again
  */
 export function useTerrorZoneSchedule({
   slotCount = SCHEDULE_SLOT_COUNT,
@@ -63,5 +64,5 @@ export function useTerrorZoneSchedule({
     return () => clearInterval(interval);
   }, [refreshIntervalMs, load]);
 
-  return { schedule, error, now };
+  return { schedule, error, now, reload: load };
 }

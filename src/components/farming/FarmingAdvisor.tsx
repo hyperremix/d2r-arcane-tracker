@@ -13,6 +13,7 @@ import { useFarmingSessionStore } from '@/stores/farmingSessionStore';
 import { useGrailStore } from '@/stores/grailStore';
 import { FarmingDataNotice } from './FarmingDataNotice';
 import { FarmingInputs } from './FarmingInputs';
+import { FarmingItemList } from './FarmingItemList';
 import { FarmingLocationsTable } from './FarmingLocationsTable';
 import { TerrorZoneFarming } from './TerrorZoneFarming';
 import { useFarmingOverview } from './useFarmingOverview';
@@ -54,8 +55,40 @@ function FarmingOverviewContent({
 }
 
 /**
+ * The missing items, shown when there are no drop tables to say where they drop. Each item opens
+ * its details.
+ */
+function MissingItems({
+  items,
+  onSelectItem,
+}: {
+  items: Item[];
+  onSelectItem: (itemId: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  if (items.length === 0) {
+    return <p className="text-muted-foreground">{t(translations.farming.noMissingItems)}</p>;
+  }
+  return (
+    <section aria-labelledby="farming-missing-items" className="space-y-3">
+      <h2 id="farming-missing-items" className="font-semibold text-lg">
+        {t(translations.farming.missingItems)}
+      </h2>
+      <FarmingItemList
+        label={t(translations.farming.summary, { count: items.length })}
+        items={items}
+        onSelectItem={onSelectItem}
+        defaultOpen
+      />
+    </section>
+  );
+}
+
+/**
  * The farming advisor page: where the missing grail items can drop, in the current and next
  * terror zone and in every area, super unique and boss, from the user's extracted game files.
+ * Without the game files it lists the missing items and says how to get the drop data.
  * @returns {JSX.Element} The farming advisor page
  */
 export function FarmingAdvisor() {
@@ -73,7 +106,7 @@ export function FarmingAdvisor() {
     () => getMissingFarmingItems(items, progress, settings),
     [items, progress, settings],
   );
-  const { overview, error } = useFarmingOverview(missingItems, characterLevel);
+  const { overview, error, reload } = useFarmingOverview(missingItems, characterLevel);
 
   return (
     <PageShell>
@@ -99,7 +132,12 @@ export function FarmingAdvisor() {
         </Card>
       )}
 
-      {overview?.status === 'unavailable' && <FarmingDataNotice unavailable={overview} />}
+      {overview?.status === 'unavailable' && (
+        <>
+          <FarmingDataNotice unavailable={overview} onFolderSet={reload} />
+          <MissingItems items={missingItems} onSelectItem={setSelectedItemId} />
+        </>
+      )}
 
       {overview?.status === 'ready' && (
         <>

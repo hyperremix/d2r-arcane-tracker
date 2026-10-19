@@ -1,9 +1,10 @@
-import { createWriteStream, existsSync, promises as fs } from 'node:fs';
+import { createWriteStream, existsSync, promises as fs, statSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import { PNG } from 'pngjs';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { D2R_PROCESS_NAME } from './d2rProcess';
 import { findWineD2RInstallations } from './winePrefixes';
 
 const log = createServiceLogger('IconService');
@@ -53,6 +54,19 @@ export const WINDOWS_DEFAULT_D2R_INSTALL_PATH = 'C:\\Program Files (x86)\\Diablo
 export const MAC_DEFAULT_D2R_INSTALL_PATH = '/Applications/Diablo II Resurrected.app';
 
 /**
+ * Checks whether a folder is a D2R installation: it holds the game executable, D2R.exe. A folder
+ * that doesn't exist or can't be read is not one.
+ * @param folder - The folder to check
+ */
+function isD2RInstallFolder(folder: string): boolean {
+  try {
+    return statSync(path.join(folder, D2R_PROCESS_NAME)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Service for managing D2R item icons.
  * Handles sprite conversion from D2R installation to PNGs stored in userData.
  */
@@ -89,7 +103,43 @@ export class IconService {
   }
 
   /**
-   * Detects the D2R installation path based on the operating system.
+   * Lists the well-known D2R installation folders of the operating system, most likely first.
+   * @returns The folders to look in; they may not exist
+   */
+  private getInstallFolderCandidates(): string[] {
+    const currentPlatform = platform();
+    const home = homedir();
+
+    if (currentPlatform === 'win32') {
+      return [
+        // Battle.net installs here by default
+        WINDOWS_DEFAULT_D2R_INSTALL_PATH,
+        'C:\\Program Files\\Diablo II Resurrected',
+        'C:\\Games\\Diablo II Resurrected',
+        'D:\\Program Files (x86)\\Diablo II Resurrected',
+        'D:\\Program Files\\Diablo II Resurrected',
+        // Steam
+        'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Diablo II Resurrected',
+        'D:\\Steam\\steamapps\\common\\Diablo II Resurrected',
+        path.join(home, 'Games', 'Diablo II Resurrected'),
+      ];
+    }
+    if (currentPlatform === 'darwin') {
+      return [
+        MAC_DEFAULT_D2R_INSTALL_PATH,
+        path.join(home, 'Applications', 'Diablo II Resurrected.app'),
+      ];
+    }
+    if (currentPlatform === 'linux') {
+      // The Steam release, or a Battle.net install inside a Wine or Proton prefix
+      return findWineD2RInstallations(home);
+    }
+    return [];
+  }
+
+  /**
+   * Detects the D2R installation path based on the operating system and sets it as the
+   * configured path.
    * @returns The D2R installation path or null if not found
    */
   findD2RInstallation(): string | null {
@@ -97,65 +147,24 @@ export class IconService {
       return this.d2rPath;
     }
 
-    const possiblePaths: string[] = [];
-    const currentPlatform = platform();
-    const home = homedir();
-
-    if (currentPlatform === 'win32') {
-      // Windows paths
-      possiblePaths.push(
-        'C:\\Games\\Diablo II Resurrected',
-        'C:\\Program Files (x86)\\Diablo II Resurrected',
-        'C:\\Program Files\\Diablo II Resurrected',
-        'D:\\Program Files (x86)\\Diablo II Resurrected',
-        'D:\\Program Files\\Diablo II Resurrected',
-        // Steam
-        'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Diablo II Resurrected',
-        'D:\\Steam\\steamapps\\common\\Diablo II Resurrected',
-        // Battle.net default
-        path.join(home, 'Games', 'Diablo II Resurrected'),
-      );
-    } else if (currentPlatform === 'darwin') {
-      // macOS paths
-      possiblePaths.push(
-        '/Applications/Diablo II Resurrected.app',
-        path.join(home, 'Applications', 'Diablo II Resurrected.app'),
-      );
-    } else if (currentPlatform === 'linux') {
-      // The Steam release, or a Battle.net install inside a Wine or Proton prefix
-      possiblePaths.push(...findWineD2RInstallations(home));
+    const found = this.getInstallFolderCandidates().find(isD2RInstallFolder);
+    if (!found) {
+      return null;
     }
-
-    // Check each path
-    for (const possiblePath of possiblePaths) {
-      if (existsSync(possiblePath)) {
-        log.info('findD2RInstallation', `Found D2R installation at: ${possiblePath}`);
-        this.d2rPath = possiblePath;
-        return possiblePath;
-      }
-    }
-
-    return null;
+    log.info('findD2RInstallation', `Found D2R installation at: ${found}`);
+    this.d2rPath = found;
+    return found;
   }
 
   /**
-   * Gets the platform's default D2R installation path, but only if it exists on disk,
-   * so the setup wizard never suggests a location that isn't there. On Linux this is the first
-   * installation found in a Steam library or a Wine or Proton prefix.
+   * Finds the first well-known folder that is a D2R installation (see {@link isD2RInstallFolder}),
+   * so the app only ever suggests a folder the game is installed in. On Linux these are the Steam
+   * libraries and the Wine and Proton prefixes.
    * Unlike {@link findD2RInstallation}, this does not change the configured path.
-   * @returns The existing default installation path, or undefined
+   * @returns The installation folder, or undefined if none was found
    */
   getSuggestedD2RPath(): string | undefined {
-    const currentPlatform = platform();
-    let defaultPath: string | undefined;
-    if (currentPlatform === 'win32') {
-      defaultPath = WINDOWS_DEFAULT_D2R_INSTALL_PATH;
-    } else if (currentPlatform === 'darwin') {
-      defaultPath = MAC_DEFAULT_D2R_INSTALL_PATH;
-    } else if (currentPlatform === 'linux') {
-      [defaultPath] = findWineD2RInstallations(homedir());
-    }
-    return defaultPath && existsSync(defaultPath) ? defaultPath : undefined;
+    return this.getInstallFolderCandidates().find(isD2RInstallFolder);
   }
 
   /**

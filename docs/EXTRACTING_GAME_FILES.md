@@ -15,7 +15,7 @@ The rest of the app works without this step.
 3. In the left panel, click **data**, then **data** again, then **Extract**.
 4. Wait for it to finish. It extracts about 40 GB (`global`, `hd`, `local`) into a `work` folder next to `CascView.exe`.
 5. Move the three folders into the top-level `Data` folder of your D2R install, for example `C:\Program Files (x86)\Diablo II Resurrected\Data`. There is another `data` folder inside it. Don't use that one.
-6. In the app, set **Settings → D2R installation** to your D2R folder: type the path and press Enter or click away, or click **Browse**. The field only shows a path you saved; while it's empty, a notice says no installation path is saved. If the app finds D2R at the default location, the notice shows that folder with a **Use this folder** button instead of filling it in.
+6. In the app, set **Settings → D2R installation** to your D2R folder: type the path and press Enter or click away, or click **Browse**. The field only shows a path you saved; while it's empty, a notice says no installation path is saved. If the app finds D2R in a [well-known folder](#where-the-app-looks-for-d2r), the notice shows that folder with a **Use this folder** button instead of filling it in.
 
 Extraction doesn't modify the game. Repeat it after a patch if you need new item icons, the patch changed terror zones, or you use the farming advisor (its drop rates come from the extracted tables).
 
@@ -26,6 +26,15 @@ These steps haven't been tested on Linux yet:
 - CASC Viewer is a Windows program. Run `CascView.exe` with Wine, for example `wine CascView.exe`. In its folder dialog, drive `Z:` is your Linux root folder.
 - The D2R folder is `~/.local/share/Steam/steamapps/common/Diablo II Resurrected` for the Steam release. For a Battle.net install it's `drive_c/Program Files (x86)/Diablo II Resurrected` inside the game's Wine or Proton prefix. The app suggests the folder in **Settings → D2R installation** if it finds one of these.
 - Folder names are case-sensitive on Linux. Move the extracted folders into the top-level `Data` folder, with a capital D.
+
+### Where the app looks for D2R
+
+While no D2R folder is saved, the app looks for the game in these folders and takes the first one that contains `D2R.exe`. The setup wizard fills that folder in. Everywhere else the app only offers it, and you confirm it with **Use this folder** in Settings, or with **Use** and the folder's path in the prompts on the farming advisor, terror zone and item pages.
+
+- Windows: `C:\Program Files (x86)\Diablo II Resurrected` (the Battle.net default), `C:\Program Files\Diablo II Resurrected`, `C:\Games\Diablo II Resurrected`, `D:\Program Files (x86)\Diablo II Resurrected`, `D:\Program Files\Diablo II Resurrected`, `C:\Program Files (x86)\Steam\steamapps\common\Diablo II Resurrected`, `D:\Steam\steamapps\common\Diablo II Resurrected` and `Games\Diablo II Resurrected` in your user folder.
+- Linux and Steam Deck, in this order: `steamapps/common/Diablo II Resurrected` in each Steam library (the Steam installation in your home folder, native, Debian package or Flatpak, plus the libraries it lists, for example on an SD card), then `drive_c/Program Files (x86)/Diablo II Resurrected` and `drive_c/Program Files/Diablo II Resurrected` in each Wine prefix. The prefixes searched are `$WINEPREFIX` if set, Steam's Proton prefixes (`steamapps/compatdata/<app ID>/pfx`), each subfolder of `~/Games` (Lutris), `~/Games/Heroic/Prefixes` and `~/Games/Heroic/Prefixes/default` (Heroic) and of the Bottles folder (native or Flatpak), and `~/.wine`.
+
+If your game is somewhere else, choose the folder with **Browse**.
 
 ## Making D2R use the extracted files
 
