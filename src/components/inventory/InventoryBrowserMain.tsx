@@ -440,7 +440,7 @@ export function InventoryBrowserMain() {
 
       <section aria-labelledby={snapshotListTitleId} className="space-y-4">
         <div className="space-y-1">
-          <h2 id={snapshotListTitleId} className="font-semibold text-base leading-snug">
+          <h2 id={snapshotListTitleId} className="font-semibold text-base">
             {t(translations.inventoryBrowser.snapshotList.title)}
           </h2>
           <p className="text-muted-foreground text-sm">

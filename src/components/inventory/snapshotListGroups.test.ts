@@ -108,6 +108,43 @@ describe('When the characters and stashes list is grouped', () => {
     expect(toNames(groups)).toEqual([['characters', ['Zed', 'Untracked']]]);
   });
 
+  it('If characters share a level and some saves are not tracked, Then the untracked ones still come last', () => {
+    // Arrange
+    const snapshots = [
+      buildSnapshot('Alpha', 'd2s'),
+      buildSnapshot('Zed', 'd2s'),
+      buildSnapshot('Bob', 'd2s'),
+      buildSnapshot('Cy', 'd2s'),
+    ];
+    const characters = [
+      buildCharacter('Zed', 5),
+      buildCharacter('Bob', 5),
+      buildCharacter('Cy', 3),
+    ];
+
+    // Act
+    const groups = groupSnapshotList(snapshots, characters);
+
+    // Assert
+    expect(toNames(groups)).toEqual([['characters', ['Bob', 'Zed', 'Cy', 'Alpha']]]);
+  });
+
+  it('If a tracked character is level 0, Then it ranks like an untracked save and is ordered by name among them', () => {
+    // Arrange
+    const snapshots = [
+      buildSnapshot('Zeta', 'd2s'),
+      buildSnapshot('Alpha', 'd2s'),
+      buildSnapshot('Mid', 'd2s'),
+    ];
+    const characters = [buildCharacter('Zeta', 0), buildCharacter('Mid', 1)];
+
+    // Act
+    const groups = groupSnapshotList(snapshots, characters);
+
+    // Assert
+    expect(toNames(groups)).toEqual([['characters', ['Mid', 'Alpha', 'Zeta']]]);
+  });
+
   it('If there are softcore and hardcore stashes, Then each softcore stash sits next to its hardcore counterpart', () => {
     // Arrange
     const snapshots = [
