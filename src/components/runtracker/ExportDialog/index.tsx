@@ -399,7 +399,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
           {error && (
             <div role="alert" className="rounded-md bg-destructive/10 p-3">
               <p className="text-destructive text-sm">{error.message}</p>
-              {error.detail && <p className="mt-1 text-destructive/80 text-xs">{error.detail}</p>}
+              {error.detail && <p className="mt-1 text-destructive text-xs">{error.detail}</p>}
             </div>
           )}
         </div>

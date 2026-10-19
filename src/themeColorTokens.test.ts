@@ -239,15 +239,29 @@ function hueDistance(first: Oklch, second: Oklch): number {
   return Math.min(distance, 360 - distance);
 }
 
-/** Euclidean distance in OKLab (deltaE OK): about 0.02 is barely noticeable, 0.1 is clearly different. */
-function perceptualDistance(first: Oklch, second: Oklch): number {
-  const toLab = ({ l, c, h }: Oklch) => [
-    l,
-    c * Math.cos((h * Math.PI) / 180),
-    c * Math.sin((h * Math.PI) / 180),
+/** Gamma-encoded sRGB (0-1) to OKLab, from the linear sRGB to OKLab matrices of the CSS Color 4 spec. */
+function toOklab(rgb: Rgb): [number, number, number] {
+  const [r, g, b] = rgb.map((value) =>
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+  );
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
   ];
-  const [l1, a1, b1] = toLab(first);
-  const [l2, a2, b2] = toLab(second);
+}
+
+/**
+ * Euclidean distance in OKLab (deltaE OK) between the colors the browser paints: about 0.02 is
+ * barely noticeable, 0.1 is clearly different. Measured after the sRGB clamp in `toSrgb`, because
+ * a token outside the sRGB gamut is painted as its clamped neighbour, which can sit much closer.
+ */
+function perceptualDistance(first: Oklch, second: Oklch): number {
+  const [l1, a1, b1] = toOklab(toSrgb(first));
+  const [l2, a2, b2] = toOklab(toSrgb(second));
   return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
 }
 
@@ -386,7 +400,8 @@ const statusThemes = [
 ] as const;
 const MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY = 0.1;
 const SUCCESS_BADGE_TINT = 0.15;
-const ALERT_DESCRIPTION_ALPHA = 0.9;
+/** Alerts and inline error blocks tint with bg-destructive/10 in both themes. */
+const RESTING_ALERT_TINT = 0.1;
 
 describe.each(
   statusThemes,
@@ -430,21 +445,28 @@ describe.each(
     expect(failing).toEqual([]);
   });
 
-  it('If an alert description shows destructive text at /90 on its tint, Then it passes WCAG AA on background and card', () => {
+  it('If source shows destructive text at partial opacity, Then it passes WCAG AA on a /10 tint over background and card', () => {
     // Arrange
     const { destructive } = tokens;
+    const fadedTextClasses = collectSourceFiles(srcDir).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(/text-destructive\/(\d+)/g)].map((match) => ({
+        label: `${relative(srcDir, file)} ${match[0]}`,
+        alpha: Number(match[1]) / 100,
+      })),
+    );
 
     // Act
     const failing = belowAa(
       Object.fromEntries(
-        surfaces.map((surface) => {
-          const tint = over(destructive, destructiveTint, tokens[surface]);
-          const text = toSrgb(destructive).map(
-            (value, index) =>
-              value * ALERT_DESCRIPTION_ALPHA + tint[index] * (1 - ALERT_DESCRIPTION_ALPHA),
-          ) as Rgb;
-          return [`destructive/90 on destructive tint over ${surface}`, contrast(text, tint)];
-        }),
+        fadedTextClasses.flatMap(({ label, alpha }) =>
+          surfaces.map((surface) => {
+            const tint = over(destructive, RESTING_ALERT_TINT, tokens[surface]);
+            const text = toSrgb(destructive).map(
+              (value, index) => value * alpha + tint[index] * (1 - alpha),
+            ) as Rgb;
+            return [`${label} on destructive tint over ${surface}`, contrast(text, tint)];
+          }),
+        ),
       ),
     );
 
