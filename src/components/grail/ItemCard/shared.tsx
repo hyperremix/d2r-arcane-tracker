@@ -3,6 +3,7 @@ import type { SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
 import placeholderUrl from '/images/placeholder-item.svg';
+import { FarmingHintText } from '../farmingHints';
 import { ItemCategoryLabel } from './ItemCategoryLabel';
 import { DiscoveryInfo } from './indicators';
 
@@ -28,7 +29,8 @@ interface ItemTooltipBodyProps {
 
 /**
  * ItemTooltipBody component that renders the name tooltip of a card: name and base item, optionally
- * the set, category and, when the item has been found, who found it and when.
+ * the set, category and, when the item has been found, who found it and when. A missing item names
+ * where to farm it when farming data is available.
  */
 export function ItemTooltipBody({
   item,
@@ -51,6 +53,7 @@ export function ItemTooltipBody({
       </p>
 
       <DiscoveryInfo allProgress={allProgress} characters={characters} />
+      {allProgress.length === 0 && <FarmingHintText itemId={item.id} />}
     </div>
   );
 }

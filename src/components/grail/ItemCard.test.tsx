@@ -3,6 +3,7 @@ import type { Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { type FarmingHint, FarmingHintsContext } from './farmingHints';
 import { ItemCard } from './ItemCard';
 
 // Mock dependencies
@@ -189,6 +190,108 @@ describe('When ItemCard is rendered', () => {
       expect(label).toBeInTheDocument();
       expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If farming hints are available and the item name tooltip is opened', () => {
+    const hints = new Map<string, FarmingHint>([
+      [
+        'shako',
+        {
+          location: 'Mephisto',
+          areaName: 'Durance of Hate Level 3',
+          difficulty: 'hell',
+          monsterLevel: { min: 87, max: 87 },
+        },
+      ],
+      [
+        'ber',
+        { location: 'Chaos Sanctuary', difficulty: 'hell', monsterLevel: { min: 85, max: 88 } },
+      ],
+    ]);
+
+    const openTooltip = (name: string) =>
+      fireEvent.focus(screen.getByText(name).closest('[data-slot="tooltip-trigger"]') as Element);
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card of a missing item says where it drops', async (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('shako').withName('Shako').build();
+      render(
+        <FarmingHintsContext.Provider value={hints}>
+          <ItemCard item={item} viewMode={viewMode} />
+        </FarmingHintsContext.Provider>,
+      );
+
+      // Act
+      openTooltip('Shako');
+
+      // Assert
+      expect(
+        await screen.findByText(
+          'Drops at Mephisto in Durance of Hate Level 3 (Hell, monster level 87)',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('Then a hint without an area shows the monster level range', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('ber').withName('Ber').build();
+      render(
+        <FarmingHintsContext.Provider value={hints}>
+          <ItemCard item={item} />
+        </FarmingHintsContext.Provider>,
+      );
+
+      // Act
+      openTooltip('Ber');
+
+      // Assert
+      expect(
+        await screen.findByText('Drops at Chaos Sanctuary (Hell, monster level 85–88)'),
+      ).toBeInTheDocument();
+    });
+
+    it('Then a found item shows no farming hint', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('shako').withName('Shako').build();
+      const progress = [
+        GrailProgressBuilder.new()
+          .withItemId('shako')
+          .withFoundDate(new Date('2026-01-01'))
+          .build(),
+      ];
+      render(
+        <FarmingHintsContext.Provider value={hints}>
+          <ItemCard item={item} normalProgress={progress} />
+        </FarmingHintsContext.Provider>,
+      );
+
+      // Act
+      openTooltip('Shako');
+
+      // Assert
+      await screen.findAllByText('Shako');
+      expect(screen.queryByText(/^Drops at/)).not.toBeInTheDocument();
+    });
+
+    it('Then a card without farming data shows no farming hint', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('shako')
+        .withName('Shako')
+        .withCategory('armor')
+        .build();
+      render(<ItemCard item={item} />);
+
+      // Act
+      openTooltip('Shako');
+
+      // Assert
+      await screen.findByText(/^Armor/);
+      expect(screen.queryByText(/^Drops at/)).not.toBeInTheDocument();
     });
   });
 

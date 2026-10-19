@@ -127,15 +127,17 @@ describe('When ProgressSummary is rendered', () => {
       ).toEqual(['Unique 1/3 Found', 'Set 0/1 Found', 'Rune 0/1 Found', 'Runeword 0/1 Found']);
     });
 
-    it('Then sizes each segment by its share of the grail and fills it to its found share', () => {
+    it('Then gives every segment the same width and fills it to its found share', () => {
       // Arrange & Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
 
       // Assert
       const unique = screen.getByRole('button', { name: /^Unique/ });
       const set = screen.getByRole('button', { name: /^Set/ });
-      expect(unique).toHaveStyle({ flexGrow: '3' });
-      expect(set).toHaveStyle({ flexGrow: '1' });
+      for (const segment of within(getLedger()).getAllByRole('button')) {
+        // The same equal flex share, whatever the number of items of the type
+        expect(segment).toHaveClass('flex-1', 'basis-0');
+      }
       expect(getFill(unique)?.style.width).toBe(`${(1 / 3) * 100}%`);
       expect(getFill(set)?.style.width).toBe('0%');
     });
@@ -272,7 +274,7 @@ describe('When ProgressSummary is rendered', () => {
       // Assert
       expect(screen.getByText('0.0%')).toBeInTheDocument();
       for (const segment of within(getLedger()).getAllByRole('button')) {
-        expect(segment).toHaveStyle({ flexGrow: '1' });
+        expect(segment).toHaveClass('flex-1');
         expect(getFill(segment)?.style.width).toBe('0%');
       }
     });

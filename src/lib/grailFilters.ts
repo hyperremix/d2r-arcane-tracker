@@ -247,9 +247,23 @@ const compareBySortKey = (
 };
 
 /**
+ * Puts missing items before found items when sorting by found date, whatever the sort order.
+ * @returns {number} Negative if only `a` is missing, positive if only `b` is, else zero
+ */
+const compareMissingFirst = (
+  a: Item,
+  b: Item,
+  sortBy: string,
+  foundDateMap: Map<string, number>,
+): number =>
+  sortBy === 'found_date' ? Number(foundDateMap.has(a.id)) - Number(foundDateMap.has(b.id)) : 0;
+
+/**
  * Sorts items based on the specified criteria and order.
  * Types follow Diablo's quality order and categories the display order (see {@link itemTypeOrder}
  * and {@link itemCategoryOrder}) instead of their alphabetical internal keys.
+ * When sorting by found date, missing items come first in both sort orders, so the items still to
+ * find lead the list, followed by the found items in the chosen date order.
  * Items with equal sort keys (e.g. all missing items when sorting by found date) are ordered
  * by name A–Z and then by ID, regardless of the sort order, so the result is always stable.
  * @param {Item[]} items - Array of items to sort
@@ -266,6 +280,8 @@ const sortItems = (
 ): Item[] => {
   const direction = sortOrder === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
+    const missingFirst = compareMissingFirst(a, b, sortBy, foundDateMap);
+    if (missingFirst !== 0) return missingFirst;
     const comparison = compareBySortKey(a, b, sortBy, foundDateMap);
     if (comparison !== 0) return comparison * direction;
     const nameComparison = sortBy === 'name' ? 0 : nameCollator.compare(a.name, b.name);

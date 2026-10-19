@@ -50,19 +50,16 @@ interface LedgerSegmentProps {
   pressed: boolean;
   /** Whether any type filter is active, so the segments that are not selected recede */
   filtering: boolean;
-  /**
-   * Flex grow factor, so the segment is as wide as its share of the grail. Narrow segments are
-   * widened to fit their label and count (`min-w-fit`), so widths are only proportional above that.
-   */
-  grow: number;
   onToggle: (type: ItemType) => void;
 }
 
 /**
  * One segment of the progress ledger: the type name, its found/total count and a bar filled to the
- * found share. The segment is a toggle button for the type filter.
+ * found share. The segment is a toggle button for the type filter. All segments are equally wide,
+ * so small types such as runes keep room for their label and count; a segment only grows beyond
+ * its share if its label and count need more room (`min-w-fit`).
  */
-function LedgerSegment({ type, progress, pressed, filtering, grow, onToggle }: LedgerSegmentProps) {
+function LedgerSegment({ type, progress, pressed, filtering, onToggle }: LedgerSegmentProps) {
   const { t } = useTranslation();
   const found = progress?.found ?? 0;
   const total = progress?.total ?? 0;
@@ -72,9 +69,8 @@ function LedgerSegment({ type, progress, pressed, filtering, grow, onToggle }: L
       type="button"
       aria-pressed={pressed}
       onClick={() => onToggle(type)}
-      style={{ flexGrow: grow }}
       className={cn(
-        'flex min-w-fit basis-0 flex-col gap-1.5 rounded-md border border-transparent px-2 py-1.5 text-left outline-none',
+        'flex min-w-fit flex-1 basis-0 flex-col gap-1.5 rounded-md border border-transparent px-2 py-1.5 text-left outline-none',
         'focus-visible:ring-[3px] focus-visible:ring-ring/50 motion-safe:transition-colors',
         pressed ? segmentStyles[type].pressed : 'hover:bg-muted/60',
       )}
@@ -113,10 +109,10 @@ interface ProgressSummaryProps {
 
 /**
  * ProgressSummary renders the grail progress ledger: the overall completion percentage and found
- * count next to one segment per tracked item type (unique, set, rune, runeword). Each segment is
- * as wide as its type's share of the grail, filled to its found share in the type's quality color,
- * and toggles the type filter of the item grid. When ethereal tracking is enabled, the normal and
- * ethereal progress are listed below the segments.
+ * count next to one segment per tracked item type (unique, set, rune, runeword). The segments are
+ * equally wide, filled to their found share in the type's quality color, and toggle the type
+ * filter of the item grid. When ethereal tracking is enabled, the normal and ethereal progress are
+ * listed below the segments.
  */
 export function ProgressSummary({ statistics, showEtherealBreakdown }: ProgressSummaryProps) {
   const { t } = useTranslation();
@@ -128,9 +124,6 @@ export function ProgressSummary({ statistics, showEtherealBreakdown }: ProgressS
   const percentage = toPercentage(statistics.foundItems, statistics.totalItems);
   const showVersionBreakdown =
     showEtherealBreakdown && statistics.normalItems.total > 0 && statistics.etherealItems.total > 0;
-
-  // Size segments by their share of the grail; before any items are loaded, share the row evenly
-  const hasTotals = trackedTypes.some((type) => (typeProgress[type]?.total ?? 0) > 0);
 
   const toggleType = (type: ItemType) => setFilter({ types: toggleValue(selectedTypes, type) });
 
@@ -169,7 +162,6 @@ export function ProgressSummary({ statistics, showEtherealBreakdown }: ProgressS
             progress={typeProgress[type]}
             pressed={selectedTypes.includes(type)}
             filtering={selectedTypes.length > 0}
-            grow={hasTotals ? (typeProgress[type]?.total ?? 0) : 1}
             onToggle={toggleType}
           />
         ))}
