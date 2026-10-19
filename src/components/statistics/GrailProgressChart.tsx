@@ -45,7 +45,7 @@ interface GrailProgressChartProps {
  * Step area chart of the number of grail entries found over time, ending today. Each step is a day
  * with new grail entries. With a baseline (the entries startup save file scans found on the first
  * day of the chart), the value axis starts near the baseline instead of zero, so the finds made
- * since stay visible, and a note says how many entries the first scan that found items found.
+ * since stay visible, and a note says how many entries the scans found that day.
  * @returns {JSX.Element} The chart card
  */
 export function GrailProgressChart({

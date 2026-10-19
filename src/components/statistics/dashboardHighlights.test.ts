@@ -209,8 +209,8 @@ describe('When summarizing the runes', () => {
   });
 });
 
-describe('When finding the last find made while tracking', () => {
-  it('If later finds came from the initial scan, Then the latest tracked find is returned', () => {
+describe('When finding the last find', () => {
+  it('If a later startup scan found an item, Then it is the last find on the day of the scan and marked as found by scan', () => {
     // Arrange
     const items = ['a', 'b'].map((id) =>
       HolyGrailItemBuilder.new().withId(id).withName(id).build(),
@@ -229,8 +229,57 @@ describe('When finding the last find made while tracking', () => {
     const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
 
     // Assert
-    expect(lastFind?.item.id).toBe('a');
-    expect(lastFind?.foundDate).toEqual(new Date(2026, 0, 5));
+    expect(lastFind).toEqual({ item: items[1], foundDate: new Date(2026, 0, 9), fromScan: true });
+  });
+
+  it('If the latest finds are the baseline of the first scan, Then an earlier find made while tracking is not replaced by them', () => {
+    // Arrange: the first scan that found items ran after the first tracked find, on the same day
+    const items = ['a', 'b'].map((id) =>
+      HolyGrailItemBuilder.new().withId(id).withName(id).build(),
+    );
+    const progress = [
+      buildFind('a', new Date(2026, 0, 5, 9)),
+      GrailProgressBuilder.new()
+        .withId('baseline')
+        .withItemId('b')
+        .withFoundDate(new Date(2026, 0, 5, 18))
+        .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
+
+    // Assert
+    expect(lastFind).toEqual({
+      item: items[0],
+      foundDate: new Date(2026, 0, 5, 9),
+      fromScan: false,
+    });
+  });
+
+  it('If a second character records an item that was already found, Then the repeat is not the last find', () => {
+    // Arrange
+    const items = ['a', 'b'].map((id) =>
+      HolyGrailItemBuilder.new().withId(id).withName(id).build(),
+    );
+    const progress = [
+      buildFind('a', new Date(2026, 0, 1)),
+      buildFind('b', new Date(2026, 0, 5)),
+      GrailProgressBuilder.new()
+        .withId('repeat')
+        .withItemId('a')
+        .withCharacterId('second')
+        .withFoundDate(new Date(2026, 0, 9))
+        .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
+
+    // Assert
+    expect(lastFind).toEqual({ item: items[1], foundDate: new Date(2026, 0, 5), fromScan: false });
   });
 
   it('If the latest find is not a tracked item, Then it is skipped', () => {
@@ -248,7 +297,7 @@ describe('When finding the last find made while tracking', () => {
     expect(lastFind?.item.id).toBe('a');
   });
 
-  it('If everything came from the initial scan, Then there is no last find', () => {
+  it('If everything came from the first scan that found items, Then there is no last find', () => {
     // Arrange
     const items = [HolyGrailItemBuilder.new().withId('a').build()];
     const progress = [GrailProgressBuilder.new().withItemId('a').asFromInitialScan().build()];

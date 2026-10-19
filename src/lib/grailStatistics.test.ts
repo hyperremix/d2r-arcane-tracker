@@ -132,6 +132,138 @@ describe('When computeGrailStatistics is called', () => {
     });
   });
 
+  describe('If a later startup scan found items', () => {
+    it('Then they are recent finds on the day of that scan, and the first scan stays the baseline', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('item1').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('item2').withCategory('armor').build(),
+      ];
+      const progress = [
+        find('baseline', 'item1', daysAgo(30)).asFromInitialScan().build(),
+        find('later-scan', 'item2', daysAgo(1)).asFromInitialScan().build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.recentFinds).toBe(1);
+      expect(stats.currentStreak).toBe(1);
+      expect(stats.categoryStats[0].recent).toBe(1);
+    });
+  });
+
+  describe('If a second character is first seen later and records an item another character already found', () => {
+    it('Then the repeat does not count as a recent find, a streak day or a category find, while the characters keep their own finds', () => {
+      // Arrange
+      const first = CharacterBuilder.new().withId('first').build();
+      const second = CharacterBuilder.new().withId('second').build();
+      const items = [
+        HolyGrailItemBuilder.new().withId('found-before').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('new-item').withCategory('weapons').build(),
+      ];
+      const progress = [
+        find('original', 'found-before', daysAgo(30), 'first').build(),
+        find('repeat', 'found-before', daysAgo(1), 'second').asFromInitialScan().build(),
+        find('new', 'new-item', daysAgo(3), 'second').build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [first, second],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.recentFinds).toBe(1);
+      expect(stats.averageItemsPerDay).toBeCloseTo(1 / 7);
+      expect(stats.currentStreak).toBe(0);
+      expect(stats.maxStreak).toBe(1);
+      expect(stats.categoryStats.map(({ category, recent }) => [category, recent]).sort()).toEqual([
+        ['armor', 0],
+        ['weapons', 1],
+      ]);
+      expect(stats.characterStats).toEqual([
+        { character: second, totalFound: 2, recentFinds: 2 },
+        { character: first, totalFound: 1, recentFinds: 0 },
+      ]);
+    });
+  });
+
+  describe('If records of untracked versions and items exist next to normal finds', () => {
+    it('Then the recent finds match the found count and a character total counts only its tracked finds', () => {
+      // Arrange
+      const sorc = CharacterBuilder.new().withId('sorc').build();
+      const items = [
+        HolyGrailItemBuilder.new().withId('shako').withEtherealType('optional').build(),
+        HolyGrailItemBuilder.new().withId('soj').withEtherealType('none').build(),
+        HolyGrailItemBuilder.new().withId('eth-only').withEtherealType('only').build(),
+      ];
+      const progress = [
+        find('p1', 'shako', daysAgo(2), 'sorc').asNormal().build(),
+        find('p2', 'shako', daysAgo(1), 'other').asNormal().build(),
+        find('p3', 'shako', daysAgo(1), 'sorc').asEthereal().build(),
+        find('p4', 'soj', daysAgo(1), 'sorc').asNormal().build(),
+        find('p5', 'eth-only', daysAgo(1), 'sorc').asNormal().build(),
+        find('p6', 'not-tracked', daysAgo(1), 'sorc').build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [sorc],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.foundItems).toBe(2);
+      expect(stats.recentFinds).toBe(stats.foundItems);
+      expect(stats.characterStats[0].totalFound).toBe(2);
+    });
+  });
+
+  describe('If a character found a version that is not tracked', () => {
+    it('Then it counts neither as a find of that character nor as a recent find', () => {
+      // Arrange
+      const sorc = CharacterBuilder.new().withId('sorc').build();
+      const items = [
+        HolyGrailItemBuilder.new().withId('shako').withEtherealType('optional').build(),
+        HolyGrailItemBuilder.new().withId('eth-only').withEtherealType('only').build(),
+      ];
+      const progress = [
+        find('p1', 'shako', daysAgo(30), 'sorc').asNormal().build(),
+        find('p2', 'shako', daysAgo(1), 'sorc').asEthereal().build(),
+        find('p3', 'eth-only', daysAgo(1), 'sorc').asNormal().build(),
+        find('p4', 'not-tracked', daysAgo(1), 'sorc').build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [sorc],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.recentFinds).toBe(0);
+      expect(stats.characterStats).toEqual([{ character: sorc, totalFound: 1, recentFinds: 0 }]);
+    });
+  });
+
   describe('If finds are older than a week', () => {
     it('Then they are not recent', () => {
       // Arrange

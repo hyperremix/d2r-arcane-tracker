@@ -376,7 +376,9 @@ describe('When run analytics show the run durations by session', () => {
     render(<RunAnalytics />, { wrapper: MemoryRouter });
 
     // Assert
-    expect(await screen.findByText('No completed runs yet')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Complete runs in at least 2 sessions to compare them'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Run durations by session' })).toHaveAttribute(
       'data-chart-state',
       'empty',

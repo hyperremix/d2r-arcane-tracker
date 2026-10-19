@@ -119,12 +119,35 @@ describe('When the run duration card loads its sessions', () => {
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Sep 1, 2026');
   });
 
-  it('If a session has a single completed run, Then the summary names the only session', async () => {
+  it('If only one session has completed runs, Then a note asks for runs in a second session instead of a chart', async () => {
     // Arrange
     mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
-      buildSession('only', new Date(2026, 9, 1, 12), 1),
+      buildSession('only', new Date(2026, 9, 1, 12), 3),
+      buildSession('open', new Date(2026, 9, 2, 12), 1),
     ]);
-    mockRuns({ only: [95_000] });
+    mockRuns({ only: [95_000, 100_000, 120_000] });
+
+    // Act
+    render(<RunDurationCard />);
+
+    // Assert
+    expect(
+      await screen.findByText('Complete runs in at least 2 sessions to compare them'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Run durations by session' })).toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('If two sessions have completed runs, Then the chart compares them', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
+      buildSession('first', new Date(2026, 9, 1, 12), 1),
+      buildSession('second', new Date(2026, 9, 2, 12), 1),
+    ]);
+    mockRuns({ first: [95_000], second: [80_000] });
 
     // Act
     render(<RunDurationCard />);
@@ -132,7 +155,7 @@ describe('When the run duration card loads its sessions', () => {
     // Assert
     expect(
       await screen.findByRole('img', {
-        name: 'Run durations of your only session with completed runs: median run 1:35',
+        name: 'Run durations of your last 2 sessions with completed runs: the median run went from 1:35 in the earliest to 1:20 in the latest',
       }),
     ).toBeInTheDocument();
   });
@@ -141,9 +164,10 @@ describe('When the run duration card loads its sessions', () => {
     // Arrange
     mockElectronAPI.runTracker.getAllSessions.mockRejectedValueOnce(new Error('database locked'));
     mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
-      buildSession('only', new Date(2026, 9, 1, 12), 1),
+      buildSession('first', new Date(2026, 9, 1, 12), 1),
+      buildSession('second', new Date(2026, 9, 2, 12), 1),
     ]);
-    mockRuns({ only: [95_000] });
+    mockRuns({ first: [95_000], second: [80_000] });
     render(<RunDurationCard />);
     const retry = await screen.findByRole('button', { name: 'Retry' });
 
@@ -152,7 +176,7 @@ describe('When the run duration card loads its sessions', () => {
 
     // Assert
     expect(
-      await screen.findByRole('img', { name: /^Run durations of your only session/ }),
+      await screen.findByRole('img', { name: /^Run durations of your last 2 sessions/ }),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     await waitFor(() => expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledTimes(2));
@@ -214,9 +238,10 @@ describe('When the run duration card loads its sessions', () => {
       }),
     );
     mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
-      buildSession('new', new Date(2026, 9, 2, 12), 1),
+      buildSession('new1', new Date(2026, 9, 3, 12), 1),
+      buildSession('new2', new Date(2026, 9, 4, 12), 1),
     ]);
-    mockRuns({ old: [60_000], new: [95_000] });
+    mockRuns({ old1: [60_000], old2: [60_000], new1: [95_000], new2: [95_000] });
     render(
       <StrictMode>
         <RunDurationCard />
@@ -225,17 +250,21 @@ describe('When the run duration card loads its sessions', () => {
     await screen.findByRole('table', { name: 'Run durations by session' });
 
     // Act
-    resolveFirst([buildSession('old', new Date(2026, 9, 1, 12), 1)]);
+    resolveFirst([
+      buildSession('old1', new Date(2026, 9, 1, 12), 1),
+      buildSession('old2', new Date(2026, 9, 2, 12), 1),
+    ]);
     await waitFor(() =>
-      expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalledWith('old'),
+      expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalledWith('old2'),
     );
 
     // Assert
     const rows = within(
       screen.getByRole('table', { name: 'Run durations by session' }),
     ).getAllByRole('row');
-    expect(rows).toHaveLength(2);
-    expect(rows[1]).toHaveTextContent('Oct 2, 2026');
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent('Oct 3, 2026');
+    expect(rows[2]).toHaveTextContent('Oct 4, 2026');
   });
 });
 

@@ -1,6 +1,10 @@
 import type { GrailProgress, Item, ItemSet } from 'electron/types/grail';
-import { canItemBeEthereal, canItemBeNormal, filterItemsByTrackedVersions } from '@/lib/ethereal';
-import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
+import { filterItemsByTrackedVersions, isTrackedFind } from '@/lib/ethereal';
+import {
+  excludeBaselineFinds,
+  findFirstTrackedFinds,
+  type GrailStatisticsSettings,
+} from '@/lib/grailStatistics';
 
 /** Progress of one item set. */
 export interface SetProgress {
@@ -25,25 +29,13 @@ export interface RunesSummary {
   highestMissing: Item | undefined;
 }
 
-/** The latest find made while the tracker was running. */
+/** The latest find of a tracked item version, leaving out the baseline. */
 export interface LastTrackedFind {
   item: Item;
   foundDate: Date;
+  /** Whether a startup save file scan found it, so the date is the day of the scan. */
+  fromScan: boolean;
 }
-
-/**
- * Returns whether a record is a find of a tracked version of its item: the version must be tracked
- * and the item must be able to have it (sets and runes, for example, cannot be ethereal).
- */
-const isTrackedFind = (
-  record: GrailProgress,
-  item: Item,
-  settings: GrailStatisticsSettings,
-): record is GrailProgress & { foundDate: Date } =>
-  record.foundDate !== undefined &&
-  (record.isEthereal
-    ? settings.grailEthereal && canItemBeEthereal(item)
-    : settings.grailNormal && canItemBeNormal(item));
 
 /**
  * Returns the IDs of the given items with at least one found record of a tracked version.
@@ -57,7 +49,7 @@ function findFoundItemIds(
   const found = new Set<string>();
   for (const record of progress) {
     const item = itemsById.get(record.itemId);
-    if (item && isTrackedFind(record, item, settings)) found.add(item.id);
+    if (item && isTrackedFind(item, record, settings)) found.add(item.id);
   }
   return found;
 }
@@ -136,12 +128,13 @@ export function summarizeRunes(
 }
 
 /**
- * Finds the latest find of a tracked item version made while the tracker was running. Finds from
- * the initial save file scan are left out, since their date is the date of the scan.
+ * Finds the latest first find of a tracked item version. The baseline (the startup save file scan
+ * finds from the first day anything was found) is left out, since those items were found before
+ * the tracker existed; finds of later scans count on the day of their scan.
  * @param items - Tracked items
  * @param progress - All progress records
  * @param settings - Which item versions are tracked
- * @returns The latest find, or undefined if nothing was found while the tracker was running
+ * @returns The latest find, or undefined if nothing but the baseline was found
  */
 export function findLastTrackedFind(
   items: Item[],
@@ -150,12 +143,11 @@ export function findLastTrackedFind(
 ): LastTrackedFind | undefined {
   const itemsById = new Map(items.map((item) => [item.id, item]));
   let latest: LastTrackedFind | undefined;
-  for (const record of progress) {
+  for (const record of excludeBaselineFinds(findFirstTrackedFinds(items, progress, settings))) {
     const item = itemsById.get(record.itemId);
-    if (!item || !isTrackedFind(record, item, settings) || record.fromInitialScan) continue;
     const foundDate = new Date(record.foundDate);
-    if (!latest || foundDate.getTime() > latest.foundDate.getTime()) {
-      latest = { item, foundDate };
+    if (item && (!latest || foundDate.getTime() > latest.foundDate.getTime())) {
+      latest = { item, foundDate, fromScan: Boolean(record.fromInitialScan) };
     }
   }
   return latest;

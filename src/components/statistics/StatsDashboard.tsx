@@ -53,7 +53,7 @@ function SectionTitle({ icon: Icon, children }: SectionTitleProps) {
 /**
  * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.
  * Shows headline statistics that stay meaningful when nothing was found recently (total progress,
- * last find while tracking, closest set and missing runes), progress over time, finds per week,
+ * last find, closest set and missing runes), progress over time, finds per week,
  * category breakdowns and a character comparison.
  * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
@@ -75,7 +75,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
     return {
       today: toLocalDayIndex(now),
       cumulativeFinds: buildCumulativeFinds(progress, items, { grailNormal, grailEthereal }),
-      weeklyFinds: buildWeeklyFinds(progress, now),
+      weeklyFinds: buildWeeklyFinds(progress, items, { grailNormal, grailEthereal }, now),
     };
   }, [progress, items, grailNormal, grailEthereal, currentDay]);
 
@@ -111,7 +111,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
           })}
         />
         <StatTile
-          label={t(translations.statistics.dashboard.lastTrackedFind)}
+          label={t(translations.statistics.dashboard.lastFind)}
           icon={History}
           value={
             lastTrackedFind
@@ -120,7 +120,11 @@ export const StatsDashboard = memo(function StatsDashboard() {
           }
           hint={
             lastTrackedFind
-              ? lastTrackedFind.item.name
+              ? lastTrackedFind.fromScan
+                ? t(translations.statistics.dashboard.lastFindByScan, {
+                    item: lastTrackedFind.item.name,
+                  })
+                : lastTrackedFind.item.name
               : t(translations.statistics.dashboard.sinceTrackingBegan)
           }
         />

@@ -1,6 +1,10 @@
 import type { GrailProgress, Item, Run } from 'electron/types/grail';
 import { DAY_MS, formatLocalizedDate, HOUR_MS } from '@/lib/date';
-import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
+import {
+  excludeBaselineFinds,
+  findFirstTrackedFinds,
+  type GrailStatisticsSettings,
+} from '@/lib/grailStatistics';
 import { findFirstDiscoveries } from '@/lib/sessionStats';
 
 /** Number of weeks shown by the finds-per-week chart. */
@@ -8,6 +12,12 @@ export const WEEKLY_FINDS_WEEKS = 12;
 
 /** Number of most recent sessions shown by the run duration chart. */
 export const RUN_DURATION_SESSIONS = 12;
+
+/**
+ * Fewest sessions with completed runs the run duration chart needs. The chart compares sessions,
+ * and the run statistics above it already sum up the runs of a single session.
+ */
+export const MIN_RUN_DURATION_SESSIONS = 2;
 
 const DAYS_PER_WEEK = 7;
 
@@ -68,9 +78,8 @@ export interface CumulativeFinds {
   /** One point per day with at least one new entry, in chronological order. */
   points: CumulativeFindsPoint[];
   /**
-   * Entries that startup save file scans found on the first day of the chart, if any. This is the
-   * first scan that found items, which is not necessarily the very first scan. They are included
-   * in the totals of the points.
+   * Entries that startup save file scans found on the first day of the chart (the first day
+   * anything was found), if any. They are included in the totals of the points.
    */
   baseline: TrackingBaseline | undefined;
 }
@@ -80,8 +89,7 @@ export interface CumulativeFinds {
  * entry. Each tracked item version counts once, on the day it was first found; finds from startup
  * save file scans count on the day of the scan. The entries that scans found on the first day of the
  * chart are reported as the baseline, since they were found before the tracker saw anything; later
- * scans count on their own day. Scans are not recorded when they find nothing, so the baseline is
- * from the first scan that found items.
+ * scans count on their own day.
  * @param progress - All progress records
  * @param items - Tracked items
  * @param settings - Which item versions are tracked
@@ -140,15 +148,20 @@ export interface WeeklyFinds {
 
 /**
  * Counts finds per week for the most recent weeks, the last week ending today. Like the recent
- * finds statistic, every find made while the tracker was running counts and finds from the initial
- * save file scan do not.
+ * finds statistic, the first find of each tracked item version counts except the baseline (the
+ * startup save file scan finds from the first day anything was found); finds of later scans count
+ * on their scan day.
  * @param progress - All progress records
+ * @param items - Tracked items
+ * @param settings - Which item versions are tracked
  * @param now - Reference time
  * @param weeks - Number of weeks
  * @returns Weeks in chronological order
  */
 export function buildWeeklyFinds(
   progress: GrailProgress[],
+  items: Item[],
+  settings: GrailStatisticsSettings,
   now: Date,
   weeks: number = WEEKLY_FINDS_WEEKS,
 ): WeeklyFinds[] {
@@ -160,8 +173,7 @@ export function buildWeeklyFinds(
     count: 0,
   }));
 
-  for (const record of progress) {
-    if (!record.foundDate || record.fromInitialScan) continue;
+  for (const record of excludeBaselineFinds(findFirstTrackedFinds(items, progress, settings))) {
     const day = toLocalDayIndex(new Date(record.foundDate));
     if (day < firstDay || day > today) continue;
     result[Math.floor((day - firstDay) / DAYS_PER_WEEK)].count++;

@@ -227,6 +227,23 @@ describe('When findFirstDiscoveries is called', () => {
     });
   });
 
+  describe('If a record is for a version the item cannot have', () => {
+    it('Then it is not a grail discovery, just as the grail progress does not count it', () => {
+      // Arrange: a save file reported an ethereal-only item as normal
+      const ethOnly = HolyGrailItemBuilder.new()
+        .withId('eth-only')
+        .withEtherealType('only')
+        .build();
+      const progress = [progressRecord('normal', 'eth-only', at(9)).build()];
+
+      // Act
+      const discoveries = findFirstDiscoveries(progress, [...items, ethOnly], normalOnly);
+
+      // Assert
+      expect(discoveries.size).toBe(0);
+    });
+  });
+
   describe('If an item is not tracked', () => {
     it('Then its finds are not grail discoveries', () => {
       // Arrange
