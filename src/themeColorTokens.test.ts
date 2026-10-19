@@ -98,6 +98,16 @@ function findViolations(pattern: RegExp, isViolation: (match: RegExpMatchArray) 
   );
 }
 
+/** Every `text-destructive/NN` class in source with its opacity. */
+function findFadedTextClasses() {
+  return collectSourceFiles(srcDir).flatMap((file) =>
+    [...readFileSync(file, 'utf8').matchAll(/text-destructive\/(\d+)/g)].map((match) => ({
+      label: `${relative(srcDir, file)} ${match[0]}`,
+      alpha: Number(match[1]) / 100,
+    })),
+  );
+}
+
 function getDefinedThemeColors(): Set<string> {
   const css = readFileSync(join(srcDir, 'index.css'), 'utf8');
   return new Set([...css.matchAll(/--color-([a-z0-9-]+):/g)].map((match) => match[1]));
@@ -402,13 +412,6 @@ const MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY = 0.1;
 const SUCCESS_BADGE_TINT = 0.15;
 /** Alerts and inline error blocks tint with bg-destructive/10 in both themes. */
 const RESTING_ALERT_TINT = 0.1;
-/** Every `text-destructive/NN` class in source, scanned once for all themes. */
-const fadedTextClasses = collectSourceFiles(srcDir).flatMap((file) =>
-  [...readFileSync(file, 'utf8').matchAll(/text-destructive\/(\d+)/g)].map((match) => ({
-    label: `${relative(srcDir, file)} ${match[0]}`,
-    alpha: Number(match[1]) / 100,
-  })),
-);
 
 describe.each(
   statusThemes,
@@ -459,7 +462,7 @@ describe.each(
     // Act
     const failing = belowAa(
       Object.fromEntries(
-        fadedTextClasses.flatMap(({ label, alpha }) =>
+        findFadedTextClasses().flatMap(({ label, alpha }) =>
           surfaces.map((surface) => {
             const tint = over(destructive, RESTING_ALERT_TINT, tokens[surface]);
             const text = toSrgb(destructive).map(

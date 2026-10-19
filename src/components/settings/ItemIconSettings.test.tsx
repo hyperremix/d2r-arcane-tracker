@@ -175,3 +175,36 @@ describe('When the icon size is chosen in the item icon settings', () => {
     });
   });
 });
+
+describe('When the item icon settings explain how to extract the game files', () => {
+  beforeEach(() => {
+    setupGrailStore({ showItemIcons: true });
+    windowGlobals.electronAPI = {
+      icon: {
+        validatePath: vi.fn().mockResolvedValue({ valid: false, error: 'Game files not found' }),
+      },
+    };
+  });
+
+  afterEach(() => {
+    windowGlobals.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  it('If the CASC viewer link is shown, Then it uses the shared link style', async () => {
+    // Arrange
+    render(<ItemIconSettings />);
+
+    // Act
+    const link = await screen.findByRole('link', { name: "Ladik's CASC Viewer" });
+
+    // Assert
+    expect(link).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+  });
+});

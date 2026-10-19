@@ -133,6 +133,26 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
     });
   });
 
+  describe('If the game file is missing and the CASC viewer link is shown', () => {
+    it('Then the link uses the shared link style', async () => {
+      // Arrange
+      setupTerrorZoneApi({ valid: false, errorCode: 'gameFileNotFound' });
+      renderTerrorZoneConfiguration();
+
+      // Act
+      const link = await screen.findByRole('link', { name: "Ladik's CASC Viewer" });
+
+      // Assert
+      expect(link).toHaveClass(
+        'text-foreground',
+        'underline',
+        'decoration-muted-foreground',
+        'underline-offset-4',
+        'hover:decoration-foreground',
+      );
+    });
+  });
+
   describe('If the error text mentions "not found" but the code is different', () => {
     it('Then the extraction guide is not shown', async () => {
       // Arrange
