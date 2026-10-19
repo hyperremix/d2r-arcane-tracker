@@ -3,7 +3,6 @@ import { Calendar } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -58,7 +57,7 @@ function SessionTableRow({
 
   return (
     <TableRow
-      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70"
+      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
       tabIndex={0}
       onClick={() => onSessionClick(session.id)}
       onKeyDown={(event) => {
@@ -111,6 +110,7 @@ function TableRowSkeleton() {
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
   const { t, i18n } = useTranslation();
+  const headingId = useId();
   const showArchivedLabelId = useId();
   const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } = useRunTrackerStore(
     useShallow((state) => ({
@@ -332,126 +332,123 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>{t(translations.runTracker.sessionsList.title)}</span>
-          <div className="flex items-center gap-2 font-normal font-ui">
-            <span id={showArchivedLabelId} className="text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionsList.showArchived)}
-            </span>
-            <Switch
-              checked={showArchived}
-              onCheckedChange={setShowArchived}
-              disabled={showSkeleton}
-              aria-labelledby={showArchivedLabelId}
-            />
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {showSkeleton ? (
+    // A page section rather than a card: the table needs no extra frame below the live session
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id={headingId} className="font-semibold text-base leading-snug">
+          {t(translations.runTracker.sessionsList.title)}
+        </h2>
+        <div className="flex items-center gap-2">
+          <span id={showArchivedLabelId} className="text-muted-foreground text-sm">
+            {t(translations.runTracker.sessionsList.showArchived)}
+          </span>
+          <Switch
+            checked={showArchived}
+            onCheckedChange={setShowArchived}
+            disabled={showSkeleton}
+            aria-labelledby={showArchivedLabelId}
+          />
+        </div>
+      </div>
+      {showSkeleton ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t(translations.runTracker.table.date)}</TableHead>
+              <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
+              <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+              <TableHead>{t(translations.runTracker.table.duration)}</TableHead>
+              <TableHead className="text-center">{t(translations.runTracker.table.runs)}</TableHead>
+              <TableHead className="text-center">
+                {t(translations.runTracker.table.items)}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }, (_, i) => (
+              <TableRowSkeleton key={`session-skeleton-${Date.now()}-${i}`} />
+            ))}
+          </TableBody>
+        </Table>
+      ) : sortedSessions.length > 0 ? (
+        <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t(translations.runTracker.table.date)}</TableHead>
+                {/* Date and start time share the same timestamp, so only Date is sortable */}
+                <SortableTableHead
+                  field="startTime"
+                  label={t(translations.runTracker.table.date)}
+                  activeField={sortField}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                />
                 <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
                 <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
-                <TableHead>{t(translations.runTracker.table.duration)}</TableHead>
-                <TableHead className="text-center">
-                  {t(translations.runTracker.table.runs)}
-                </TableHead>
-                <TableHead className="text-center">
-                  {t(translations.runTracker.table.items)}
-                </TableHead>
+                <SortableTableHead
+                  field="duration"
+                  label={t(translations.runTracker.table.duration)}
+                  activeField={sortField}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                />
+                <SortableTableHead
+                  field="runCount"
+                  label={t(translations.runTracker.table.runs)}
+                  activeField={sortField}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                  align="center"
+                />
+                <SortableTableHead
+                  field="itemsFound"
+                  label={t(translations.runTracker.table.items)}
+                  activeField={sortField}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                  align="center"
+                />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: 5 }, (_, i) => (
-                <TableRowSkeleton key={`session-skeleton-${Date.now()}-${i}`} />
+              {paginatedSessions.map((session) => (
+                <SessionTableRow
+                  key={session.id}
+                  session={session}
+                  onSessionClick={handleSessionClick}
+                  getSessionStats={getSessionStats}
+                  getSessionDuration={getSessionDuration}
+                  formatSessionDate={formatSessionDay}
+                />
               ))}
             </TableBody>
           </Table>
-        ) : sortedSessions.length > 0 ? (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {/* Date and start time share the same timestamp, so only Date is sortable */}
-                  <SortableTableHead
-                    field="startTime"
-                    label={t(translations.runTracker.table.date)}
-                    activeField={sortField}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
-                  <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
-                  <SortableTableHead
-                    field="duration"
-                    label={t(translations.runTracker.table.duration)}
-                    activeField={sortField}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableTableHead
-                    field="runCount"
-                    label={t(translations.runTracker.table.runs)}
-                    activeField={sortField}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                    align="center"
-                  />
-                  <SortableTableHead
-                    field="itemsFound"
-                    label={t(translations.runTracker.table.items)}
-                    activeField={sortField}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                    align="center"
-                  />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedSessions.map((session) => (
-                  <SessionTableRow
-                    key={session.id}
-                    session={session}
-                    onSessionClick={handleSessionClick}
-                    getSessionStats={getSessionStats}
-                    getSessionDuration={getSessionDuration}
-                    formatSessionDate={formatSessionDay}
-                  />
-                ))}
-              </TableBody>
-            </Table>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4">
-                <div className="text-muted-foreground text-sm">
-                  {t(translations.runTracker.sessionsList.showingRange, {
-                    start: startIndex + 1,
-                    end: Math.min(endIndex, sortedSessions.length),
-                    total: sortedSessions.length,
-                  })}
-                </div>
-                <PageNavigation
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={goToPage}
-                />
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionsList.showingRange, {
+                  start: startIndex + 1,
+                  end: Math.min(endIndex, sortedSessions.length),
+                  total: sortedSessions.length,
+                })}
               </div>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
-            <p className="mb-2 font-medium text-muted-foreground">{emptyState.title}</p>
-            <p className="text-muted-foreground text-sm">{emptyState.description}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <PageNavigation
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
+          <p className="mb-2 font-medium text-muted-foreground">{emptyState.title}</p>
+          <p className="text-muted-foreground text-sm">{emptyState.description}</p>
+        </div>
+      )}
+    </section>
   );
 }

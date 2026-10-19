@@ -75,13 +75,13 @@ function getChartsRow(): HTMLElement {
   return screen.getByTestId('stats-charts');
 }
 
-/** Returns the card of the chart with the given heading. */
-function getChartCard(name: string): HTMLElement {
-  const card = screen
+/** Returns the chart card, or the note that replaces an empty chart, with the given heading. */
+function getChart(name: string): HTMLElement {
+  const chart = screen
     .getByRole('heading', { level: 2, name })
-    .closest<HTMLElement>('[data-slot="card"]');
-  expect(card).not.toBeNull();
-  return card as HTMLElement;
+    .closest<HTMLElement>('[data-slot="card"], [data-chart-state="empty"]');
+  expect(chart).not.toBeNull();
+  return chart as HTMLElement;
 }
 
 function buildCharacter(id: string, name: string, characterClass: CharacterClass) {
@@ -432,15 +432,12 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
-    expect(getChartCard('Grail progress over time')).not.toHaveAttribute(
-      'data-chart-state',
-      'empty',
-    );
-    expect(getChartCard('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
+    expect(getChart('Grail progress over time')).not.toHaveAttribute('data-chart-state', 'empty');
+    expect(getChart('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
     expect(screen.getAllByRole('img')).toHaveLength(2);
   });
 
-  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is compact', () => {
+  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is a one-line note', () => {
     // Arrange
     const items = [HolyGrailItemBuilder.new().withId('a').build()];
     setupStatistics({
@@ -460,12 +457,10 @@ describe('When StatsDashboard shows the progress charts', () => {
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
     expect(screen.getByRole('img', { name: /^Grail progress over time/ })).toBeInTheDocument();
-    expect(getChartCard('Grail progress over time')).not.toHaveAttribute(
-      'data-chart-state',
-      'empty',
-    );
-    const weekly = getChartCard('Finds per week');
+    expect(getChart('Grail progress over time')).not.toHaveAttribute('data-chart-state', 'empty');
+    const weekly = getChart('Finds per week');
     expect(weekly).toHaveAttribute('data-chart-state', 'empty');
+    expect(weekly).not.toHaveAttribute('data-slot', 'card');
     expect(within(weekly).getByText('No finds in the last 12 weeks')).toBeInTheDocument();
     expect(within(weekly).queryByRole('img')).not.toBeInTheDocument();
     expect(within(weekly).queryByText(/the latest week ending today/)).not.toBeInTheDocument();
@@ -490,8 +485,8 @@ describe('When StatsDashboard shows the progress charts', () => {
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
     expect(screen.getByRole('img', { name: /^Finds per week/ })).toBeInTheDocument();
-    expect(getChartCard('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
-    const progress = getChartCard('Grail progress over time');
+    expect(getChart('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
+    const progress = getChart('Grail progress over time');
     expect(progress).toHaveAttribute('data-chart-state', 'empty');
     expect(within(progress).getByText('No items found yet')).toBeInTheDocument();
     expect(within(progress).queryByRole('img')).not.toBeInTheDocument();
@@ -507,8 +502,8 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
-    expect(getChartCard('Grail progress over time')).toHaveAttribute('data-chart-state', 'empty');
-    expect(getChartCard('Finds per week')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChart('Grail progress over time')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChart('Finds per week')).toHaveAttribute('data-chart-state', 'empty');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 

@@ -21,10 +21,10 @@ function createSession(id: string, startHour: number, durationMinutes: number): 
   };
 }
 
-function setupRunTrackerStore(sessions: Session[]) {
+function setupRunTrackerStore(sessions: Session[], sessionsLoading = false) {
   const storeState = {
     sessions,
-    loading: false,
+    sessionsLoading,
     runs: new Map(sessions.map((session) => [session.id, []])),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
     loadingSessions: new Set<string>(),
@@ -49,8 +49,21 @@ describe('When SessionsList is rendered with previous sessions', () => {
     render(<SessionsList onSessionSelect={vi.fn()} />);
 
     // Assert
-    expect(screen.getByText('Previous sessions')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Previous sessions' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Show archived' })).toBeInTheDocument();
+  });
+
+  it('Then the list is a page section with a heading instead of a card', () => {
+    // Arrange & Act
+    const { container } = render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getByRole('region', { name: 'Previous sessions' })).toContainElement(
+      screen.getByRole('table'),
+    );
+    expect(container.querySelector('[data-slot="card"]')).toBeNull();
   });
 
   it('Then the show archived switch is labelled', () => {
@@ -59,15 +72,6 @@ describe('When SessionsList is rendered with previous sessions', () => {
 
     // Assert
     expect(screen.getByLabelText('Show archived')).toHaveAttribute('role', 'switch');
-  });
-
-  it('Then the show archived wrapper opts out of the display title font with font-ui', () => {
-    // Arrange & Act
-    render(<SessionsList onSessionSelect={vi.fn()} />);
-
-    // Assert
-    const wrapper = screen.getByText('Show archived').parentElement;
-    expect(wrapper).toHaveClass('font-ui', 'font-normal');
   });
 
   it('Then only the Date column sorts by start time, avoiding duplicate indicators', () => {
@@ -105,6 +109,35 @@ describe('When SessionsList is rendered with previous sessions', () => {
 
     // Assert
     expect(screen.getAllByRole('row', { name: /^View session from .+ details$/ })).toHaveLength(2);
+  });
+
+  it('Then each session row is focusable and shows a pointer and a keyboard focus outline', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    for (const row of screen.getAllByRole('row', { name: /^View session from .+ details$/ })) {
+      expect(row).toHaveAttribute('tabindex', '0');
+      expect(row).toHaveClass('cursor-pointer', 'hover:bg-muted/70', 'focus-visible:outline-2');
+    }
+  });
+
+  it('If a session row is clicked or activated with Enter or Space, Then that session is opened', () => {
+    // Arrange
+    const onSessionSelect = vi.fn();
+    render(<SessionsList onSessionSelect={onSessionSelect} />);
+    const [firstRow, secondRow] = screen.getAllByRole('row', {
+      name: /^View session from .+ details$/,
+    });
+
+    // Act
+    fireEvent.click(firstRow);
+    fireEvent.keyDown(secondRow, { key: 'Enter' });
+    fireEvent.keyDown(secondRow, { key: ' ' });
+
+    // Assert
+    // Newest first: s-2 started later than s-1
+    expect(onSessionSelect.mock.calls).toEqual([['s-2'], ['s-1'], ['s-1']]);
   });
 
   it('Then sessions older than a week show a compact date instead of the full weekday date', () => {
@@ -180,5 +213,44 @@ describe('When SessionsList is rendered without previous sessions', () => {
     // Assert
     expect(screen.getByText('No previous sessions')).toBeInTheDocument();
     expect(screen.getByText('Start a session to begin tracking your runs.')).toBeInTheDocument();
+  });
+});
+
+describe('When SessionsList is loading its first sessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupRunTrackerStore([], true);
+  });
+
+  it('Then the table headers are shown without session rows and the archived switch is disabled', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /^View session from .+ details$/ })).toBeNull();
+    expect(screen.queryByText('No previous sessions')).not.toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Show archived' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+});
+
+describe('When SessionsList is rendered with more sessions than fit on one page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupRunTrackerStore(
+      Array.from({ length: 12 }, (_, i) => createSession(`s-${i + 1}`, i + 1, 30)),
+    );
+  });
+
+  it('Then the first page of sessions and the visible range are shown', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getAllByRole('row', { name: /^View session from .+ details$/ })).toHaveLength(10);
+    expect(screen.getByText('Showing 1-10 of 12 sessions')).toBeInTheDocument();
   });
 });

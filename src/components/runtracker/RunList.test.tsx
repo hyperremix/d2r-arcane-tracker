@@ -154,6 +154,21 @@ describe('When RunList is rendered', () => {
       expect(screen.getByText('Run history')).toBeInTheDocument();
     });
 
+    it('Then the run history is a section with a heading instead of a card', () => {
+      // Arrange
+      const runs = createRuns(2);
+
+      // Act
+      const { container } = render(<RunList runs={runs} />);
+
+      // Assert
+      expect(screen.getByRole('region', { name: 'Run history' })).toContainElement(
+        screen.getByRole('table'),
+      );
+      expect(screen.getByRole('heading', { level: 3, name: 'Run history' })).toBeInTheDocument();
+      expect(container.querySelector('[data-slot="card"]')).toBeNull();
+    });
+
     it('Then renders runs count badge', () => {
       // Arrange
       const runs = createRuns(3);
@@ -330,6 +345,19 @@ describe('When RunList is rendered', () => {
 
       // Assert
       expect(screen.getByRole('row', { name: 'View run #1 details' })).toBeInTheDocument();
+    });
+
+    it('Then the row is focusable and shows a pointer and a keyboard focus outline', () => {
+      // Arrange
+      const runs = createRuns(1);
+
+      // Act
+      render(<RunList runs={runs} />);
+
+      // Assert
+      const row = screen.getByRole('row', { name: 'View run #1 details' });
+      expect(row).toHaveAttribute('tabindex', '0');
+      expect(row).toHaveClass('cursor-pointer', 'hover:bg-muted/70', 'focus-visible:outline-2');
     });
   });
 

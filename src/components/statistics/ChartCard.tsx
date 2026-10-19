@@ -54,9 +54,9 @@ export function ChartCard({ title, description, children, className }: ChartCard
 }
 
 /**
- * Props for the EmptyChartCard component.
+ * Props for the EmptyChartNote component.
  */
-interface EmptyChartCardProps {
+interface EmptyChartNoteProps {
   /** Section heading, rendered as an `h2` */
   title: string;
   /** Why the chart has nothing to show */
@@ -64,19 +64,24 @@ interface EmptyChartCardProps {
 }
 
 /**
- * Compact card shown in place of a chart without data: the heading and the message side by side,
- * so an empty chart takes little room on the page. The message wraps below the heading when the
- * card is too narrow for both, rather than being truncated.
- * @returns {JSX.Element} The empty chart card
+ * One-line note shown in place of a chart without data: the heading and the message side by side,
+ * without card chrome, so an empty chart takes little room and doesn't read as content. The
+ * message wraps below the heading when the line is too narrow for both, rather than being truncated.
+ * @returns {JSX.Element} The empty chart note
  */
-export function EmptyChartCard({ title, message }: EmptyChartCardProps) {
+export function EmptyChartNote({ title, message }: EmptyChartNoteProps) {
+  const headingId = useId();
   return (
-    <Card className="py-4" data-chart-state="empty">
-      <CardContent className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <ChartCardTitle>{title}</ChartCardTitle>
-        <p className="text-muted-foreground text-sm">{message}</p>
-      </CardContent>
-    </Card>
+    <section
+      aria-labelledby={headingId}
+      data-chart-state="empty"
+      className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
+    >
+      <h2 id={headingId} className="font-semibold text-base leading-snug">
+        {title}
+      </h2>
+      <p className="text-muted-foreground text-sm">{message}</p>
+    </section>
   );
 }
 

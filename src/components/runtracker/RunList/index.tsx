@@ -1,12 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { PageNavigation } from '@/components/runtracker/PageNavigation';
 import { SortableTableHead, type SortOrder } from '@/components/runtracker/SortableTableHead';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
@@ -32,6 +31,7 @@ const VIRTUAL_SCROLLING_THRESHOLD = 100;
  */
 export function RunList({ runs }: RunListProps) {
   const { t } = useTranslation();
+  const headingId = useId();
   const { runItems, loadRunItems, loadingRunItems } = useRunTrackerStore(
     useShallow((state) => ({
       runItems: state.runItems,
@@ -243,14 +243,12 @@ export function RunList({ runs }: RunListProps) {
   // Show loading state if runs are undefined
   if (runs === undefined) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-6 w-16" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+        <div className="space-y-4">
           {/* Table Skeleton */}
           <div className="space-y-2">
             <Table>
@@ -272,22 +270,23 @@ export function RunList({ runs }: RunListProps) {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    // A page section rather than a card: the table needs no extra frame in the session details
+    <section aria-labelledby={headingId} className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h3 id={headingId} className="font-semibold text-base leading-snug">
           {t(translations.runTracker.runList.title)}
-          <Badge variant="outline" className="text-xs">
-            {t(translations.runTracker.runList.runsCount, { count: sortedRuns.length })}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </h3>
+        <Badge variant="outline" className="text-xs">
+          {t(translations.runTracker.runList.runsCount, { count: sortedRuns.length })}
+        </Badge>
+      </div>
+      <div className="space-y-4">
         {/* Runs Table */}
         {sortedRuns.length > 0 ? (
           <div className="space-y-2">
@@ -467,7 +466,7 @@ export function RunList({ runs }: RunListProps) {
           getItemCardData={getItemCardData}
           characters={characters}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
