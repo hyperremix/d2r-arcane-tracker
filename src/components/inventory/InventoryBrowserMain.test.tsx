@@ -897,6 +897,87 @@ describe('When InventoryBrowserMain is rendered', () => {
     });
   });
 
+  describe('If the list holds shared stashes and characters', () => {
+    function createListSnapshot(characterName: string, sourceFileType: 'd2s' | 'd2i') {
+      const sourceFilePath = `/tmp/${characterName}.${sourceFileType}`;
+      return {
+        snapshotId: `snap-${characterName}`,
+        characterName,
+        sourceFileType,
+        sourceFilePath,
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [
+          {
+            fingerprint: `fp-${characterName}`,
+            characterName,
+            sourceFileType,
+            sourceFilePath,
+            locationContext: 'inventory',
+            type: 'unique',
+            isSocketedItem: false,
+            itemName: 'Shako',
+            quality: 'unique',
+            ethereal: false,
+            socketCount: 0,
+            rawItemJson: '{}',
+            seenAt: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+      };
+    }
+
+    it('Then the list sits on the page with shared stashes first and characters by level under their own headings', async () => {
+      // Arrange
+      const snapshots = [
+        createListSnapshot('Gems', 'd2s'),
+        createListSnapshot('Runewords', 'd2s'),
+        createListSnapshot('Shared Stash Softcore', 'd2i'),
+        createListSnapshot('Sinsin', 'd2s'),
+        createListSnapshot('Modern Shared Stash Softcore', 'd2i'),
+      ];
+      searchAllMock.mockResolvedValue({
+        inventory: { snapshots, totalSnapshots: snapshots.length, totalItems: snapshots.length },
+        vault: { items: [], total: 0, page: 1, pageSize: 200 },
+      });
+      useGrailStore.setState({
+        characters: [
+          createCharacter({ id: 'gems', name: 'Gems', level: 1 }),
+          createCharacter({ id: 'runewords', name: 'Runewords', level: 1 }),
+          createCharacter({ id: 'sinsin', name: 'Sinsin', level: 93 }),
+        ],
+      });
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const stashes = await screen.findByRole('region', { name: 'Shared stashes' });
+      const characters = screen.getByRole('region', { name: 'Characters' });
+      expect(
+        stashes.compareDocumentPosition(characters) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        within(stashes)
+          .getAllByRole('button')
+          .map((row) => row.textContent),
+      ).toEqual([
+        expect.stringMatching(/^Modern Shared Stash Softcore/),
+        expect.stringMatching(/^Shared Stash Softcore/),
+      ]);
+      expect(
+        within(characters)
+          .getAllByRole('button')
+          .map((row) => row.textContent),
+      ).toEqual([
+        expect.stringMatching(/^Sinsin/),
+        expect.stringMatching(/^Gems/),
+        expect.stringMatching(/^Runewords/),
+      ]);
+      const listHeading = screen.getByRole('heading', { level: 2, name: 'Characters & stashes' });
+      expect(listHeading.closest('[data-slot="card"]')).toBeNull();
+    });
+  });
+
   describe('If the inventory is still loading', () => {
     it('Then a loading status is shown instead of an empty list', async () => {
       // Arrange

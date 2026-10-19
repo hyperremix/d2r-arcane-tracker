@@ -5,7 +5,7 @@ import type {
 } from 'electron/types/grail';
 import { isGrailBookmark } from 'electron/utils/vaultState';
 import { Loader2 } from 'lucide-react';
-import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   hasInventoryOrVaultDragData,
@@ -29,7 +29,11 @@ import {
 import { MatchingItemsList } from '@/components/inventory/MatchingItemsList';
 import { SaveWriteNotice } from '@/components/inventory/SaveWriteNotice';
 import { SelectedVaultItemPanel } from '@/components/inventory/SelectedVaultItemPanel';
-import { findSnapshotCharacter, SnapshotListRow } from '@/components/inventory/SnapshotListRow';
+import { SnapshotListRow } from '@/components/inventory/SnapshotListRow';
+import {
+  groupSnapshotList,
+  type SnapshotListGroupKind,
+} from '@/components/inventory/snapshotListGroups';
 import { useInventoryIconLookup } from '@/components/inventory/useInventoryIconLookup';
 import { useInventorySearch } from '@/components/inventory/useInventorySearch';
 import { useVaultActions } from '@/components/inventory/useVaultActions';
@@ -44,6 +48,11 @@ import { useGrailStore } from '@/stores/grailStore';
 
 const SNAPSHOT_HOVER_OPEN_DELAY_MS = 650;
 const SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS = 900;
+
+const SNAPSHOT_GROUP_TITLE_KEYS: Record<SnapshotListGroupKind, string> = {
+  sharedStashes: translations.inventoryBrowser.snapshotList.sharedStashes,
+  characters: translations.inventoryBrowser.snapshotList.characters,
+};
 
 function getSnapshotWindowTargetKey(snapshot: CharacterInventorySnapshot): string {
   return `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
@@ -77,6 +86,7 @@ function isDragLeavingWindow(event: globalThis.DragEvent): boolean {
 
 export function InventoryBrowserMain() {
   const { t } = useTranslation();
+  const snapshotListTitleId = useId();
   const [selectedVaultItemId, setSelectedVaultItemId] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
   const [characterId, setCharacterId] = useState('all');
@@ -270,6 +280,11 @@ export function InventoryBrowserMain() {
       .filter((snapshot) => snapshot.items.length > 0);
   }, [inventoryResponse?.inventory.snapshots, typeFilter, propertyFilters]);
 
+  const snapshotGroups = useMemo(
+    () => groupSnapshotList(snapshots, characters),
+    [snapshots, characters],
+  );
+
   const matchingItems = useMemo(
     () =>
       sortItems(
@@ -423,72 +438,78 @@ export function InventoryBrowserMain() {
 
       <SaveWriteNotice />
 
-      <Card>
-        <CardHeader>
-          <div className="space-y-1">
-            <CardTitle className="text-base">
-              {t(translations.inventoryBrowser.snapshotList.title)}
-            </CardTitle>
-            <div className="text-muted-foreground text-sm">
-              {t(translations.inventoryBrowser.snapshotList.description)}
-            </div>
+      <section aria-labelledby={snapshotListTitleId} className="space-y-4">
+        <div className="space-y-1">
+          <h2 id={snapshotListTitleId} className="font-semibold text-base leading-snug">
+            {t(translations.inventoryBrowser.snapshotList.title)}
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            {t(translations.inventoryBrowser.snapshotList.description)}
+          </p>
+        </div>
+        <InventoryFilterBar
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          characterId={characterId}
+          onCharacterIdChange={setCharacterId}
+          characterOptions={characterOptions}
+          locationContext={locationContext}
+          onLocationContextChange={setLocationContext}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          propertyFilterProps={{
+            filters: propertyFilters,
+            onChange: setPropertyFilters,
+            sortOrder,
+            onSortOrderChange: setSortOrder,
+          }}
+        />
+        {isInitialLoad ? (
+          <output className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {t(translations.common.loading)}
+          </output>
+        ) : !isLoading && snapshots.length === 0 ? (
+          <div className="text-center text-muted-foreground text-sm">
+            {t(translations.inventoryBrowser.snapshotList.empty)}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <InventoryFilterBar
-            searchText={searchText}
-            onSearchTextChange={setSearchText}
-            characterId={characterId}
-            onCharacterIdChange={setCharacterId}
-            characterOptions={characterOptions}
-            locationContext={locationContext}
-            onLocationContextChange={setLocationContext}
-            typeFilter={typeFilter}
-            onTypeFilterChange={setTypeFilter}
-            propertyFilterProps={{
-              filters: propertyFilters,
-              onChange: setPropertyFilters,
-              sortOrder,
-              onSortOrderChange: setSortOrder,
+        ) : (
+          snapshotGroups.map((group) => {
+            const groupTitleId = `${snapshotListTitleId}-${group.kind}`;
+            return (
+              <section key={group.kind} aria-labelledby={groupTitleId} className="space-y-2">
+                <h3 id={groupTitleId} className="font-medium text-sm">
+                  {t(SNAPSHOT_GROUP_TITLE_KEYS[group.kind])}
+                </h3>
+                <ul className="space-y-2">
+                  {group.entries.map(({ snapshot, character }) => (
+                    <li key={snapshot.snapshotId}>
+                      <SnapshotListRow
+                        snapshot={snapshot}
+                        character={character}
+                        onOpen={(target) => {
+                          void handleOpenSnapshotWindow(target);
+                        }}
+                        onDragOver={handleSnapshotRowDragOver}
+                        onDragLeave={handleSnapshotRowDragLeave}
+                        onDrop={resetSnapshotHoverSession}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })
+        )}
+        {hasActiveFilters && inventoryResponse !== null && (
+          <MatchingItemsList
+            items={matchingItems}
+            onOpen={(item) => {
+              void handleOpenSnapshotWindow(item);
             }}
           />
-          {isInitialLoad ? (
-            <output className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              {t(translations.common.loading)}
-            </output>
-          ) : !isLoading && snapshots.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm">
-              {t(translations.inventoryBrowser.snapshotList.empty)}
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {snapshots.map((snapshot) => (
-                <li key={snapshot.snapshotId}>
-                  <SnapshotListRow
-                    snapshot={snapshot}
-                    character={findSnapshotCharacter(snapshot, characters)}
-                    onOpen={(target) => {
-                      void handleOpenSnapshotWindow(target);
-                    }}
-                    onDragOver={handleSnapshotRowDragOver}
-                    onDragLeave={handleSnapshotRowDragLeave}
-                    onDrop={resetSnapshotHoverSession}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          {hasActiveFilters && inventoryResponse !== null && (
-            <MatchingItemsList
-              items={matchingItems}
-              onOpen={(item) => {
-                void handleOpenSnapshotWindow(item);
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </section>
 
       {isVaultCardVisible && (
         <Card>
