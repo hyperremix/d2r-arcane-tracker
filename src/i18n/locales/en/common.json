@@ -384,7 +384,6 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Configure save file monitoring, tracking, display and data options",
     "saveError": {
       "title": "Couldn't save your settings",
       "description": "Your change has been undone. Please try again."
@@ -810,7 +809,6 @@
     }
   },
   "statistics": {
-    "description": "Your Holy Grail progress and run performance at a glance",
     "grailStatistics": "Grail statistics",
     "runStatistics": "Run statistics",
     "dashboard": {
@@ -1054,7 +1052,6 @@
   },
   "inventoryBrowser": {
     "title": "Inventory browser",
-    "description": "See what is in your save files, move items between characters and stashes, and keep items in the vault.",
     "searchPlaceholder": "Search items, codes, or quality...",
     "character": "Character",
     "locationFilter": "Location",
@@ -1510,7 +1507,6 @@
   "runeword": {
     "calculator": {
       "title": "Runeword calculator",
-      "subtitle": "Find which runewords you can craft with your available runes",
       "showingResults": "Showing {{filtered}} of {{total}} runewords",
       "searchLabel": "Search runewords",
       "searchPlaceholder": "Search runewords...",
@@ -1570,7 +1566,6 @@
   },
   "terrorZone": {
     "title": "Terror zone configuration",
-    "description": "Choose which terror zones can appear in your game",
     "loadingTerrorZones": "Loading terror zones...",
     "warning": "This feature modifies game files in your D2R installation. The original file is backed up automatically and can be restored at any time, but any issues caused by these changes are your own responsibility.",
     "openInstallationSettings": "Open D2R installation settings",
@@ -1662,7 +1657,6 @@
   },
   "runTracker": {
     "title": "Run tracker",
-    "description": "Track your sessions and runs and review past sessions",
     "loadingData": "Loading run tracker data...",
     "errorLoading": "Error loading run tracker",
     "sessionCard": {

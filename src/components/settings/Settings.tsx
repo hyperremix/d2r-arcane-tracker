@@ -381,10 +381,7 @@ export function Settings() {
           contentClassName="space-y-10"
           data-testid="settings-scroll-container"
         >
-          <PageHeader
-            title={t(translations.settings.title)}
-            description={t(translations.settings.description)}
-          />
+          <PageHeader title={t(translations.settings.title)} />
           {settingsSections.map((section) => (
             <section
               key={section.id}

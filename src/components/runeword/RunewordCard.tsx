@@ -131,11 +131,10 @@ function BaseStatus({ bases }: BaseStatusProps) {
  * only called out when some are missing: a line names them, the rune images cross them out, and
  * the Horadric Cube upgrades that make them follow.
  *
- * The card spans four rows of its parent grid (header, runes, missing runes, footer) and shares
- * them through a subgrid, so headers, rune rows, missing runes and footers line up across every
- * card in the same grid row even when a long name wraps. The card sets `gap-[normal]`, which makes
- * the subgrid inherit its row gap from the parent grid, so the gap is defined in one place (the
- * grid).
+ * The card spans three rows of its parent grid (header, runes, footer) and shares them through a
+ * subgrid, so headers, rune rows and footers line up across every card in the same grid row even
+ * when a long name wraps. The missing runes follow the runes in their row, so a card without them
+ * has no empty row. The card sets its own, tighter row gap instead of the grid's, to stay compact.
  *
  * The card is `relative` so the absolutely positioned `sr-only` text of the missing rune markers
  * is contained by the card instead of the page, where it would stretch the document's scrollable
@@ -158,32 +157,29 @@ export function RunewordCard({
   return (
     <Card
       className={cn(
-        'relative row-span-4 grid grid-rows-subgrid gap-[normal] px-6 transition-all hover:shadow-md',
+        'relative row-span-3 grid grid-rows-subgrid gap-2 px-4 py-3 transition-all hover:shadow-md',
         className,
       )}
     >
       {/* Header: the name gets the full card width and the owned bases sit on their own line below
           it. Most names fit on one line; a long one wraps instead of being cut off. */}
-      <div className="flex min-w-0 flex-col items-start gap-1.5">
+      <div className="flex min-w-0 flex-col items-start gap-1">
         <h3 className="w-full break-words font-semibold text-lg leading-tight">{runeword.name}</h3>
         {readiness && <BaseStatus bases={readiness.bases} />}
       </div>
 
-      {/* Required runes; the wrapper keeps the row in place even without runes */}
-      <div>
+      {/* Required runes, followed by the missing runes and the upgrades that make them. The runes
+          wrap onto as many lines as the card needs. The wrapper keeps the row in place even
+          without runes. */}
+      <div className="flex min-w-0 flex-col items-start gap-2 text-xs">
         {runeIds.length > 0 && (
           <RuneImages
             runeIds={runeIds}
-            viewMode="grid"
             showRuneNames
             completionStatus={completionStatus}
+            className="flex flex-wrap gap-x-2 gap-y-1"
           />
         )}
-      </div>
-
-      {/* Missing runes and the upgrades that make them. The wrapper keeps the row in place when no
-          rune is missing. */}
-      <div className="flex min-w-0 flex-col items-start gap-2 text-xs">
         {missingRunes.length > 0 && (
           <p className="font-medium">
             {t(translations.runeword.card.missingRunes, {
@@ -209,7 +205,7 @@ export function RunewordCard({
 
       {/* Footer: one socket per rune, and a link to the runeword's page on an external site. Both
           stay on one line each; on a card too narrow for both, the link wraps to its own line. */}
-      <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1 border-border border-t pt-3 text-xs">
+      <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1 border-border border-t pt-2 text-xs">
         {socketCount > 0 && (
           <span className="whitespace-nowrap text-muted-foreground">
             {t(translations.runeword.card.sockets, { count: socketCount })}
@@ -221,7 +217,7 @@ export function RunewordCard({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={t(getExternalLinkLabelKey(runeword.link))}
-            className="ml-auto inline-flex items-center gap-1 whitespace-nowrap text-primary hover:underline"
+            className="ml-auto inline-flex items-center gap-1 whitespace-nowrap text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground"
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI?.shell.openExternal(runeword.link);

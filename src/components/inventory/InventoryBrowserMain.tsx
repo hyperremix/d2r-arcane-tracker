@@ -431,10 +431,7 @@ export function InventoryBrowserMain() {
 
   return (
     <PageShell>
-      <PageHeader
-        title={t(translations.inventoryBrowser.title)}
-        description={t(translations.inventoryBrowser.description)}
-      />
+      <PageHeader title={t(translations.inventoryBrowser.title)} />
 
       <SaveWriteNotice />
 

@@ -300,7 +300,6 @@ export function TerrorZoneConfiguration() {
   const pageHeader = (
     <PageHeader
       title={t(translations.terrorZone.title)}
-      description={t(translations.terrorZone.description)}
       actions={
         <Link to="/terror-zones" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           <CalendarClock aria-hidden="true" />

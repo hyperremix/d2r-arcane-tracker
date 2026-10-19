@@ -308,11 +308,7 @@ export function RunewordCalculator() {
     // the xl breakpoint so the runeword grid keeps most of a small window, and widens to five
     // columns above it.
     <div className="grid min-h-0 flex-1 grid-cols-[14rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
-      <PageHeader
-        className="col-span-2 pr-6"
-        title={t(translations.runeword.calculator.title)}
-        description={t(translations.runeword.calculator.subtitle)}
-      />
+      <PageHeader className="col-span-2 pr-6" title={t(translations.runeword.calculator.title)} />
 
       {/* Left Sidebar - Rune filters, as tall as its content but never taller than the window */}
       <div className="flex min-h-0 flex-col pb-6">
@@ -393,8 +389,7 @@ export function RunewordCalculator() {
           )}
 
           {/* Runeword Grid: columns follow the available width, not the viewport. Each card spans
-            four rows (header, runes, missing runes, footer) via subgrid and takes its row gap from
-            this grid. */}
+            three rows (header, runes, footer) via subgrid. */}
           {!isLoading && filteredRunewords.length > 0 && (
             <div
               data-testid="runeword-grid"
