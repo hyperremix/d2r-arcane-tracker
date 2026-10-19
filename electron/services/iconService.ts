@@ -58,7 +58,7 @@ export const MAC_DEFAULT_D2R_INSTALL_PATH = '/Applications/Diablo II Resurrected
  * that doesn't exist or can't be read is not one.
  * @param folder - The folder to check
  */
-export function isD2RInstallFolder(folder: string): boolean {
+function isD2RInstallFolder(folder: string): boolean {
   try {
     return statSync(path.join(folder, D2R_PROCESS_NAME)).isFile();
   } catch {

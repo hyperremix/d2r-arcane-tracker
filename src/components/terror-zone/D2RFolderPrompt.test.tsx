@@ -131,6 +131,20 @@ describe('When the D2RFolderPrompt is shown', () => {
       );
     });
 
+    it('Then the button shows the full folder as its title in case the label is truncated', async () => {
+      // Arrange
+      setupIconApi({ suggestion: SUGGESTED_PATH });
+
+      // Act
+      renderPrompt('page');
+
+      // Assert
+      expect(await screen.findByRole('button', { name: `Use ${SUGGESTED_PATH}` })).toHaveAttribute(
+        'title',
+        SUGGESTED_PATH,
+      );
+    });
+
     it('Then nothing is saved until the user clicks it', async () => {
       // Arrange
       const icon = setupIconApi({ suggestion: SUGGESTED_PATH });

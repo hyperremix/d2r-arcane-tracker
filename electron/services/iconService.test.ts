@@ -155,6 +155,7 @@ describe('IconService', () => {
   describe('When the D2R installation is looked up on Windows', () => {
     const battleNetDefault = 'C:\\Program Files (x86)\\Diablo II Resurrected';
     const programFiles = 'C:\\Program Files\\Diablo II Resurrected';
+    const cGames = 'C:\\Games\\Diablo II Resurrected';
 
     beforeEach(() => {
       osOverrides.platform = 'win32';
@@ -183,6 +184,43 @@ describe('IconService', () => {
 
       // Assert
       expect(suggested).toBe(programFiles);
+    });
+
+    it('If D2R.exe is in the Battle.net default folder, Then it is detected and becomes the configured path', () => {
+      // Arrange
+      fakeWindowsFiles([`${battleNetDefault}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      const detected = service.findD2RInstallation();
+
+      // Assert
+      expect(detected).toBe(battleNetDefault);
+      expect(service.getD2RPath()).toBe(battleNetDefault);
+    });
+
+    it('If the Battle.net default folder and C:\\Games both have D2R.exe, Then the Battle.net default is detected', () => {
+      // Arrange
+      fakeWindowsFiles([`${battleNetDefault}\\D2R.exe`, `${cGames}\\D2R.exe`]);
+      const service = new IconService();
+
+      // Act
+      const detected = service.findD2RInstallation();
+
+      // Assert
+      expect(detected).toBe(battleNetDefault);
+    });
+
+    it('If C:\\Games has no D2R.exe, Then it is skipped and nothing is detected', () => {
+      // Arrange
+      fakeWindowsFiles([`${cGames}\\Data\\data.000`]);
+      const service = new IconService();
+
+      // Act
+      const detected = service.findD2RInstallation();
+
+      // Assert
+      expect(detected).toBeNull();
     });
 
     it('If no well-known folder has D2R.exe, Then nothing is suggested or detected', () => {

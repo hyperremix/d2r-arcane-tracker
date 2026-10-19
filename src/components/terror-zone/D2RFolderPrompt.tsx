@@ -88,6 +88,7 @@ export function D2RFolderPrompt({ layout, description, onFolderSet }: D2RFolderP
           size={isPage ? 'default' : 'sm'}
           disabled={isSaving}
           onClick={() => void saveSuggestedPath(suggestedPath)}
+          title={suggestedPath}
           className="max-w-full"
         >
           <FolderCheck aria-hidden="true" />
