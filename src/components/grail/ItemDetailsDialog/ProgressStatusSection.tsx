@@ -23,8 +23,9 @@ function getStatusClasses(kind: StatusKind): string {
   return cn(
     'inline-flex items-center gap-1 font-medium',
     kind === 'found' && 'text-found',
-    kind === 'foundNotTracked' && 'text-muted-foreground',
-    kind === 'missing' && 'text-missing',
+    // A missing version is neutral rather than an error color; the empty circle and the text tell
+    // it apart from a find that isn't tracked
+    (kind === 'foundNotTracked' || kind === 'missing') && 'text-muted-foreground',
   );
 }
 

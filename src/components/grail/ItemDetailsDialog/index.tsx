@@ -1,5 +1,5 @@
 import type { Item } from 'electron/types/grail';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ItemFarmingSources } from '@/components/farming/ItemFarmingSources';
 import { Button } from '@/components/ui/button';
@@ -106,10 +106,10 @@ function ItemArtwork({ item, showItemIcons }: { item: Item; showItemIcons: boole
 
 /**
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
- * It reads like the in-game item tooltip: artwork, the name in its quality color, the base item
- * and found status, then the item's facts as plain text lines. Below that it lists per-character
- * progress and the copies in the user's saves and vault, and lets the user manually record or
- * remove finds.
+ * Its centered header reads like the in-game item tooltip: artwork, the name in its quality color,
+ * the base item and found status. The item's facts follow as a two-column list. Below that it
+ * lists per-character progress and the copies in the user's saves and vault, and lets the user
+ * manually record or remove finds.
  */
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
@@ -140,8 +140,9 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     );
   }, [item, progress, characters]);
 
-  // Hook must be called before early return
+  // Hooks must be called before early return
   const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);
+  const titleId = useId();
 
   if (!item) {
     return null;
@@ -152,12 +153,20 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl">
+      <DialogContent
+        className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl"
+        // Focus the dialog itself (named by its title) rather than its first focusable element,
+        // the external item link, so opening the dialog doesn't start on a way out of the app
+        initialFocus={() =>
+          document.getElementById(titleId)?.closest<HTMLElement>('[role="dialog"]') ?? true
+        }
+      >
         <DialogHeader className="shrink-0 items-center gap-1 text-center">
           <div className="mb-2 flex justify-center empty:hidden">
             <ItemArtwork item={item} showItemIcons={settings.showItemIcons} />
           </div>
           <DialogTitle
+            id={titleId}
             className={cn(
               'text-balance font-display font-semibold text-2xl leading-tight',
               getItemQualityTextClass(item.type),

@@ -76,6 +76,13 @@ function setupStoreMock(settingsOverrides: Partial<Settings> = {}) {
   });
 }
 
+/**
+ * A normal find of the item, so the grid renders it as a full-height found tile.
+ */
+function foundProgress(itemId: string) {
+  return [GrailProgressBuilder.new().withItemId(itemId).asNormal().build()];
+}
+
 describe('When ItemCard is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,12 +112,15 @@ describe('When ItemCard is rendered', () => {
       expect(screen.queryByTestId('item-type-icon')).not.toBeInTheDocument();
     });
 
-    it('Then lets long item names wrap to two lines instead of truncating them', () => {
+    it('Then lets long names of found items wrap to two lines instead of truncating them', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withName("Immortal King's Stone Crusher").build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName("Immortal King's Stone Crusher")
+        .build();
 
       // Act
-      render(<ItemCard item={item} />);
+      render(<ItemCard item={item} normalProgress={foundProgress('item-1')} />);
 
       // Assert
       const name = screen.getByRole('heading', { name: "Immortal King's Stone Crusher" });
@@ -484,9 +494,10 @@ describe('When ItemCard is rendered', () => {
       [3, 'items-center', '[&_img]:size-[18px]'],
       [4, 'items-end', '[&_img]:size-4'],
       [6, 'items-end', '[&_img]:size-4'],
-    ])('Then %i runes sit in a slot aligned %s with %s runes', (runeCount, alignment, runeSize) => {
+    ])('Then %i runes of a found runeword sit in a slot aligned %s with %s runes', (runeCount, alignment, runeSize) => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
         .withType('runeword')
         .withRunewordSubCategory('runewords')
         .build();
@@ -496,7 +507,7 @@ describe('When ItemCard is rendered', () => {
       );
 
       // Act
-      render(<ItemCard item={item} />);
+      render(<ItemCard item={item} normalProgress={foundProgress('item-1')} />);
 
       // Assert
       expect(screen.getByTestId('item-artwork')).toHaveClass(alignment);
@@ -527,13 +538,20 @@ describe('When ItemCard is rendered', () => {
       ['default', 'list', '48px'],
       ['large', 'list', '96px'],
       ['extraLarge', 'list', '144px'],
-    ] as const)('Then the %s icon in the %s view is %s wide and high', (iconSize, viewMode, pixels) => {
+    ] as const)('Then the %s icon of a found item in the %s view is %s wide and high', (iconSize, viewMode, pixels) => {
       // Arrange
       setupStoreMock({ showItemIcons: true });
-      const item = HolyGrailItemBuilder.new().withType('unique').build();
+      const item = HolyGrailItemBuilder.new().withId('item-1').withType('unique').build();
 
       // Act
-      render(<ItemCard item={item} viewMode={viewMode} iconSize={iconSize} />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={foundProgress('item-1')}
+          viewMode={viewMode}
+          iconSize={iconSize}
+        />,
+      );
 
       // Assert
       const artwork = screen.getByRole('img').parentElement;
@@ -553,17 +571,20 @@ describe('When ItemCard is rendered', () => {
       expect(screen.getByTestId('item-artwork')).toHaveClass('max-w-full');
     });
 
-    it('Then the runeword artwork slot of a grid tile is as high as the icon', () => {
+    it('Then the runeword artwork slot of a found grid tile is as high as the icon', () => {
       // Arrange
       setupStoreMock({ showItemIcons: true });
       const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
         .withType('runeword')
         .withRunewordSubCategory('runewords')
         .build();
       (item as { runes: string[] }).runes = ['r01', 'r02', 'r03'];
 
       // Act
-      render(<ItemCard item={item} iconSize="extraLarge" />);
+      render(
+        <ItemCard item={item} normalProgress={foundProgress('item-1')} iconSize="extraLarge" />,
+      );
 
       // Assert
       expect(screen.getByTestId('item-artwork')).toHaveStyle({ height: '120px' });
@@ -574,13 +595,15 @@ describe('When ItemCard is rendered', () => {
     it.each([
       ['item icons are hidden', false, 'unique'],
       ['the item is a runeword without runes', true, 'runeword'],
-    ] as const)('Then the empty artwork slot is as high as the icon if %s', (_name, showItemIcons, type) => {
+    ] as const)('Then the empty artwork slot of a found tile is as high as the icon if %s', (_name, showItemIcons, type) => {
       // Arrange
       setupStoreMock({ showItemIcons });
-      const item = HolyGrailItemBuilder.new().withType(type).build();
+      const item = HolyGrailItemBuilder.new().withId('item-1').withType(type).build();
 
       // Act
-      const { container } = render(<ItemCard item={item} iconSize="large" />);
+      const { container } = render(
+        <ItemCard item={item} normalProgress={foundProgress('item-1')} iconSize="large" />,
+      );
 
       // Assert
       const slot = container.querySelector('[data-slot="card-content"]')?.firstElementChild;
@@ -683,24 +706,34 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If the tile layout is checked', () => {
-    it('Then every grid row has a fixed height so tiles line up', () => {
+    it('Then every row of a found grid tile has a fixed height so tiles line up', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withName('Shako').withItemBase('Shako').build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName('Shako')
+        .withItemBase('Shako')
+        .build();
 
       // Act
-      render(<ItemCard item={item} />);
+      render(<ItemCard item={item} normalProgress={foundProgress('item-1')} />);
 
       // Assert
       expect(screen.getByRole('heading', { name: 'Shako' })).toHaveClass('line-clamp-2', 'h-8');
       expect(screen.getByText('Shako', { selector: 'p' })).toHaveClass('h-4', 'truncate');
     });
 
-    it('Then a tile without artwork or subtitle keeps the same rows', () => {
+    it('Then a found tile without artwork or subtitle keeps the same rows', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withType('rune').withName('Ber Rune').build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('rune')
+        .withName('Ber Rune')
+        .build();
 
       // Act
-      const { container } = render(<ItemCard item={item} />);
+      const { container } = render(
+        <ItemCard item={item} normalProgress={foundProgress('item-1')} />,
+      );
 
       // Assert
       const content = container.querySelector('[data-slot="card-content"]');
@@ -1220,7 +1253,7 @@ describe('When ItemCard is rendered', () => {
     it.each([
       'grid',
       'list',
-    ] as const)('Then the %s card uses a neutral border and muted surface without any quality color', (viewMode) => {
+    ] as const)('Then the %s card uses a neutral border and muted surface without a lit quality frame', (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withType('unique').withName('Neutral').build();
 
@@ -1232,7 +1265,8 @@ describe('When ItemCard is rendered', () => {
       const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
       expect(surface).toHaveAttribute('data-found', 'false');
       expect(surface).toHaveClass('border-border', 'bg-muted/40');
-      expect(surface?.className).not.toMatch(/item-unique/);
+      expect(surface).not.toHaveClass('border-item-unique/60');
+      expect(surface).not.toHaveClass('bg-card');
     });
 
     it('Then the set name is muted rather than set-colored', () => {
@@ -1249,6 +1283,100 @@ describe('When ItemCard is rendered', () => {
       const setName = screen.getByText("Tal Rasha's Wrappings");
       expect(setName).toHaveClass('text-muted-foreground');
       expect(setName).not.toHaveClass('text-item-set');
+    });
+
+    it.each([
+      'unique',
+      'set',
+      'rune',
+      'runeword',
+    ] as const)('Then the %s card shows its quality only as a faint left edge', (type) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType(type).withName('Edge').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const surface = screen.getByRole('button', { name: 'Edge, Not found' }).firstElementChild;
+      expect(surface).toHaveClass('border-l-2', `border-l-item-${type}/50`);
+      expect(surface).not.toHaveClass(`border-item-${type}/60`);
+    });
+  });
+
+  describe('If item is missing and shown as a grid tile', () => {
+    it('Then the tile is compact: tighter padding and the name and subtitle on one line each', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withName("Immortal King's Stone Crusher")
+        .withItemBase('Ogre Maul')
+        .build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const name = screen.getByRole('heading', { name: "Immortal King's Stone Crusher" });
+      expect(name).toHaveClass('truncate', 'h-4');
+      expect(name).not.toHaveClass('line-clamp-2');
+      expect(name).not.toHaveClass('h-8');
+      expect(screen.getByText('Ogre Maul')).toHaveClass('h-4', 'truncate');
+      expect(container.querySelector('[data-slot="card-content"]')).toHaveClass('p-1.5');
+    });
+
+    it.each([
+      ['default', '16px'],
+      ['large', '32px'],
+      ['extraLarge', '48px'],
+    ] as const)('Then the %s icon shrinks to %s', (iconSize, pixels) => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+      // Act
+      render(<ItemCard item={item} iconSize={iconSize} />);
+
+      // Assert
+      const slot = screen.getByTestId('item-artwork');
+      expect(slot).toHaveStyle({ width: pixels, height: pixels });
+      expect(slot).toHaveClass('grayscale', 'opacity-40');
+    });
+
+    it('Then an empty artwork slot is as high as the compact icon', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: false });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} iconSize="large" />);
+
+      // Assert
+      const slot = container.querySelector('[data-slot="card-content"]')?.firstElementChild;
+      expect(slot).toHaveAttribute('aria-hidden', 'true');
+      expect(slot).toHaveStyle({ height: '32px' });
+    });
+
+    it.each([
+      3, 6,
+    ])('Then the %i runes of a runeword sit in one centered row of small runes', (runeCount) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = Array.from(
+        { length: runeCount },
+        (_, i) => `r0${i + 1}`,
+      );
+
+      // Act
+      render(<ItemCard item={item} iconSize="extraLarge" />);
+
+      // Assert
+      const slot = screen.getByTestId('item-artwork');
+      expect(slot).toHaveClass('items-center');
+      expect(slot).toHaveStyle({ height: '48px' });
+      expect(screen.getByTestId('rune-images')).toHaveClass('[&_img]:size-4');
     });
   });
 

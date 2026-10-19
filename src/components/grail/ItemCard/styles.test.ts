@@ -91,16 +91,28 @@ describe('When getCardStateClasses is called', () => {
     'set',
     'rune',
     'runeword',
-  ] as const)('If a %s item is missing, Then it returns a neutral border and muted surface without any quality color', (type) => {
+  ] as const)('If a %s item is missing, Then it returns a neutral frame and muted surface with only a faint quality edge on the left', (type) => {
     // Arrange
     const isFound = false;
 
     // Act
-    const classes = getCardStateClasses(type, isFound, true);
+    const classes = getCardStateClasses(type, isFound, true).split(' ');
 
     // Assert
-    expect(classes.split(' ')).toEqual(expect.arrayContaining(['border-border', 'bg-muted/40']));
-    expect(classes).not.toMatch(/item-/);
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        'border-border',
+        'bg-muted/40',
+        'border-l-2',
+        `border-l-item-${type}/50`,
+        `hover:border-l-item-${type}`,
+      ]),
+    );
+    expect(classes).not.toContain(`border-item-${type}/60`);
+    expect(classes).not.toContain('bg-card');
+    expect(
+      classes.filter((cls) => cls.includes('item-')).every((cls) => /border-l-/.test(cls)),
+    ).toBe(true);
   });
 
   it('If a found card is interactive, Then hover strengthens its quality border and lifts its shadow', () => {

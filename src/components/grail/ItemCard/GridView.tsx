@@ -68,9 +68,52 @@ interface GridArtworkProps {
 }
 
 /**
+ * Props interface for the GridRuneArtwork component.
+ */
+interface GridRuneArtworkProps {
+  runeIds: string[];
+  isFound: boolean;
+  /** Height of the artwork slot in pixels */
+  height: number;
+  focusableTriggers: boolean;
+}
+
+/**
+ * Renders the runes of a runeword in the artwork slot of a grid card, dimmed and grayscale while
+ * missing.
+ */
+function GridRuneArtwork({ runeIds, isFound, height, focusableTriggers }: GridRuneArtworkProps) {
+  // Up to three runes sit in one centered row. Longer runewords wrap into two rows of three:
+  // smaller runes (34px high) sit at the bottom of the slot (at least 40px), so its top 6px
+  // stay free. The corner "New" badge (12px high at the card's top edge) ends 13px below the
+  // card top, the slot starts 9px and the top rune row 15px below it, so the rune rows clear it.
+  // The compact tile of a missing runeword keeps all runes in one row of 16px runes, which fits
+  // its smallest slot (16px) and up to six runes in the narrowest column.
+  const isOneRow = !isFound || runeIds.length <= 3;
+  return (
+    <div
+      data-testid="item-artwork"
+      className={cn(
+        'flex justify-center',
+        isOneRow ? 'items-center' : 'items-end',
+        !isFound && missingArtworkStyles,
+      )}
+      style={{ height }}
+    >
+      <RuneImages
+        runeIds={runeIds}
+        viewMode={isOneRow ? 'list' : 'grid'}
+        className={cn('gap-0.5', isFound && isOneRow ? '[&_img]:size-[18px]' : '[&_img]:size-4')}
+        focusableTriggers={focusableTriggers}
+      />
+    </div>
+  );
+}
+
+/**
  * Renders the item icon or rune images for a grid card, dimmed and grayscale while missing.
- * The artwork slot is as high as the icon size preset, also when it is empty, so every tile is
- * equally tall.
+ * The artwork slot is as high as the icon size preset (the smaller compact icon while missing),
+ * also when it is empty, so every tile of the same state is equally tall.
  */
 function GridArtwork({
   item,
@@ -80,31 +123,16 @@ function GridArtwork({
   focusableTriggers,
 }: GridArtworkProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
-  const iconPixels = ITEM_ICON_PIXELS[iconSize].grid;
+  const iconPixels = ITEM_ICON_PIXELS[iconSize][isFound ? 'grid' : 'missingGrid'];
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
-    // Up to three runes sit in one centered row. Longer runewords wrap into two rows of three:
-    // smaller runes (34px high) sit at the bottom of the slot (at least 40px), so its top 6px
-    // stay free. The corner "New" badge (12px high at the card's top edge) ends 13px below the
-    // card top, the slot starts 9px and the top rune row 15px below it, so the rune rows clear it.
-    const isOneRow = item.runes.length <= 3;
     return (
-      <div
-        data-testid="item-artwork"
-        className={cn(
-          'flex justify-center',
-          isOneRow ? 'items-center' : 'items-end',
-          !isFound && missingArtworkStyles,
-        )}
-        style={{ height: iconPixels }}
-      >
-        <RuneImages
-          runeIds={item.runes}
-          viewMode={isOneRow ? 'list' : 'grid'}
-          className={cn('gap-0.5', isOneRow ? '[&_img]:size-[18px]' : '[&_img]:size-4')}
-          focusableTriggers={focusableTriggers}
-        />
-      </div>
+      <GridRuneArtwork
+        runeIds={item.runes}
+        isFound={isFound}
+        height={iconPixels}
+        focusableTriggers={focusableTriggers}
+      />
     );
   }
 
@@ -133,8 +161,10 @@ function GridArtwork({
 /**
  * GridView component that renders an item as a compact, fixed-height tile of the grail
  * "collection wall": found items light up in their quality color, missing items stay dim and
- * neutral. A tile shows the artwork, the name (up to two lines), one truncated line with the set
- * name or base item and, while ethereal tracking is on, the version pills. Who found the item and
+ * neutral with a faint quality edge. A found tile shows the artwork, the name (up to two lines),
+ * one truncated line with the set name or base item and, while ethereal tracking is on, the
+ * version pills. A missing tile is about half as high: a smaller icon, tighter padding and the
+ * name on one truncated line, so more of what is left fits on screen. Who found the item and
  * when is shown in the name tooltip and the item details dialog.
  * When interactive props are provided the card is a focusable button-like element
  * that can be activated with Enter or Space.
@@ -185,8 +215,11 @@ export function GridView({
           </div>
         )}
 
-        {/* Every row has a fixed height, so all tiles are equally tall and the rows line up */}
-        <CardContent className="flex flex-col items-center p-2 text-center">
+        {/* Every row has a fixed height, so all tiles of the same state are equally tall and the rows
+            line up */}
+        <CardContent
+          className={cn('flex flex-col items-center text-center', isFound ? 'p-2' : 'p-1.5')}
+        >
           {/* Item Icon or Rune Images */}
           <GridArtwork
             item={item}
@@ -196,15 +229,16 @@ export function GridView({
             focusableTriggers={focusableTriggers}
           />
 
-          {/* Item Name: lit in its quality color when found, muted while missing */}
+          {/* Item Name: lit in its quality color when found, muted on one line while missing */}
           <Tooltip>
             <TooltipTrigger
               render={getTooltipTriggerRender(focusableTriggers)}
-              className="mt-1.5 block w-full text-center"
+              className={cn('block w-full text-center', isFound ? 'mt-1.5' : 'mt-1')}
             >
               <h3
                 className={cn(
-                  'line-clamp-2 h-8 break-words text-xs leading-4',
+                  'text-xs leading-4',
+                  isFound ? 'line-clamp-2 h-8 break-words' : 'h-4 truncate',
                   getItemNameClasses(item.type, isFound),
                 )}
               >
