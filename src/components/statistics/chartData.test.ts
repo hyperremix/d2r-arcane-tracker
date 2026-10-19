@@ -217,7 +217,9 @@ describe('When building the cumulative grail finds', () => {
 });
 
 describe('When counting finds per week', () => {
-  const items = [HolyGrailItemBuilder.new().withId('default-item').build()];
+  const items = ['default-item', 'today', '6-days', '7-days', 'old', 'baseline', 'later-scan'].map(
+    (id) => HolyGrailItemBuilder.new().withId(id).build(),
+  );
 
   it('If finds fall into different weeks, Then each week ending today counts its own finds', () => {
     // Arrange
@@ -225,18 +227,22 @@ describe('When counting finds per week', () => {
     const progress = [
       GrailProgressBuilder.new()
         .withId('today')
+        .withItemId('today')
         .withFoundDate(new Date(2026, 9, 10, 8))
         .build(),
       GrailProgressBuilder.new()
         .withId('6-days')
+        .withItemId('6-days')
         .withFoundDate(new Date(2026, 9, 4, 8))
         .build(),
       GrailProgressBuilder.new()
         .withId('7-days')
+        .withItemId('7-days')
         .withFoundDate(new Date(2026, 9, 3, 8))
         .build(),
       GrailProgressBuilder.new()
         .withId('old')
+        .withItemId('old')
         .withFoundDate(new Date(2026, 5, 1))
         .build(),
     ];
@@ -275,13 +281,46 @@ describe('When counting finds per week', () => {
     const progress = [
       GrailProgressBuilder.new()
         .withId('baseline')
+        .withItemId('baseline')
         .withFoundDate(new Date(2026, 0, 1))
         .asFromInitialScan()
         .build(),
       GrailProgressBuilder.new()
         .withId('later-scan')
+        .withItemId('later-scan')
         .withFoundDate(new Date(2026, 9, 9))
         .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, now, 2);
+
+    // Assert
+    expect(weeks.map((week) => week.count)).toEqual([0, 1]);
+  });
+
+  it('If a second character records an item that was already found, Then only the first find counts', () => {
+    // Arrange
+    const now = new Date(2026, 9, 10, 12);
+    const items = ['a', 'b'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('original')
+        .withItemId('a')
+        .withFoundDate(new Date(2026, 8, 1))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('repeat')
+        .withItemId('a')
+        .withCharacterId('second')
+        .withFoundDate(new Date(2026, 9, 9))
+        .asFromInitialScan()
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('new')
+        .withItemId('b')
+        .withFoundDate(new Date(2026, 9, 8))
         .build(),
     ];
 

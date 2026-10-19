@@ -2,7 +2,7 @@ import type { GrailProgress, Item, ItemSet } from 'electron/types/grail';
 import { filterItemsByTrackedVersions, isTrackedFind } from '@/lib/ethereal';
 import {
   excludeBaselineFinds,
-  findTrackedFinds,
+  findFirstTrackedFinds,
   type GrailStatisticsSettings,
 } from '@/lib/grailStatistics';
 
@@ -128,9 +128,9 @@ export function summarizeRunes(
 }
 
 /**
- * Finds the latest find of a tracked item version. The baseline (the finds of the first startup
- * save file scan that found items) is left out, since those items were found before the tracker
- * existed; finds of later scans count on the day of their scan.
+ * Finds the latest first find of a tracked item version. The baseline (the startup save file scan
+ * finds from the first day anything was found) is left out, since those items were found before
+ * the tracker existed; finds of later scans count on the day of their scan.
  * @param items - Tracked items
  * @param progress - All progress records
  * @param settings - Which item versions are tracked
@@ -143,7 +143,7 @@ export function findLastTrackedFind(
 ): LastTrackedFind | undefined {
   const itemsById = new Map(items.map((item) => [item.id, item]));
   let latest: LastTrackedFind | undefined;
-  for (const record of excludeBaselineFinds(findTrackedFinds(items, progress, settings))) {
+  for (const record of excludeBaselineFinds(findFirstTrackedFinds(items, progress, settings))) {
     const item = itemsById.get(record.itemId);
     const foundDate = new Date(record.foundDate);
     if (item && (!latest || foundDate.getTime() > latest.foundDate.getTime())) {

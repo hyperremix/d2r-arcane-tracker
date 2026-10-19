@@ -122,7 +122,12 @@ export function RunDurationCard() {
   }
 
   if (summaries.length < MIN_RUN_DURATION_SESSIONS) {
-    return <EmptyChartNote title={title} message={t(chartT.runDurationsEmpty)} />;
+    return (
+      <EmptyChartNote
+        title={title}
+        message={t(chartT.runDurationsEmpty, { count: MIN_RUN_DURATION_SESSIONS })}
+      />
+    );
   }
 
   return (

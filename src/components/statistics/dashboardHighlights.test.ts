@@ -258,6 +258,30 @@ describe('When finding the last find', () => {
     });
   });
 
+  it('If a second character records an item that was already found, Then the repeat is not the last find', () => {
+    // Arrange
+    const items = ['a', 'b'].map((id) =>
+      HolyGrailItemBuilder.new().withId(id).withName(id).build(),
+    );
+    const progress = [
+      buildFind('a', new Date(2026, 0, 1)),
+      buildFind('b', new Date(2026, 0, 5)),
+      GrailProgressBuilder.new()
+        .withId('repeat')
+        .withItemId('a')
+        .withCharacterId('second')
+        .withFoundDate(new Date(2026, 0, 9))
+        .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const lastFind = findLastTrackedFind(items, progress, NORMAL_ONLY);
+
+    // Assert
+    expect(lastFind).toEqual({ item: items[1], foundDate: new Date(2026, 0, 5), fromScan: false });
+  });
+
   it('If the latest find is not a tracked item, Then it is skipped', () => {
     // Arrange
     const items = [HolyGrailItemBuilder.new().withId('a').build()];
