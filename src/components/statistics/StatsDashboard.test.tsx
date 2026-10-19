@@ -131,7 +131,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last find while tracking'));
+    const lastFind = within(getTile('Last find'));
     expect(within(getTile('Total progress')).getByText('5/10')).toBeInTheDocument();
     expect(lastFind.getByText('None yet')).toBeInTheDocument();
     expect(lastFind.getByText('Since tracking began')).toBeInTheDocument();
@@ -176,7 +176,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last find while tracking'));
+    const lastFind = within(getTile('Last find'));
     expect(lastFind.getByText('3 days ago')).toBeInTheDocument();
     expect(lastFind.getByText('Angelic Halo')).toBeInTheDocument();
     const closestSet = within(getTile('Closest set'));
@@ -188,7 +188,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
   });
 
-  it('If the startup scan found an item after the last tracked find, Then the page shows one last find, the tracked one', () => {
+  it('If a later startup scan found an item after the last tracked find, Then the page shows one last find, the scanned one marked as found by scan', () => {
     // Arrange
     const items = [
       HolyGrailItemBuilder.new().withId('tracked').withName('Vampire Gaze').build(),
@@ -215,10 +215,10 @@ describe('When StatsDashboard shows the headline statistics', () => {
     // Assert
     expect(screen.getAllByText(/last find/i)).toHaveLength(1);
     expect(screen.queryByText('Last Find')).not.toBeInTheDocument();
-    expect(
-      within(getTile('Last find while tracking')).getByText('Vampire Gaze'),
-    ).toBeInTheDocument();
-    expect(container).not.toHaveTextContent("Mara's Kaleidoscope");
+    const lastFind = within(getTile('Last find'));
+    expect(lastFind.getByText('2 days ago')).toBeInTheDocument();
+    expect(lastFind.getByText("Mara's Kaleidoscope \u2022 found by scan")).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('Vampire Gaze');
     expect(container).not.toHaveTextContent('Recent Activity');
   });
 
@@ -253,7 +253,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     // Assert
     expect(screen.queryByText('Closest set')).not.toBeInTheDocument();
     expect(screen.queryByText('Runes missing')).not.toBeInTheDocument();
-    expect(screen.getByText('Last find while tracking')).toBeInTheDocument();
+    expect(screen.getByText('Last find')).toBeInTheDocument();
   });
 
   it('If only ethereal items are tracked, Then a normal find of a set item is not the last find', () => {
@@ -290,7 +290,7 @@ describe('When StatsDashboard shows the headline statistics', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const lastFind = within(getTile('Last find while tracking'));
+    const lastFind = within(getTile('Last find'));
     expect(lastFind.getByText('5 days ago')).toBeInTheDocument();
     expect(lastFind.getByText('Ethereal Helm')).toBeInTheDocument();
   });
@@ -466,7 +466,7 @@ describe('When StatsDashboard shows the progress charts', () => {
     expect(within(weekly).queryByText(/the latest week ending today/)).not.toBeInTheDocument();
   });
 
-  it('If finds were made but no tracked grail entry was found, Then the weekly chart takes the whole row and the progress chart is compact', () => {
+  it('If the only find is of an item that is not tracked, Then neither chart counts it', () => {
     // Arrange
     setupStatistics({
       items: [],
@@ -484,13 +484,9 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
-    expect(screen.getByRole('img', { name: /^Finds per week/ })).toBeInTheDocument();
-    expect(getChart('Finds per week')).not.toHaveAttribute('data-chart-state', 'empty');
-    const progress = getChart('Grail progress over time');
-    expect(progress).toHaveAttribute('data-chart-state', 'empty');
-    expect(within(progress).getByText('No items found yet')).toBeInTheDocument();
-    expect(within(progress).queryByRole('img')).not.toBeInTheDocument();
-    expect(within(progress).queryByText(/counted on the day each was first found/)).toBeNull();
+    expect(getChart('Finds per week')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChart('Grail progress over time')).toHaveAttribute('data-chart-state', 'empty');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('If neither chart has finds, Then both are compact and stacked', () => {

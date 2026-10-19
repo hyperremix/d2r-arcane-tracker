@@ -17,6 +17,7 @@ import {
 import {
   buildSessionDurations,
   durationTicks,
+  MIN_RUN_DURATION_SESSIONS,
   RUN_DURATION_SESSIONS,
   type SessionDurationSummary,
   type SessionRuns,
@@ -63,7 +64,8 @@ async function loadSessionDurations(): Promise<SessionDurationSummary[]> {
 
 /**
  * Card with the run duration chart of the most recent sessions. Loads its own data, so a failure
- * only affects this chart.
+ * only affects this chart. With fewer than {@link MIN_RUN_DURATION_SESSIONS} sessions with completed
+ * runs there is nothing to compare, so a one-line note replaces the chart.
  * @returns {JSX.Element} The chart card
  */
 export function RunDurationCard() {
@@ -119,7 +121,7 @@ export function RunDurationCard() {
     );
   }
 
-  if (summaries.length === 0) {
+  if (summaries.length < MIN_RUN_DURATION_SESSIONS) {
     return <EmptyChartNote title={title} message={t(chartT.runDurationsEmpty)} />;
   }
 

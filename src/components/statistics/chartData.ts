@@ -1,6 +1,10 @@
 import type { GrailProgress, Item, Run } from 'electron/types/grail';
 import { DAY_MS, formatLocalizedDate, HOUR_MS } from '@/lib/date';
-import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
+import {
+  excludeBaselineFinds,
+  findTrackedFinds,
+  type GrailStatisticsSettings,
+} from '@/lib/grailStatistics';
 import { findFirstDiscoveries } from '@/lib/sessionStats';
 
 /** Number of weeks shown by the finds-per-week chart. */
@@ -8,6 +12,12 @@ export const WEEKLY_FINDS_WEEKS = 12;
 
 /** Number of most recent sessions shown by the run duration chart. */
 export const RUN_DURATION_SESSIONS = 12;
+
+/**
+ * Fewest sessions with completed runs the run duration chart needs. The chart compares sessions,
+ * and the run statistics above it already sum up the runs of a single session.
+ */
+export const MIN_RUN_DURATION_SESSIONS = 2;
 
 const DAYS_PER_WEEK = 7;
 
@@ -140,15 +150,19 @@ export interface WeeklyFinds {
 
 /**
  * Counts finds per week for the most recent weeks, the last week ending today. Like the recent
- * finds statistic, every find made while the tracker was running counts and finds from the initial
- * save file scan do not.
+ * finds statistic, every find of a tracked item version counts except the baseline (the finds of
+ * the first startup save file scan that found items); finds of later scans count on their scan day.
  * @param progress - All progress records
+ * @param items - Tracked items
+ * @param settings - Which item versions are tracked
  * @param now - Reference time
  * @param weeks - Number of weeks
  * @returns Weeks in chronological order
  */
 export function buildWeeklyFinds(
   progress: GrailProgress[],
+  items: Item[],
+  settings: GrailStatisticsSettings,
   now: Date,
   weeks: number = WEEKLY_FINDS_WEEKS,
 ): WeeklyFinds[] {
@@ -160,8 +174,7 @@ export function buildWeeklyFinds(
     count: 0,
   }));
 
-  for (const record of progress) {
-    if (!record.foundDate || record.fromInitialScan) continue;
+  for (const record of excludeBaselineFinds(findTrackedFinds(items, progress, settings))) {
     const day = toLocalDayIndex(new Date(record.foundDate));
     if (day < firstDay || day > today) continue;
     result[Math.floor((day - firstDay) / DAYS_PER_WEEK)].count++;

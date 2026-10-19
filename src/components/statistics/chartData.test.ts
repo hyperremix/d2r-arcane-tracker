@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder, RunBuilder } from '@/fixtures';
+import { computeGrailStatistics } from '@/lib/grailStatistics';
 import {
   buildCumulativeFinds,
   buildSessionDurations,
@@ -163,6 +164,32 @@ describe('When building the cumulative grail finds', () => {
     expect(points.map((point) => point.total)).toEqual([2, 3]);
   });
 
+  it('If records exist that the grail progress does not count, Then the chart ends at the found count of the grail progress', () => {
+    // Arrange: an ethereal-only item recorded as normal, an untracked ethereal find, a find of an
+    // item that is not tracked and a second character finding the same item
+    const items = [
+      HolyGrailItemBuilder.new().withId('a').withEtherealType('optional').build(),
+      HolyGrailItemBuilder.new().withId('b').withEtherealType('none').build(),
+      HolyGrailItemBuilder.new().withId('eth-only').withEtherealType('only').build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new().withId('a').withItemId('a').build(),
+      GrailProgressBuilder.new().withId('a-again').withItemId('a').withCharacterId('c2').build(),
+      GrailProgressBuilder.new().withId('b-eth').withItemId('b').asEthereal().build(),
+      GrailProgressBuilder.new().withId('eth-only-normal').withItemId('eth-only').build(),
+      GrailProgressBuilder.new().withId('gone').withItemId('not-tracked').build(),
+    ];
+    const settings = NORMAL_ONLY;
+
+    // Act
+    const { points } = buildCumulativeFinds(progress, items, settings);
+    const stats = computeGrailStatistics({ items, progress, characters: [], settings });
+
+    // Assert
+    expect(stats.foundItems).toBe(1);
+    expect(points[points.length - 1].total).toBe(stats.foundItems);
+  });
+
   it('If only a later startup scan found items, Then there is no baseline', () => {
     // Arrange
     const items = ['a', 'b'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
@@ -190,6 +217,8 @@ describe('When building the cumulative grail finds', () => {
 });
 
 describe('When counting finds per week', () => {
+  const items = [HolyGrailItemBuilder.new().withId('default-item').build()];
+
   it('If finds fall into different weeks, Then each week ending today counts its own finds', () => {
     // Arrange
     const now = new Date(2026, 9, 10, 12);
@@ -213,7 +242,7 @@ describe('When counting finds per week', () => {
     ];
 
     // Act
-    const weeks = buildWeeklyFinds(progress, now, 3);
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, now, 3);
 
     // Assert
     expect(weeks.map((week) => week.count)).toEqual([0, 1, 2]);
@@ -223,7 +252,7 @@ describe('When counting finds per week', () => {
     });
   });
 
-  it('If a find comes from the initial scan, Then it does not count', () => {
+  it('If a find is from the first startup scan that found items, Then it is the baseline and does not count', () => {
     // Arrange
     const now = new Date(2026, 9, 10, 12);
     const progress = [
@@ -234,7 +263,53 @@ describe('When counting finds per week', () => {
     ];
 
     // Act
-    const weeks = buildWeeklyFinds(progress, now, 2);
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, now, 2);
+
+    // Assert
+    expect(weeks.map((week) => week.count)).toEqual([0, 0]);
+  });
+
+  it('If a later startup scan found items, Then they count in the week of that scan', () => {
+    // Arrange
+    const now = new Date(2026, 9, 10, 12);
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('baseline')
+        .withFoundDate(new Date(2026, 0, 1))
+        .asFromInitialScan()
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('later-scan')
+        .withFoundDate(new Date(2026, 9, 9))
+        .asFromInitialScan()
+        .build(),
+    ];
+
+    // Act
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, now, 2);
+
+    // Assert
+    expect(weeks.map((week) => week.count)).toEqual([0, 1]);
+  });
+
+  it('If a find is of a version or item that is not tracked, Then it does not count', () => {
+    // Arrange
+    const now = new Date(2026, 9, 10, 12);
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('ethereal')
+        .withFoundDate(new Date(2026, 9, 9))
+        .asEthereal()
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('not-tracked')
+        .withItemId('not-tracked')
+        .withFoundDate(new Date(2026, 9, 9))
+        .build(),
+    ];
+
+    // Act
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, now, 2);
 
     // Assert
     expect(weeks.map((week) => week.count)).toEqual([0, 0]);
@@ -266,7 +341,7 @@ describe('When deciding whether the finds charts have anything to show', () => {
 
   it('If every week has zero finds, Then the weekly chart has no finds', () => {
     // Arrange
-    const weeks = buildWeeklyFinds([], new Date(2026, 9, 10, 12), 3);
+    const weeks = buildWeeklyFinds([], [], NORMAL_ONLY, new Date(2026, 9, 10, 12), 3);
 
     // Act
     const result = hasWeeklyFinds(weeks);
@@ -277,6 +352,7 @@ describe('When deciding whether the finds charts have anything to show', () => {
 
   it('If any week has a find, Then the weekly chart has finds', () => {
     // Arrange
+    const items = [HolyGrailItemBuilder.new().withId('a').build()];
     const progress = [
       GrailProgressBuilder.new()
         .withId('p1')
@@ -284,7 +360,7 @@ describe('When deciding whether the finds charts have anything to show', () => {
         .withFoundDate(new Date(2026, 9, 9, 9))
         .build(),
     ];
-    const weeks = buildWeeklyFinds(progress, new Date(2026, 9, 10, 12), 3);
+    const weeks = buildWeeklyFinds(progress, items, NORMAL_ONLY, new Date(2026, 9, 10, 12), 3);
 
     // Act
     const result = hasWeeklyFinds(weeks);

@@ -816,7 +816,8 @@
     "dashboard": {
       "totalProgress": "Total progress",
       "complete": "{{percentage}}% complete",
-      "lastTrackedFind": "Last find while tracking",
+      "lastFind": "Last find",
+      "lastFindByScan": "{{item}} • found by scan",
       "noTrackedFindYet": "None yet",
       "sinceTrackingBegan": "Since tracking began",
       "closestSet": "Closest set",
@@ -890,7 +891,7 @@
       "runDurationsDescription_other": "Median and middle half of the completed runs in each of your {{count}} most recent sessions with completed runs. Lower is faster; a shorter bar means more consistent runs.",
       "runDurationsSummary_one": "Run durations of your only session with completed runs: median run {{last}}",
       "runDurationsSummary_other": "Run durations of your last {{count}} sessions with completed runs: the median run went from {{first}} in the earliest to {{last}} in the latest",
-      "runDurationsEmpty": "No completed runs yet",
+      "runDurationsEmpty": "Complete runs in at least 2 sessions to compare them",
       "runDurationsError": "Could not load the run durations",
       "medianRun": "Median run",
       "middleHalf": "Middle half of runs",

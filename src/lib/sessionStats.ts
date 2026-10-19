@@ -6,13 +6,15 @@ import type {
   Session,
   SessionStats,
 } from 'electron/types/grail';
+import { isTrackedFind } from '@/lib/ethereal';
 import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
 
 /**
  * Finds the progress records that added an item version to the grail: for every tracked item
- * (and, with both versions tracked, every version of it) the earliest found record. Records of
- * versions that are not tracked are ignored. A run item linked to one of these records was a new
- * grail item.
+ * (and, with both versions tracked, every version of it) the earliest found record. Records that
+ * the grail progress does not count are ignored: versions that are not tracked and versions the item
+ * cannot have (e.g. a normal record of an ethereal-only item). A run item linked to one of these
+ * records was a new grail item.
  * @param progress - All progress records
  * @param items - Tracked items; finds of other items are not grail items
  * @param settings - Which versions are tracked; with both, normal and ethereal versions are
@@ -24,18 +26,16 @@ export function findFirstDiscoveries(
   items: Item[],
   settings: GrailStatisticsSettings,
 ): ReadonlyMap<string, GrailProgress> {
-  const trackedItemIds = new Set(items.map((item) => item.id));
+  const itemsById = new Map(items.map((item) => [item.id, item]));
   const trackBothVersions = settings.grailNormal && settings.grailEthereal;
   const earliestByEntry = new Map<string, GrailProgress>();
 
   for (const record of progress) {
-    if (!record.foundDate || !trackedItemIds.has(record.itemId)) {
+    const item = itemsById.get(record.itemId);
+    if (!record.foundDate || !item || !isTrackedFind(item, record, settings)) {
       continue;
     }
     const isEthereal = Boolean(record.isEthereal);
-    if (!(isEthereal ? settings.grailEthereal : settings.grailNormal)) {
-      continue;
-    }
     const entry = trackBothVersions ? `${record.itemId}:${isEthereal}` : record.itemId;
     const earliest = earliestByEntry.get(entry);
     if (!earliest?.foundDate || record.foundDate.getTime() < earliest.foundDate.getTime()) {

@@ -8,7 +8,7 @@ import type {
   Settings,
 } from 'electron/types/grail';
 import { DAY_MS } from '@/lib/date';
-import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import { canItemBeEthereal, canItemBeNormal, isTrackedFind } from '@/lib/ethereal';
 
 /** Number of days a find counts as recent. */
 const RECENT_FIND_DAYS = 7;
@@ -26,7 +26,7 @@ export interface ProgressCount {
 /** Progress of a single item category. */
 export interface CategoryStatistics extends ProgressCount {
   category: ItemCategory;
-  /** Recent finds (excluding the initial scan) of items in this category. */
+  /** Recent finds (excluding the baseline) of items in this category. */
   recent: number;
 }
 
@@ -34,7 +34,7 @@ export interface CategoryStatistics extends ProgressCount {
 export interface CharacterStatistics {
   character: Character;
   totalFound: number;
-  /** Recent finds (excluding the initial scan) of this character. */
+  /** Recent finds (excluding the baseline) of this character. */
   recentFinds: number;
 }
 
@@ -61,6 +61,9 @@ export interface GrailStatisticsInput {
   now?: Date;
 }
 
+/** A progress record with a found date. */
+export type FoundProgress = GrailProgress & { foundDate: Date };
+
 interface FoundVersions {
   normal: boolean;
   ethereal: boolean;
@@ -74,6 +77,45 @@ const toPercentage = (found: number, total: number): number =>
  */
 const toDayIndex = (date: Date): number =>
   Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
+
+/**
+ * Returns the finds that count towards the grail: found records of a tracked version of a tracked
+ * item, the same finds the grail progress counts. Every character's find is included, so an item
+ * found by two characters has two finds.
+ * @param items - Tracked items
+ * @param progress - All progress records
+ * @param settings - Which item versions are tracked
+ * @returns The finds, in the order of the records
+ */
+export function findTrackedFinds(
+  items: Item[],
+  progress: GrailProgress[],
+  settings: GrailStatisticsSettings,
+): FoundProgress[] {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  return progress.filter((record): record is FoundProgress => {
+    const item = itemsById.get(record.itemId);
+    return item !== undefined && isTrackedFind(item, record, settings);
+  });
+}
+
+/**
+ * Leaves out the baseline: the finds of the first startup save file scan that found items, which
+ * were found before the tracker existed. They are the scan finds on the day of the earliest find,
+ * the same baseline the grail progress chart starts from. Finds of later startup scans were made
+ * while the app was closed, so they stay in and count on the day of their scan.
+ * @param finds - Finds from {@link findTrackedFinds}
+ * @returns The finds made since the baseline
+ */
+export function excludeBaselineFinds(finds: FoundProgress[]): FoundProgress[] {
+  const firstDay = finds.reduce(
+    (earliest, record) => Math.min(earliest, toDayIndex(new Date(record.foundDate))),
+    Number.POSITIVE_INFINITY,
+  );
+  return finds.filter(
+    (record) => !record.fromInitialScan || toDayIndex(new Date(record.foundDate)) !== firstDay,
+  );
+}
 
 /**
  * Calculates the current and longest streak of consecutive days with at least one find.
@@ -203,9 +245,10 @@ export function computeTypeProgress({
 /**
  * Computes the Holy Grail statistics. Pure, so callers can memoize it on its inputs.
  *
- * Only the tracked versions of the tracked items count towards completion. Finds from the
- * initial save file scan count as found, but not towards recent finds, streaks or the daily
- * average, since they were not found while the tracker was running.
+ * Only the tracked versions of the tracked items count, towards completion as well as towards
+ * recent finds, streaks, the daily average and the character totals. Finds of the baseline (the
+ * first startup save file scan that found items) count as found, but not towards recent finds,
+ * streaks or the daily average, since they were found before the tracker existed.
  * @param input - Items, progress, characters, settings and the reference time
  * @returns The statistics
  */
@@ -224,11 +267,13 @@ export function computeGrailStatistics({
   const foundVersions = collectFoundVersions(foundProgress);
   const counts = countTrackedVersions(items, foundVersions, settings);
 
-  // Finds made while the tracker was running
-  const trackedFinds = foundProgress.filter((p) => !p.fromInitialScan);
-  const recentFinds = trackedFinds.filter((p) => new Date(p.foundDate).getTime() > recentThreshold);
+  const trackedFinds = findTrackedFinds(items, progress, settings);
+  const findsSinceBaseline = excludeBaselineFinds(trackedFinds);
+  const recentFinds = findsSinceBaseline.filter(
+    (p) => new Date(p.foundDate).getTime() > recentThreshold,
+  );
   const { currentStreak, maxStreak } = calculateFindStreaks(
-    trackedFinds.map((p) => new Date(p.foundDate)),
+    findsSinceBaseline.map((p) => new Date(p.foundDate)),
     now,
   );
 
@@ -259,13 +304,10 @@ export function computeGrailStatistics({
 
   // Character comparison
   const characterStats: CharacterStatistics[] = characters.map((character) => {
-    const characterFinds = foundProgress.filter((p) => p.characterId === character.id);
     return {
       character,
-      totalFound: characterFinds.length,
-      recentFinds: characterFinds.filter(
-        (p) => !p.fromInitialScan && new Date(p.foundDate).getTime() > recentThreshold,
-      ).length,
+      totalFound: trackedFinds.filter((p) => p.characterId === character.id).length,
+      recentFinds: recentFinds.filter((p) => p.characterId === character.id).length,
     };
   });
   characterStats.sort((a, b) => b.totalFound - a.totalFound);

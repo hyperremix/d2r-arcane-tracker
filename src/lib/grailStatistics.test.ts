@@ -132,6 +132,64 @@ describe('When computeGrailStatistics is called', () => {
     });
   });
 
+  describe('If a later startup scan found items', () => {
+    it('Then they are recent finds on the day of that scan, and the first scan stays the baseline', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('item1').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('item2').withCategory('armor').build(),
+      ];
+      const progress = [
+        find('baseline', 'item1', daysAgo(30)).asFromInitialScan().build(),
+        find('later-scan', 'item2', daysAgo(1)).asFromInitialScan().build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.recentFinds).toBe(1);
+      expect(stats.currentStreak).toBe(1);
+      expect(stats.categoryStats[0].recent).toBe(1);
+    });
+  });
+
+  describe('If a character found a version that is not tracked', () => {
+    it('Then it counts neither as a find of that character nor as a recent find', () => {
+      // Arrange
+      const sorc = CharacterBuilder.new().withId('sorc').build();
+      const items = [
+        HolyGrailItemBuilder.new().withId('shako').withEtherealType('optional').build(),
+        HolyGrailItemBuilder.new().withId('eth-only').withEtherealType('only').build(),
+      ];
+      const progress = [
+        find('p1', 'shako', daysAgo(30), 'sorc').asNormal().build(),
+        find('p2', 'shako', daysAgo(1), 'sorc').asEthereal().build(),
+        find('p3', 'eth-only', daysAgo(1), 'sorc').asNormal().build(),
+        find('p4', 'not-tracked', daysAgo(1), 'sorc').build(),
+      ];
+
+      // Act
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [sorc],
+        settings: NORMAL_ONLY,
+        now: NOW,
+      });
+
+      // Assert
+      expect(stats.recentFinds).toBe(0);
+      expect(stats.characterStats).toEqual([{ character: sorc, totalFound: 1, recentFinds: 0 }]);
+    });
+  });
+
   describe('If finds are older than a week', () => {
     it('Then they are not recent', () => {
       // Arrange
