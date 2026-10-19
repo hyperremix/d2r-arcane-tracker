@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
  * Also guards the accent: primary stays blood red (not item gold), its text and filled
  * states, including the /90 hovers, pass WCAG AA in the light and dark themes, and the
  * ring, sidebar accent and first chart color follow primary.
+ *
+ * Status colors: destructive stays clearly distinct from the accent, and destructive and
+ * success text pass WCAG AA on the surfaces and tints they are shown on.
  */
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
@@ -236,6 +239,18 @@ function hueDistance(first: Oklch, second: Oklch): number {
   return Math.min(distance, 360 - distance);
 }
 
+/** Euclidean distance in OKLab (deltaE OK): about 0.02 is barely noticeable, 0.1 is clearly different. */
+function perceptualDistance(first: Oklch, second: Oklch): number {
+  const toLab = ({ l, c, h }: Oklch) => [
+    l,
+    c * Math.cos((h * Math.PI) / 180),
+    c * Math.sin((h * Math.PI) / 180),
+  ];
+  const [l1, a1, b1] = toLab(first);
+  const [l2, a2, b2] = toLab(second);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
 const themes = [
   ['light', ':root'],
   ['dark (and widget)', '.dark,\nbody.widget'],
@@ -364,6 +379,75 @@ describe.each(themes)('When checking the %s theme accent tokens', (_name, select
   });
 });
 
+/** Resting tint behind destructive text (buttons and badges): /10 in the light theme, /20 in dark. */
+const statusThemes = [
+  ['light', ':root', 0.1],
+  ['dark (and widget)', '.dark,\nbody.widget', 0.2],
+] as const;
+const MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY = 0.1;
+const SUCCESS_BADGE_TINT = 0.15;
+
+describe.each(
+  statusThemes,
+)('When checking the %s theme status tokens', (_name, selector, destructiveTint) => {
+  const tokens = getThemeTokens(selector);
+  const surfaces = ['background', 'card'] as const;
+
+  it('If destructive sits next to the accent, Then it differs from primary by a clearly visible distance', () => {
+    // Arrange
+    const { primary, destructive } = tokens;
+
+    // Act
+    const distance = perceptualDistance(primary, destructive);
+
+    // Assert
+    expect(distance).toBeGreaterThanOrEqual(MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY);
+  });
+
+  it('If destructive is used as text, Then it passes WCAG AA on background, card, muted and its own tint', () => {
+    // Arrange
+    const { destructive } = tokens;
+    const text = toSrgb(destructive);
+
+    // Act
+    const failing = belowAa({
+      ...Object.fromEntries(
+        (['background', 'card', 'muted'] as const).map((surface) => [
+          `destructive on ${surface}`,
+          contrast(text, toSrgb(tokens[surface])),
+        ]),
+      ),
+      ...Object.fromEntries(
+        surfaces.map((surface) => [
+          `destructive on destructive tint over ${surface}`,
+          contrast(text, over(destructive, destructiveTint, tokens[surface])),
+        ]),
+      ),
+    });
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If a success badge shows success text on its tint, Then it passes WCAG AA', () => {
+    // Arrange
+    const { success } = tokens;
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        surfaces.map((surface) => [
+          `success on success/15 over ${surface}`,
+          contrast(toSrgb(success), over(success, SUCCESS_BADGE_TINT, tokens[surface])),
+        ]),
+      ),
+    );
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+});
+
 describe('When parsing theme tokens from stylesheet text', () => {
   const css =
     ':root {\n  --primary: oklch(0.44 0.16 25);\n}\n.dark,\nbody.widget {\n  --primary: oklch(0.67 0.18 27);\n}\n';
@@ -434,16 +518,17 @@ describe('When scanning stylesheet text for color utilities', () => {
 });
 
 describe('When checking links that sit on the muted surface', () => {
-  it('If release-notes links are hovered, Then they do not fade primary text with an alpha', () => {
+  it('If release notes contain links, Then they use the shared link style instead of the accent', () => {
     // Arrange
     const css = readFileSync(join(srcDir, 'index.css'), 'utf8');
-    const rule = css.match(/\.release-notes a \{([^}]*)\}/)?.[1] ?? '';
 
     // Act
-    const alphaHovers = rule.match(/hover:text-primary\/\d+/g) ?? [];
+    const rule = css.match(/\.release-notes a \{([^}]*)\}/)?.[1] ?? '';
 
     // Assert
-    expect(rule).toContain('text-primary');
-    expect(alphaHovers).toEqual([]);
+    expect(rule).toContain(
+      'text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground',
+    );
+    expect(rule).not.toContain('text-primary');
   });
 });

@@ -235,6 +235,21 @@ describe('SaveFileMonitor', () => {
       expect(screen.getByText('Active (3 files)')).toBeInTheDocument();
     });
 
+    it('When monitoring is active, Then the badge uses the success color instead of the accent', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(2));
+
+      // Act
+      render(<SaveFileMonitor />, { wrapper: MemoryRouter });
+
+      // Assert
+      const badge = await screen.findByText('Active (2 files)');
+      expect(badge).toHaveClass('text-success');
+      expect(badge).not.toHaveClass('bg-primary');
+    });
+
     it('If exactly one save file is listed, Then the badge uses the singular', async () => {
       // Arrange
       mockGameMode(GameMode.Both);

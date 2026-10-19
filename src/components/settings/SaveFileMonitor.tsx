@@ -132,7 +132,7 @@ export function SaveFileMonitor() {
 
     if (monitoringStatus.isMonitoring) {
       return (
-        <Badge variant="default" className="flex items-center gap-1">
+        <Badge variant="success" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
           {/* Counted from the listed save files so the badge count matches the summary line */}
           {saveFilesLoaded

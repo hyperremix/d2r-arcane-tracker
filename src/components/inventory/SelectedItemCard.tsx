@@ -61,7 +61,7 @@ export function SelectedItemCard({
                 <Badge
                   variant={
                     isVaultPresent === true
-                      ? 'default'
+                      ? 'success'
                       : isVaultPresent === false
                         ? 'secondary'
                         : 'outline'

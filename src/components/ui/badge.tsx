@@ -15,9 +15,10 @@ const badgeVariants = cva(
         found: 'bg-found/15 text-found [a]:hover:bg-found/25',
         missing: 'bg-missing/15 text-missing [a]:hover:bg-missing/25',
         ethereal: 'bg-ethereal/15 text-ethereal [a]:hover:bg-ethereal/25',
+        success: 'bg-success/15 text-success [a]:hover:bg-success/25',
         outline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',
         ghost: 'hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50',
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground',
       },
     },
     defaultVariants: {

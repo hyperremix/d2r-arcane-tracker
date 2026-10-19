@@ -17,7 +17,11 @@ export function RollQualityBadge({ rollQuality }: RollQualityBadgeProps) {
   const { t } = useTranslation();
 
   if (rollQuality.isPerfect) {
-    return <Badge className="shrink-0">{t(translations.rollQuality.perfect)}</Badge>;
+    return (
+      <Badge variant="success" className="shrink-0">
+        {t(translations.rollQuality.perfect)}
+      </Badge>
+    );
   }
 
   return (
