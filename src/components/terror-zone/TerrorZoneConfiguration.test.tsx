@@ -1037,6 +1037,25 @@ describe('When TerrorZoneConfiguration is configured', () => {
     expect(callout).not.toHaveAttribute('role', 'alert');
   });
 
+  it('If the guide link is shown, Then it uses the shared link style', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    renderTerrorZoneConfiguration();
+
+    // Act
+    const guideLink = await screen.findByRole('link', { name: 'Read the terror zone guide' });
+
+    // Assert
+    expect(guideLink).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+    expect(guideLink).not.toHaveClass('text-primary');
+  });
+
   describe('If the guide link is clicked', () => {
     it('Then the guide is opened in the system browser', async () => {
       // Arrange

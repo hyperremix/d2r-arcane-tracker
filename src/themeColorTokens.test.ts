@@ -386,6 +386,7 @@ const statusThemes = [
 ] as const;
 const MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY = 0.1;
 const SUCCESS_BADGE_TINT = 0.15;
+const ALERT_DESCRIPTION_ALPHA = 0.9;
 
 describe.each(
   statusThemes,
@@ -424,6 +425,28 @@ describe.each(
         ]),
       ),
     });
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If an alert description shows destructive text at /90 on its tint, Then it passes WCAG AA on background and card', () => {
+    // Arrange
+    const { destructive } = tokens;
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        surfaces.map((surface) => {
+          const tint = over(destructive, destructiveTint, tokens[surface]);
+          const text = toSrgb(destructive).map(
+            (value, index) =>
+              value * ALERT_DESCRIPTION_ALPHA + tint[index] * (1 - ALERT_DESCRIPTION_ALPHA),
+          ) as Rgb;
+          return [`destructive/90 on destructive tint over ${surface}`, contrast(text, tint)];
+        }),
+      ),
+    );
 
     // Assert
     expect(failing).toEqual([]);
