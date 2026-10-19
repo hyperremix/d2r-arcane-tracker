@@ -133,6 +133,26 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
     });
   });
 
+  describe('If the game file is missing and the CASC viewer link is shown', () => {
+    it('Then the link uses the shared link style', async () => {
+      // Arrange
+      setupTerrorZoneApi({ valid: false, errorCode: 'gameFileNotFound' });
+      renderTerrorZoneConfiguration();
+
+      // Act
+      const link = await screen.findByRole('link', { name: "Ladik's CASC Viewer" });
+
+      // Assert
+      expect(link).toHaveClass(
+        'text-foreground',
+        'underline',
+        'decoration-muted-foreground',
+        'underline-offset-4',
+        'hover:decoration-foreground',
+      );
+    });
+  });
+
   describe('If the error text mentions "not found" but the code is different', () => {
     it('Then the extraction guide is not shown', async () => {
       // Arrange
@@ -1035,6 +1055,25 @@ describe('When TerrorZoneConfiguration is configured', () => {
     const callout = requirementsTitle.closest('[data-slot="alert"]');
     expect(callout).toHaveAttribute('role', 'status');
     expect(callout).not.toHaveAttribute('role', 'alert');
+  });
+
+  it('If the guide link is shown, Then it uses the shared link style', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    renderTerrorZoneConfiguration();
+
+    // Act
+    const guideLink = await screen.findByRole('link', { name: 'Read the terror zone guide' });
+
+    // Assert
+    expect(guideLink).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+    expect(guideLink).not.toHaveClass('text-primary');
   });
 
   describe('If the guide link is clicked', () => {

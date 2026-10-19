@@ -33,3 +33,24 @@ describe('When Button is given a ref', () => {
     expect(ref.current).toBe(screen.getByRole('button', { name: 'View' }));
   });
 });
+
+describe('When Button uses the link variant', () => {
+  it('Then it uses the shared link style instead of the accent', () => {
+    // Arrange
+    const name = 'Show details';
+
+    // Act
+    render(<Button variant="link">{name}</Button>);
+
+    // Assert
+    const button = screen.getByRole('button', { name });
+    expect(button).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+    expect(button).not.toHaveClass('text-primary');
+  });
+});

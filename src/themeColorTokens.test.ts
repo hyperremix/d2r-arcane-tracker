@@ -10,6 +10,9 @@ import { describe, expect, it } from 'vitest';
  * Also guards the accent: primary stays blood red (not item gold), its text and filled
  * states, including the /90 hovers, pass WCAG AA in the light and dark themes, and the
  * ring, sidebar accent and first chart color follow primary.
+ *
+ * Status colors: destructive stays clearly distinct from the accent, and destructive and
+ * success text pass WCAG AA on the surfaces and tints they are shown on.
  */
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +95,16 @@ function findViolationsInText(
 function findViolations(pattern: RegExp, isViolation: (match: RegExpMatchArray) => boolean) {
   return collectSourceFiles(srcDir).flatMap((file) =>
     findViolationsInText(readFileSync(file, 'utf8'), relative(srcDir, file), pattern, isViolation),
+  );
+}
+
+/** Every `text-destructive/NN` class in source with its opacity. */
+function findFadedTextClasses() {
+  return collectSourceFiles(srcDir).flatMap((file) =>
+    [...readFileSync(file, 'utf8').matchAll(/text-destructive\/(\d+)/g)].map((match) => ({
+      label: `${relative(srcDir, file)} ${match[0]}`,
+      alpha: Number(match[1]) / 100,
+    })),
   );
 }
 
@@ -236,6 +249,32 @@ function hueDistance(first: Oklch, second: Oklch): number {
   return Math.min(distance, 360 - distance);
 }
 
+/** Gamma-encoded sRGB (0-1) to OKLab, from the linear sRGB to OKLab matrices of the CSS Color 4 spec. */
+function toOklab(rgb: Rgb): [number, number, number] {
+  const [r, g, b] = rgb.map((value) =>
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+  );
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+/**
+ * Euclidean distance in OKLab (deltaE OK) between the colors the browser paints: about 0.02 is
+ * barely noticeable, 0.1 is clearly different. Measured after the sRGB clamp in `toSrgb`, because
+ * a token outside the sRGB gamut is painted as its clamped neighbour, which can sit much closer.
+ */
+function perceptualDistance(first: Oklch, second: Oklch): number {
+  const [l1, a1, b1] = toOklab(toSrgb(first));
+  const [l2, a2, b2] = toOklab(toSrgb(second));
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
 const themes = [
   ['light', ':root'],
   ['dark (and widget)', '.dark,\nbody.widget'],
@@ -364,6 +403,100 @@ describe.each(themes)('When checking the %s theme accent tokens', (_name, select
   });
 });
 
+/** Resting tint behind destructive text (buttons and badges): /10 in the light theme, /20 in dark. */
+const statusThemes = [
+  ['light', ':root', 0.1],
+  ['dark (and widget)', '.dark,\nbody.widget', 0.2],
+] as const;
+const MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY = 0.1;
+const SUCCESS_BADGE_TINT = 0.15;
+/** Alerts and inline error blocks tint with bg-destructive/10 in both themes. */
+const RESTING_ALERT_TINT = 0.1;
+
+describe.each(
+  statusThemes,
+)('When checking the %s theme status tokens', (_name, selector, destructiveTint) => {
+  const tokens = getThemeTokens(selector);
+  const surfaces = ['background', 'card'] as const;
+
+  it('If destructive sits next to the accent, Then it differs from primary by a clearly visible distance', () => {
+    // Arrange
+    const { primary, destructive } = tokens;
+
+    // Act
+    const distance = perceptualDistance(primary, destructive);
+
+    // Assert
+    expect(distance).toBeGreaterThanOrEqual(MIN_DESTRUCTIVE_DISTANCE_FROM_PRIMARY);
+  });
+
+  it('If destructive is used as text, Then it passes WCAG AA on background, card, muted and its own tint', () => {
+    // Arrange
+    const { destructive } = tokens;
+    const text = toSrgb(destructive);
+
+    // Act
+    const failing = belowAa({
+      ...Object.fromEntries(
+        (['background', 'card', 'muted'] as const).map((surface) => [
+          `destructive on ${surface}`,
+          contrast(text, toSrgb(tokens[surface])),
+        ]),
+      ),
+      ...Object.fromEntries(
+        surfaces.map((surface) => [
+          `destructive on destructive tint over ${surface}`,
+          contrast(text, over(destructive, destructiveTint, tokens[surface])),
+        ]),
+      ),
+    });
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If source shows destructive text at partial opacity, Then it passes WCAG AA on a /10 tint over background and card', () => {
+    // Arrange
+    const { destructive } = tokens;
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        findFadedTextClasses().flatMap(({ label, alpha }) =>
+          surfaces.map((surface) => {
+            const tint = over(destructive, RESTING_ALERT_TINT, tokens[surface]);
+            const text = toSrgb(destructive).map(
+              (value, index) => value * alpha + tint[index] * (1 - alpha),
+            ) as Rgb;
+            return [`${label} on destructive tint over ${surface}`, contrast(text, tint)];
+          }),
+        ),
+      ),
+    );
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+
+  it('If a success badge shows success text on its tint, Then it passes WCAG AA', () => {
+    // Arrange
+    const { success } = tokens;
+
+    // Act
+    const failing = belowAa(
+      Object.fromEntries(
+        surfaces.map((surface) => [
+          `success on success/15 over ${surface}`,
+          contrast(toSrgb(success), over(success, SUCCESS_BADGE_TINT, tokens[surface])),
+        ]),
+      ),
+    );
+
+    // Assert
+    expect(failing).toEqual([]);
+  });
+});
+
 describe('When parsing theme tokens from stylesheet text', () => {
   const css =
     ':root {\n  --primary: oklch(0.44 0.16 25);\n}\n.dark,\nbody.widget {\n  --primary: oklch(0.67 0.18 27);\n}\n';
@@ -434,16 +567,17 @@ describe('When scanning stylesheet text for color utilities', () => {
 });
 
 describe('When checking links that sit on the muted surface', () => {
-  it('If release-notes links are hovered, Then they do not fade primary text with an alpha', () => {
+  it('If release notes contain links, Then they use the shared link style instead of the accent', () => {
     // Arrange
     const css = readFileSync(join(srcDir, 'index.css'), 'utf8');
-    const rule = css.match(/\.release-notes a \{([^}]*)\}/)?.[1] ?? '';
 
     // Act
-    const alphaHovers = rule.match(/hover:text-primary\/\d+/g) ?? [];
+    const rule = css.match(/\.release-notes a \{([^}]*)\}/)?.[1] ?? '';
 
     // Assert
-    expect(rule).toContain('text-primary');
-    expect(alphaHovers).toEqual([]);
+    expect(rule).toContain(
+      'text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground',
+    );
+    expect(rule).not.toContain('text-primary');
   });
 });

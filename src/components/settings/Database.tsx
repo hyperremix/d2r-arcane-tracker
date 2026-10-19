@@ -218,7 +218,7 @@ export function DatabaseCard() {
             <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
             <p className="text-muted-foreground text-sm">
               {t(translations.settings.database.dropzoneText)}{' '}
-              <span className="text-primary underline hover:text-primary/90">
+              <span className="text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground">
                 {t(translations.settings.database.clickToBrowse)}
               </span>
             </p>

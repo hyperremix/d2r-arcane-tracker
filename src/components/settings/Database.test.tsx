@@ -67,6 +67,24 @@ describe('When managing database backups', () => {
     setElectronAPI(originalElectronAPI);
   });
 
+  it('If the dropzone is shown, Then the click to browse text uses the shared link style', () => {
+    // Arrange
+    render(<DatabaseCard />);
+
+    // Act
+    const browseText = screen.getByText('click to browse');
+
+    // Assert
+    expect(browseText).toHaveClass(
+      'text-foreground',
+      'underline',
+      'decoration-muted-foreground',
+      'underline-offset-4',
+      'hover:decoration-foreground',
+    );
+    expect(browseText).not.toHaveClass('text-primary');
+  });
+
   it('If the backup succeeds on Windows, Then a success toast and the file name are shown', async () => {
     // Arrange
     mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({

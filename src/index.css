@@ -106,7 +106,8 @@
  * Text tokens are checked for WCAG AA (>= 4.5:1) on background, card, muted and the
  * missing-card surface (muted/40 over background; muted/20 in dark) in both themes.
  * The primary pairs (text on background, card and muted; foreground on filled and hovered
- * primary) are asserted in themeColorTokens.test.ts.
+ * primary), the destructive and success text pairs and the destructive-to-primary distance are
+ * asserted in themeColorTokens.test.ts.
  */
 :root {
   --radius: 0.5rem;
@@ -117,7 +118,8 @@
   --popover: oklch(0.995 0.003 85);
   --popover-foreground: oklch(0.17 0.012 55);
   /*
-   * Brand: D2 blood red, the single UI accent (buttons, links, focus rings, selection, chart-1).
+   * Brand: D2 blood red, the single UI accent (buttons, selected states, focus rings, selection,
+   * chart-1). Text links use foreground with an underline, not the accent.
    * Gold, green, orange, purple, blue and yellow are reserved for item qualities (--item-*).
    */
   --primary: oklch(0.44 0.16 25);
@@ -128,7 +130,11 @@
   --muted-foreground: oklch(0.5 0.02 60);
   --accent: oklch(0.955 0.008 75);
   --accent-foreground: oklch(0.22 0.014 55);
-  --destructive: oklch(0.52 0.21 27);
+  /*
+   * Danger: a brighter, more saturated signal red than the darker accent. Kept inside sRGB, since
+   * browsers clamp a wider color to a neighbour that can sit much closer to primary.
+   */
+  --destructive: oklch(0.535 0.21 29);
   --border: oklch(0.9 0.012 70);
   --input: oklch(0.9 0.012 70);
   --ring: oklch(0.44 0.16 25);
@@ -196,7 +202,8 @@ body.widget {
   --muted-foreground: oklch(0.72 0.02 75);
   --accent: oklch(0.265 0.012 62);
   --accent-foreground: oklch(0.965 0.01 85);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Danger: a lighter rose red, so it does not read as the coral accent */
+  --destructive: oklch(0.78 0.13 15);
   --border: oklch(0.92 0.02 75 / 12%);
   --input: oklch(0.92 0.02 75 / 16%);
   --ring: oklch(0.67 0.18 27);
@@ -312,7 +319,7 @@ body.widget {
 }
 
 .release-notes a {
-  @apply text-primary underline hover:no-underline;
+  @apply text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground;
 }
 
 .release-notes p {

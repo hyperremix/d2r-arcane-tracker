@@ -5,6 +5,22 @@ import { RollQualityDetails } from './RollQuality';
 
 describe('When RollQualityDetails is rendered', () => {
   describe('If every variable stat is at its max', () => {
+    it('Then the perfect roll badge uses the success color', () => {
+      // Arrange
+      const rollQuality: ItemRollQuality = {
+        stats: [],
+        percent: 100,
+        isPerfect: true,
+        unratedCount: 0,
+      };
+
+      // Act
+      render(<RollQualityDetails rollQuality={rollQuality} />);
+
+      // Assert
+      expect(screen.getByText('Perfect roll')).toHaveClass('text-success');
+    });
+
     it('Then it says the roll is perfect and lists each stat with its range', () => {
       // Arrange
       const rollQuality: ItemRollQuality = {

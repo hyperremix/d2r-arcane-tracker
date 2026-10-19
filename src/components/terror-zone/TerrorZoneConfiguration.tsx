@@ -162,7 +162,7 @@ function InstallationErrorAlert({
                   href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:decoration-2"
+                  className="text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground"
                 >
                   {t(translations.settings.itemIcons.ladiksCascViewer)}
                 </a>
@@ -402,7 +402,7 @@ export function TerrorZoneConfiguration() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={handleOpenGuide}
-                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                        className="inline-flex items-center gap-1 text-foreground underline decoration-muted-foreground underline-offset-4 hover:decoration-foreground"
                       >
                         {t(translations.terrorZone.requirements.openGuide)}
                         <ExternalLink className="h-3 w-3" aria-hidden="true" />
