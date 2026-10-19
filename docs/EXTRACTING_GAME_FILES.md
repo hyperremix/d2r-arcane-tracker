@@ -32,7 +32,7 @@ These steps haven't been tested on Linux yet:
 While no D2R folder is saved, the app looks for the game in these folders and takes the first one that contains `D2R.exe`. The setup wizard fills that folder in. Everywhere else the app only offers it, and you confirm it with **Use this folder** in Settings, or with **Use** and the folder's path in the prompts on the farming advisor, terror zone and item pages.
 
 - Windows: `C:\Program Files (x86)\Diablo II Resurrected` (the Battle.net default), `C:\Program Files\Diablo II Resurrected`, `C:\Games\Diablo II Resurrected`, `D:\Program Files (x86)\Diablo II Resurrected`, `D:\Program Files\Diablo II Resurrected`, `C:\Program Files (x86)\Steam\steamapps\common\Diablo II Resurrected`, `D:\Steam\steamapps\common\Diablo II Resurrected` and `Games\Diablo II Resurrected` in your user folder.
-- Linux and Steam Deck: the Steam libraries and the Wine and Proton prefixes listed above.
+- Linux and Steam Deck, in this order: `steamapps/common/Diablo II Resurrected` in each Steam library (the Steam installation in your home folder, native, Debian package or Flatpak, plus the libraries it lists, for example on an SD card), then `drive_c/Program Files (x86)/Diablo II Resurrected` and `drive_c/Program Files/Diablo II Resurrected` in each Wine prefix. The prefixes searched are `$WINEPREFIX` if set, Steam's Proton prefixes (`steamapps/compatdata/<app ID>/pfx`), each subfolder of `~/Games` (Lutris), `~/Games/Heroic/Prefixes` and `~/Games/Heroic/Prefixes/default` (Heroic) and of the Bottles folder (native or Flatpak), and `~/.wine`.
 
 If your game is somewhere else, choose the folder with **Browse**.
 
