@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { runes } from 'electron/items/runes';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuneFilters } from './RuneFilters';
@@ -10,12 +10,16 @@ function setElectronAPI(value: unknown) {
   (window as unknown as { electronAPI: unknown }).electronAPI = value;
 }
 
-function renderRuneFilters(selectedRunes: string[]) {
+function renderRuneFilters(
+  selectedRunes: string[],
+  availableRunes: Record<string, number> = {},
+  onRuneSelectionChange = vi.fn(),
+) {
   return render(
     <RuneFilters
       selectedRunes={selectedRunes}
-      onRuneSelectionChange={vi.fn()}
-      availableRunes={{}}
+      onRuneSelectionChange={onRuneSelectionChange}
+      availableRunes={availableRunes}
     />,
   );
 }
@@ -29,12 +33,13 @@ describe('When RuneFilters shows the selection summary', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('If no rune is selected, Then no summary is shown', () => {
+  it('If no rune is selected, Then no summary is shown and Clear selection is disabled', () => {
     // Arrange & Act
     renderRuneFilters([]);
 
     // Assert
     expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear selection' })).toBeDisabled();
   });
 
   it('If one rune is selected, Then the singular form is used', async () => {
@@ -52,6 +57,18 @@ describe('When RuneFilters shows the selection summary', () => {
     // Assert
     expect(await screen.findByText('3 runes selected')).toBeInTheDocument();
   });
+
+  it('When Clear selection is clicked, Then the selection is emptied', () => {
+    // Arrange
+    const onRuneSelectionChange = vi.fn();
+    renderRuneFilters(['el', 'tir'], {}, onRuneSelectionChange);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+
+    // Assert
+    expect(onRuneSelectionChange).toHaveBeenCalledWith([]);
+  });
 });
 
 describe('When RuneFilters is placed in a height-bounded sidebar', () => {
@@ -63,28 +80,31 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('Then the rune list is a two-column list that scrolls only as a fallback', () => {
+  it('Then the rune grid fits as many columns as the sidebar width allows and scrolls only as a fallback', () => {
     // Arrange & Act
     renderRuneFilters([]);
 
     // Assert
-    const runeList = screen.getByRole('group', { name: 'Filter by runes' });
-    expect(runeList).toHaveClass('grid-cols-2', 'overflow-y-auto');
+    const runeGrid = screen.getByRole('group', { name: 'Filter by runes' });
+    expect(runeGrid).toHaveClass(
+      'grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))]',
+      'overflow-y-auto',
+    );
   });
 
-  it('Then every rune, including the highest runes, is inside the rune list', () => {
+  it('Then every rune, including the highest runes, is a toggle button in the rune grid', () => {
     // Arrange & Act
     renderRuneFilters([]);
 
     // Assert
-    const runeList = screen.getByRole('group', { name: 'Filter by runes' });
-    expect(within(runeList).getAllByRole('checkbox')).toHaveLength(runes.length);
-    expect(within(runeList).getByLabelText(/^Zod/)).toBeInTheDocument();
-    expect(within(runeList).getByLabelText(/^Cham/)).toBeInTheDocument();
+    const runeGrid = screen.getByRole('group', { name: 'Filter by runes' });
+    expect(within(runeGrid).getAllByRole('button', { pressed: false })).toHaveLength(runes.length);
+    expect(within(runeGrid).getByRole('button', { name: 'Zod, 0 owned' })).toBeInTheDocument();
+    expect(within(runeGrid).getByRole('button', { name: 'Cham, 0 owned' })).toBeInTheDocument();
   });
 });
 
-describe('When RuneFilters shows long rune names or counts', () => {
+describe('When a rune toggle is clicked', () => {
   beforeEach(() => {
     setElectronAPI({ icon: { getByFilename: vi.fn().mockResolvedValue(undefined) } });
   });
@@ -93,29 +113,46 @@ describe('When RuneFilters shows long rune names or counts', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('Then each rune name is truncated rather than overflowing and keeps its full name as a title', () => {
-    // Arrange & Act
-    render(
-      <RuneFilters
-        selectedRunes={[]}
-        onRuneSelectionChange={vi.fn()}
-        availableRunes={{ cham: 123 }}
-      />,
-    );
+  it('If the rune is not selected, Then it is added to the selection', () => {
+    // Arrange
+    const onRuneSelectionChange = vi.fn();
+    renderRuneFilters(['el'], {}, onRuneSelectionChange);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: /^Ber,/ }));
 
     // Assert
-    const name = screen.getByTitle('Cham');
-    expect(name).toHaveTextContent('Cham');
-    expect(name).toHaveClass('truncate', 'min-w-0');
-    expect(screen.getByLabelText(/^Cham\s*123$/)).toBeInTheDocument();
+    expect(onRuneSelectionChange).toHaveBeenCalledWith(['el', 'ber']);
+  });
+
+  it('If the rune is selected, Then it is pressed with an outline and a check mark', () => {
+    // Arrange
+    renderRuneFilters(['el', 'ber']);
+
+    // Act
+    const ber = screen.getByRole('button', { name: /^Ber,/ });
+    const zod = screen.getByRole('button', { name: /^Zod,/ });
+
+    // Assert
+    expect(ber).toHaveAttribute('aria-pressed', 'true');
+    // Selected runes are outlined and checked, so the state is not shown by color alone
+    expect(ber).toHaveClass('border-primary');
+    expect(ber.querySelector('svg')).not.toBeNull();
+    expect(zod.querySelector('svg')).toBeNull();
+  });
+
+  it('If the rune is selected, Then clicking it removes it from the selection', () => {
+    // Arrange
+    const onRuneSelectionChange = vi.fn();
+    renderRuneFilters(['el', 'ber'], {}, onRuneSelectionChange);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: /^Ber,/ }));
+
+    // Assert
+    expect(onRuneSelectionChange).toHaveBeenCalledWith(['el']);
   });
 });
-
-/** Finds the count shown in the row of the rune whose label matches. */
-function getCountOf(runeLabel: RegExp, count: string): HTMLElement {
-  const row = screen.getByLabelText(runeLabel).closest('div') as HTMLElement;
-  return within(row).getByText(count);
-}
 
 describe('When RuneFilters shows owned counts', () => {
   beforeEach(() => {
@@ -126,26 +163,35 @@ describe('When RuneFilters shows owned counts', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('If a rune is not owned, Then its zero count is muted text rather than a red pill', () => {
+  it('Then each rune button shows its name and owned count and says both in its accessible name', () => {
     // Arrange & Act
-    render(
-      <RuneFilters selectedRunes={[]} onRuneSelectionChange={vi.fn()} availableRunes={{ el: 2 }} />,
-    );
+    renderRuneFilters([], { cham: 123 });
 
     // Assert
-    const zodCount = getCountOf(/^Zod/, '0');
-    expect(zodCount.closest('label')).toHaveClass('text-muted-foreground');
-    expect(zodCount).not.toHaveClass('text-missing', 'bg-missing/15', 'bg-info/15');
+    const cham = screen.getByRole('button', { name: 'Cham, 123 owned' });
+    expect(within(cham).getByText('Cham')).toBeInTheDocument();
+    expect(within(cham).getByText('123')).toBeInTheDocument();
   });
 
-  it('If a rune is owned, Then its count is shown in a filled pill', () => {
+  it('If a rune is not owned, Then its button is dimmed rather than marked as an error', () => {
     // Arrange & Act
-    render(
-      <RuneFilters selectedRunes={[]} onRuneSelectionChange={vi.fn()} availableRunes={{ el: 2 }} />,
-    );
+    renderRuneFilters([], { el: 2 });
 
     // Assert
-    const elCount = getCountOf(/^El\s*2$/, '2');
-    expect(elCount).toHaveClass('bg-info/15', 'text-info');
+    const zod = screen.getByRole('button', { name: 'Zod, 0 owned' });
+    expect(within(zod).getByText('Zod')).toHaveClass('text-muted-foreground');
+    expect(within(zod).getByText('0')).toHaveClass('text-muted-foreground');
+    expect(within(zod).getByText('0')).not.toHaveClass('text-missing', 'bg-missing/15');
+  });
+
+  it('If a rune is owned, Then its count is a plain number without a colored pill', () => {
+    // Arrange & Act
+    renderRuneFilters([], { el: 2 });
+
+    // Assert
+    const el = screen.getByRole('button', { name: 'El, 2 owned' });
+    const count = within(el).getByText('2');
+    expect(count).not.toHaveClass('bg-info/15', 'text-info', 'text-muted-foreground');
+    expect(within(el).getByText('El')).not.toHaveClass('text-muted-foreground');
   });
 });

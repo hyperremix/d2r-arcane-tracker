@@ -140,7 +140,7 @@ export const features: Feature[] = [
     description:
       'Reads the runes in your save files and shows which runewords you can make right now.',
     points: [
-      'Craftable now, missing one rune, or every runeword',
+      'Runes only, runes and base, up to one rune missing, or every runeword',
       'Filter by the runes you want to use',
       'Shows how many of each rune you have',
     ],

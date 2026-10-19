@@ -1518,16 +1518,23 @@
       "adjustFilters": "Try adjusting your filters or search term",
       "availabilityLegend": "Show runewords",
       "availability": {
-        "ready": "Ready now",
-        "craftable": "Craftable now",
+        "ready": "Runes and base",
+        "craftable": "Runes only",
         "upgradable": "With upgrades",
-        "missingOne": "Missing ≤ 1"
+        "missingOne": "Up to 1 missing"
+      },
+      "availabilityDescription": {
+        "ready": "You have every rune and an empty base the runeword fits",
+        "craftable": "You have every rune, with or without a base",
+        "upgradable": "You have every rune or can cube the missing ones from your runes and gems",
+        "missingOne": "You need at most one more rune",
+        "all": "Every runeword, whatever you own"
       },
       "refreshRunes": "Refresh runes",
       "refreshFailed": "Failed to refresh runes from save files",
       "ownedItemsFailed": "Failed to load owned gems and bases",
-      "noCraftable": "You can't craft any runeword with your current runes",
-      "showCraftable": "Show craftable runewords",
+      "noCraftable": "You don't have the runes for any runeword yet",
+      "showCraftable": "Show runewords you have the runes for",
       "showUpgradable": "Show runewords you can make with upgrades",
       "showMissingOne": "Show runewords missing at most 1 rune",
       "showAll": "Show all runewords"
@@ -1535,8 +1542,8 @@
     "card": {
       "sockets_one": "{{count}} socket",
       "sockets_other": "{{count}} sockets",
-      "runesOwned": "{{available}}/{{total}} runes",
-      "runesOwnedLabel": "{{available}} of {{total}} runes available",
+      "missingRunes_one": "Missing {{count}} rune: {{runes}}",
+      "missingRunes_other": "Missing {{count}} runes: {{runes}}",
       "missingRuneTooltip": "{{rune}} (missing)",
       "makeableWithUpgrades": "Makeable with upgrades",
       "upgradePlanLabel": "Horadric Cube rune upgrades",
@@ -1553,6 +1560,7 @@
       "matchAllHint": "Shows runewords that use all selected runes",
       "clearSelection": "Clear selection",
       "filterByRunes": "Filter by runes",
+      "runeToggleLabel": "{{rune}}, {{count}} owned",
       "runesSelected_one": "{{count}} rune selected",
       "runesSelected_other": "{{count}} runes selected"
     }

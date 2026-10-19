@@ -1,7 +1,7 @@
 import { gems } from 'electron/items/gems';
 import { runes } from 'electron/items/runes';
 import type { Item } from 'electron/types/grail';
-import { ChevronDown, ExternalLink } from 'lucide-react';
+import { ChevronDown, CircleCheck, CircleSlash, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatLocation, isSharedStashFileType } from '@/components/inventory/inventoryItemLabels';
 import { Badge } from '@/components/ui/badge';
@@ -69,19 +69,77 @@ function formatBaseLocation(base: OwnedRunewordBase, t: Translate): string {
 }
 
 /**
- * RunewordCard component that displays a runeword with its required runes and completion status.
- * The owned/total badge is the single completion signal; missing runes are crossed out.
+ * Props for the BaseStatus component
+ */
+interface BaseStatusProps {
+  /** Owned bases the runeword can be made in */
+  bases: OwnedRunewordBase[];
+}
+
+/**
+ * The line under a runeword's name: how many owned bases it fits, which expands into the list of
+ * them, or that none does. An icon tells the two states apart besides the color.
+ */
+function BaseStatus({ bases }: BaseStatusProps) {
+  const { t } = useTranslation();
+
+  if (bases.length === 0) {
+    return (
+      <p className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm">
+        <CircleSlash aria-hidden="true" className="size-4 shrink-0" />
+        {t(translations.runeword.card.noOwnedBase)}
+      </p>
+    );
+  }
+
+  return (
+    <Collapsible className="w-full">
+      <CollapsibleTrigger className="group inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm font-medium text-sm outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
+        <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
+        {t(translations.runeword.card.ownedBases, { count: bases.length })}
+        <ChevronDown
+          aria-hidden="true"
+          className="size-3.5 shrink-0 transition-transform group-aria-expanded:rotate-180 motion-reduce:transition-none"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ul className="flex flex-col gap-1.5 pt-1.5 text-xs">
+          {bases.map((base) => (
+            <li key={base.key} className="flex min-w-0 flex-col">
+              <span className="flex flex-wrap items-center gap-1">
+                <span className="break-words">{base.itemName}</span>
+                {base.ethereal && (
+                  <Badge variant="ethereal">{t(translations.grail.itemDetails.ethereal)}</Badge>
+                )}
+              </span>
+              <span className="break-words text-muted-foreground">
+                {formatBaseLocation(base, t)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
+ * RunewordCard component that displays a runeword with its required runes.
  *
- * With readiness, the card also shows the Horadric Cube upgrades that make the missing runes and
- * the owned bases the runeword fits, which expand into a list.
+ * With readiness, the card leads with the owned bases the runeword fits, right under the name,
+ * since owning a base decides whether it can be made; the count expands into a list. Runes are
+ * only called out when some are missing: a line names them, the rune images cross them out, and
+ * the Horadric Cube upgrades that make them follow.
  *
- * The card spans four rows of its parent grid (header, runes, readiness, footer) and shares them
- * through a subgrid, so headers, rune rows, readiness and footers line up across every card in the
- * same grid row even when a long name wraps. The card sets `gap-[normal]`, which makes the subgrid inherit its
- * row gap from the parent grid, so the gap is defined in one place (the grid).
+ * The card spans four rows of its parent grid (header, runes, missing runes, footer) and shares
+ * them through a subgrid, so headers, rune rows, missing runes and footers line up across every
+ * card in the same grid row even when a long name wraps. The card sets `gap-[normal]`, which makes
+ * the subgrid inherit its row gap from the parent grid, so the gap is defined in one place (the
+ * grid).
  *
- * The card is `relative` so the badge's absolutely positioned `sr-only` text is contained by the
- * card instead of the page, where it would stretch the document's scrollable height.
+ * The card is `relative` so the absolutely positioned `sr-only` text of the missing rune markers
+ * is contained by the card instead of the page, where it would stretch the document's scrollable
+ * height.
  */
 export function RunewordCard({
   runeword,
@@ -94,6 +152,7 @@ export function RunewordCard({
   const runeIds = runeword.runes ?? [];
   // A runeword needs one socket per rune
   const socketCount = runeIds.length;
+  const { missingRunes } = completionStatus;
   const upgradeSteps = completionStatus.complete ? [] : (readiness?.upgradePlan ?? []);
 
   return (
@@ -103,36 +162,11 @@ export function RunewordCard({
         className,
       )}
     >
-      {/* Header: the name gets the full card width and the badges sit on their own line below
-          it, so long names never collide with them. Most names fit on one line; a long one wraps
-          instead of being cut off. */}
+      {/* Header: the name gets the full card width and the owned bases sit on their own line below
+          it. Most names fit on one line; a long one wraps instead of being cut off. */}
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <h3 className="w-full break-words font-semibold text-lg leading-tight">{runeword.name}</h3>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge
-            variant={completionStatus.complete ? 'default' : 'outline'}
-            className={cn(
-              'font-mono',
-              completionStatus.complete && 'bg-success text-success-foreground',
-            )}
-          >
-            <span aria-hidden="true">
-              {t(translations.runeword.card.runesOwned, {
-                available: completionStatus.availableCount,
-                total: completionStatus.totalCount,
-              })}
-            </span>
-            <span className="sr-only">
-              {t(translations.runeword.card.runesOwnedLabel, {
-                available: completionStatus.availableCount,
-                total: completionStatus.totalCount,
-              })}
-            </span>
-          </Badge>
-          {upgradeSteps.length > 0 && (
-            <Badge variant="secondary">{t(translations.runeword.card.makeableWithUpgrades)}</Badge>
-          )}
-        </div>
+        {readiness && <BaseStatus bases={readiness.bases} />}
       </div>
 
       {/* Required runes; the wrapper keeps the row in place even without runes */}
@@ -147,52 +181,29 @@ export function RunewordCard({
         )}
       </div>
 
-      {/* Readiness: the upgrades that make the missing runes, then the owned bases, collapsed into
-          a count so long lists do not stretch every card of the row. The wrapper keeps the row in
-          place without readiness. */}
-      <div className="flex min-w-0 flex-col gap-2 text-xs">
+      {/* Missing runes and the upgrades that make them. The wrapper keeps the row in place when no
+          rune is missing. */}
+      <div className="flex min-w-0 flex-col items-start gap-2 text-xs">
+        {missingRunes.length > 0 && (
+          <p className="font-medium">
+            {t(translations.runeword.card.missingRunes, {
+              count: missingRunes.length,
+              runes: missingRunes.map(getRuneName).join(', '),
+            })}
+          </p>
+        )}
         {upgradeSteps.length > 0 && (
-          <ol
-            aria-label={t(translations.runeword.card.upgradePlanLabel)}
-            className="flex list-decimal flex-col gap-0.5 pl-4 text-muted-foreground"
-          >
-            {upgradeSteps.map((step) => (
-              <li key={step.resultRuneId}>{formatUpgradeStep(step, t)}</li>
-            ))}
-          </ol>
-        )}
-        {readiness && readiness.bases.length === 0 && (
-          <p className="text-muted-foreground">{t(translations.runeword.card.noOwnedBase)}</p>
-        )}
-        {readiness && readiness.bases.length > 0 && (
-          <Collapsible>
-            <CollapsibleTrigger className="group inline-flex items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
-              <ChevronDown
-                aria-hidden="true"
-                className="size-3 transition-transform group-aria-expanded:rotate-180"
-              />
-              {t(translations.runeword.card.ownedBases, { count: readiness.bases.length })}
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <ul className="flex flex-col gap-1.5 pt-1.5">
-                {readiness.bases.map((base) => (
-                  <li key={base.key} className="flex min-w-0 flex-col">
-                    <span className="flex flex-wrap items-center gap-1">
-                      <span className="break-words">{base.itemName}</span>
-                      {base.ethereal && (
-                        <Badge variant="ethereal">
-                          {t(translations.grail.itemDetails.ethereal)}
-                        </Badge>
-                      )}
-                    </span>
-                    <span className="break-words text-muted-foreground">
-                      {formatBaseLocation(base, t)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
+          <>
+            <Badge variant="secondary">{t(translations.runeword.card.makeableWithUpgrades)}</Badge>
+            <ol
+              aria-label={t(translations.runeword.card.upgradePlanLabel)}
+              className="flex list-decimal flex-col gap-0.5 pl-4 text-muted-foreground"
+            >
+              {upgradeSteps.map((step) => (
+                <li key={step.resultRuneId}>{formatUpgradeStep(step, t)}</li>
+              ))}
+            </ol>
+          </>
         )}
       </div>
 
