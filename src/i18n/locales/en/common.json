@@ -1294,7 +1294,9 @@
       "title": "Characters & stashes",
       "description": "Open a character or stash in its own window to move its items.",
       "empty": "No character or stash snapshots match your current filters.",
-      "classLevel": "Level {{level}} {{characterClass}}"
+      "classLevel": "Level {{level}} {{characterClass}}",
+      "sharedStashes": "Shared stashes",
+      "characters": "Characters"
     },
     "snapshotWindow": {
       "invalidTarget": "Unable to open inventory snapshot. Missing or invalid snapshot target.",

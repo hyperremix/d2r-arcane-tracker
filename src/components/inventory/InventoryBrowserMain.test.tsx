@@ -897,6 +897,132 @@ describe('When InventoryBrowserMain is rendered', () => {
     });
   });
 
+  describe('If the list holds shared stashes and characters', () => {
+    function createListSnapshot(
+      characterName: string,
+      sourceFileType: 'd2s' | 'd2i',
+      itemType = 'unique',
+    ) {
+      const sourceFilePath = `/tmp/${characterName}.${sourceFileType}`;
+      return {
+        snapshotId: `snap-${characterName}`,
+        characterName,
+        sourceFileType,
+        sourceFilePath,
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [
+          {
+            fingerprint: `fp-${characterName}`,
+            characterName,
+            sourceFileType,
+            sourceFilePath,
+            locationContext: 'inventory',
+            type: itemType,
+            isSocketedItem: false,
+            itemName: 'Shako',
+            quality: 'unique',
+            ethereal: false,
+            socketCount: 0,
+            rawItemJson: '{}',
+            seenAt: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+      };
+    }
+
+    function mockListSnapshots(snapshots: ReturnType<typeof createListSnapshot>[]): void {
+      searchAllMock.mockResolvedValue({
+        inventory: { snapshots, totalSnapshots: snapshots.length, totalItems: snapshots.length },
+        vault: { items: [], total: 0, page: 1, pageSize: 200 },
+      });
+    }
+
+    describe('and none is filtered out', () => {
+      beforeEach(() => {
+        mockListSnapshots([
+          createListSnapshot('Gems', 'd2s'),
+          createListSnapshot('Runewords', 'd2s'),
+          createListSnapshot('Shared Stash Softcore', 'd2i'),
+          createListSnapshot('Sinsin', 'd2s'),
+          createListSnapshot('Modern Shared Stash Softcore', 'd2i'),
+        ]);
+        useGrailStore.setState({
+          characters: [
+            createCharacter({ id: 'gems', name: 'Gems', level: 1 }),
+            createCharacter({ id: 'runewords', name: 'Runewords', level: 1 }),
+            createCharacter({ id: 'sinsin', name: 'Sinsin', level: 93 }),
+          ],
+        });
+      });
+
+      it('Then shared stashes come first, ordered by name, and characters follow under their own heading by level', async () => {
+        // Act
+        render(<InventoryBrowserMain />);
+
+        // Assert
+        const stashes = await screen.findByRole('region', { name: 'Shared stashes' });
+        const characters = screen.getByRole('region', { name: 'Characters' });
+        expect(
+          stashes.compareDocumentPosition(characters) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(
+          within(stashes)
+            .getAllByRole('button')
+            .map((row) => row.textContent),
+        ).toEqual([
+          expect.stringMatching(/^Modern Shared Stash Softcore/),
+          expect.stringMatching(/^Shared Stash Softcore/),
+        ]);
+        expect(
+          within(characters)
+            .getAllByRole('button')
+            .map((row) => row.textContent),
+        ).toEqual([
+          expect.stringMatching(/^Sinsin/),
+          expect.stringMatching(/^Gems/),
+          expect.stringMatching(/^Runewords/),
+        ]);
+      });
+
+      it('Then the list title is a page heading and not a card title', async () => {
+        // Act
+        render(<InventoryBrowserMain />);
+
+        // Assert
+        const listHeading = await screen.findByRole('heading', {
+          level: 2,
+          name: 'Characters & stashes',
+        });
+        expect(listHeading.closest('[data-slot="card"]')).toBeNull();
+      });
+    });
+
+    describe('and a type filter leaves only characters', () => {
+      it('Then only the Characters heading is shown and the Shared stashes heading is gone', async () => {
+        // Arrange
+        mockListSnapshots([
+          createListSnapshot('Shared Stash Softcore', 'd2i', 'rune'),
+          createListSnapshot('Sinsin', 'd2s', 'unique'),
+        ]);
+        render(<InventoryBrowserMain />);
+        await screen.findByRole('region', { name: 'Shared stashes' });
+
+        // Act
+        fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+        const option = await screen.findByRole('option', { name: 'Unique' });
+        fireEvent.mouseMove(option);
+        fireEvent.click(option);
+
+        // Assert
+        await waitFor(() => {
+          expect(screen.queryByRole('region', { name: 'Shared stashes' })).not.toBeInTheDocument();
+        });
+        const characters = screen.getByRole('region', { name: 'Characters' });
+        expect(within(characters).getByRole('button', { name: /Sinsin/ })).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('If the inventory is still loading', () => {
     it('Then a loading status is shown instead of an empty list', async () => {
       // Arrange
