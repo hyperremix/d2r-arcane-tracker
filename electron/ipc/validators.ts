@@ -1,5 +1,6 @@
 import { extname, isAbsolute } from 'node:path';
 import { parseSaveFileSnapshotId } from '../services/saveFileBackup';
+import { MAX_D2RLOADER_PORT, MIN_D2RLOADER_PORT } from '../types/d2rLoader';
 import {
   type FarmingItemSourcesRequest,
   type FarmingOverviewRequest,
@@ -257,8 +258,8 @@ const grailProgress: FieldValidator<GrailProgress> = (value) => {
  * - `d2rInstallPath`: `icon:setD2RPath` also updates the icon service.
  * - `terrorZoneConfig`, `terrorZoneBackupCreated`: written by the terror zone handlers together
  *   with the game file.
- * - `iconConversionStatus`, `iconConversionProgress`, `mainWindowBounds`, `needsSeeding`:
- *   maintained by the main process.
+ * - `iconConversionStatus`, `iconConversionProgress`, `mainWindowBounds`, `needsSeeding`,
+ *   `d2rLoaderToken`: maintained by the main process.
  */
 const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
   saveDir: false,
@@ -308,6 +309,9 @@ const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
   runTrackerGlobalHotkeys: true,
   saveSnapshotsEnabled: true,
   saveSnapshotsPerFile: true,
+  d2rLoaderBridge: true,
+  d2rLoaderPort: true,
+  d2rLoaderToken: false,
 };
 
 const rendererWritableSettingKeys: ReadonlySet<string> = new Set(
@@ -367,6 +371,18 @@ const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
         (value.saveSnapshotsPerFile as number) >= MIN_SNAPSHOTS_PER_FILE &&
         (value.saveSnapshotsPerFile as number) <= MAX_SNAPSHOTS_PER_FILE),
     `Invalid saveSnapshotsPerFile setting: expected an integer from ${MIN_SNAPSHOTS_PER_FILE} to ${MAX_SNAPSHOTS_PER_FILE}`,
+  );
+  // Settings that start, stop or move the loopback server the D2RLoader plugin connects to
+  ensure(
+    value.d2rLoaderBridge === undefined || typeof value.d2rLoaderBridge === 'boolean',
+    'Invalid d2rLoaderBridge setting: expected a boolean',
+  );
+  ensure(
+    value.d2rLoaderPort === undefined ||
+      (Number.isInteger(value.d2rLoaderPort) &&
+        (value.d2rLoaderPort as number) >= MIN_D2RLOADER_PORT &&
+        (value.d2rLoaderPort as number) <= MAX_D2RLOADER_PORT),
+    `Invalid d2rLoaderPort setting: expected an integer from ${MIN_D2RLOADER_PORT} to ${MAX_D2RLOADER_PORT}`,
   );
   // Preset that the grail page looks up icon sizes with
   ensure(
@@ -598,6 +614,13 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   // Farming advisor
   'farming:getOverview': args(farmingOverviewRequest),
   'farming:getItemSources': args(farmingItemSourcesRequest),
+
+  // D2RLoader plugin
+  'd2rLoader:getStatus': noArgs,
+  'd2rLoader:getInstallation': noArgs,
+  'd2rLoader:installPlugin': noArgs,
+  'd2rLoader:uninstallPlugin': noArgs,
+  'd2rLoader:importRunCounter': noArgs,
 };
 
 /** All invoke channels of the contract. */

@@ -15,6 +15,13 @@
  */
 import type { ConversionResult, ConversionStatus } from '../services/iconService';
 import type {
+  D2RLoaderInstallation,
+  D2RLoaderInstallResult,
+  D2RLoaderPickupPayload,
+  D2RLoaderStatus,
+  RunCounterImportResult,
+} from '../types/d2rLoader';
+import type {
   RunEndedPayload,
   RunItemAddedPayload,
   RunPausedPayload,
@@ -399,6 +406,13 @@ export interface IpcInvokeContract {
   // Farming advisor
   'farming:getOverview': Invoke<[request: FarmingOverviewRequest], FarmingOverview>;
   'farming:getItemSources': Invoke<[request: FarmingItemSourcesRequest], FarmingItemSources>;
+
+  // D2RLoader plugin
+  'd2rLoader:getStatus': Invoke<[], D2RLoaderStatus>;
+  'd2rLoader:getInstallation': Invoke<[], D2RLoaderInstallation>;
+  'd2rLoader:installPlugin': Invoke<[], D2RLoaderInstallResult>;
+  'd2rLoader:uninstallPlugin': Invoke<[], D2RLoaderInstallResult>;
+  'd2rLoader:importRunCounter': Invoke<[], RunCounterImportResult>;
 }
 
 /**
@@ -423,6 +437,10 @@ export interface IpcEventContract {
   'run-tracker:run-resumed': RunResumedPayload;
   'run-tracker:run-item-added': RunItemAddedPayload;
   'run-tracker:global-hotkey-status': GlobalHotkeyStatus;
+  /** The D2RLoader plugin connection changed. */
+  'd2rLoader:status': D2RLoaderStatus;
+  /** The player picked up a grail item version that isn't found yet; the save file confirms it later. */
+  'd2rLoader:item-picked-up': D2RLoaderPickupPayload;
   [VAULT_DRAG_STATE_CHANNEL]: VaultDragStatePayload;
   [INVENTORY_DRAG_STATE_CHANNEL]: InventoryDragStatePayload;
 }
@@ -467,6 +485,8 @@ const EVENT_CHANNELS: Record<EventChannel, true> = {
   'run-tracker:run-resumed': true,
   'run-tracker:run-item-added': true,
   'run-tracker:global-hotkey-status': true,
+  'd2rLoader:status': true,
+  'd2rLoader:item-picked-up': true,
   [VAULT_DRAG_STATE_CHANNEL]: true,
   [INVENTORY_DRAG_STATE_CHANNEL]: true,
 };

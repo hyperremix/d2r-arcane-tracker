@@ -296,6 +296,19 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       getItemSources: (...args: InvokeArgs<'farming:getItemSources'>) =>
         invoke('farming:getItemSources', ...args),
     },
+
+    d2rLoader: {
+      /** State of the connection with the D2RLoader plugin. */
+      getStatus: () => invoke('d2rLoader:getStatus'),
+      /** Whether D2RLoader and the plugin are installed in the D2R folder. */
+      getInstallation: () => invoke('d2rLoader:getInstallation'),
+      /** Installs or updates the plugin and writes its connection settings. */
+      installPlugin: () => invoke('d2rLoader:installPlugin'),
+      /** Removes the plugin and its config file. */
+      uninstallPlugin: () => invoke('d2rLoader:uninstallPlugin'),
+      /** Imports the runs and drops Run Counter recorded. */
+      importRunCounter: () => invoke('d2rLoader:importRunCounter'),
+    },
   };
 }
 

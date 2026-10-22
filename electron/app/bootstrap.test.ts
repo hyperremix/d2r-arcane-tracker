@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => {
     initializeVaultHandlers: disposer('vaultHandlers'),
     initializeWidgetHandlers: disposer('widgetHandlers'),
     initializeSaveFileSnapshotHandlers: disposer('saveFileSnapshotHandlers'),
+    initializeD2RLoaderHandlers: disposer('d2rLoaderHandlers'),
   };
 });
 
@@ -58,9 +59,17 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('../database/database', () => ({ GrailDatabase: mocks.GrailDatabase }));
+// Node has no process.resourcesPath, which locates the bundled plugin of a packaged app
+vi.mock('./paths', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./paths')>()),
+  getBundledD2RLoaderPluginPath: () => '/resources/d2rloader/d2rl-arcane-tracker.dll',
+}));
 
 vi.mock('../ipc-handlers/appWindowHandlers', () => ({
   initializeAppWindowHandlers: mocks.initializeAppWindowHandlers,
+}));
+vi.mock('../ipc-handlers/d2rLoaderHandlers', () => ({
+  initializeD2RLoaderHandlers: mocks.initializeD2RLoaderHandlers,
 }));
 vi.mock('../ipc-handlers/dialogHandlers', () => ({
   initializeDialogHandlers: mocks.initializeDialogHandlers,
@@ -106,6 +115,16 @@ vi.mock('../ipc-handlers/widgetHandlers', () => ({
   initializeWidgetHandlers: mocks.initializeWidgetHandlers,
 }));
 
+vi.mock('../services/d2rLoader/d2rLoaderBridge', () => ({
+  D2RLoaderBridge: vi.fn(function D2RLoaderBridge() {
+    return {
+      start: vi.fn(async () => mocks.calls.push('d2rLoaderBridge.start')),
+      dispose: vi.fn(async () => mocks.calls.push('d2rLoaderBridge.dispose')),
+      getConnectionSettings: vi.fn(),
+    };
+  }),
+}));
+vi.mock('../services/d2rLoader/pluginInstaller', () => ({ PluginInstaller: vi.fn() }));
 vi.mock('../services/gameProcessGuard', () => ({ createGameProcessGuard: vi.fn(() => vi.fn()) }));
 vi.mock('../services/globalHotkeys', () => ({
   GlobalHotkeyService: vi.fn(function GlobalHotkeyService() {
@@ -358,6 +377,19 @@ describe('When the app is bootstrapped', () => {
       expect(order('runTrackerHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
     });
 
+    it('Then the D2RLoader bridge stops before the run tracker, so it can end the run it started', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      const order = (call: string) => mocks.calls.indexOf(call);
+      expect(order('d2rLoaderBridge.start')).toBeGreaterThanOrEqual(0);
+      expect(order('d2rLoaderBridge.dispose')).toBeLessThan(order('runTracker.shutdown'));
+    });
+
     it('Then every IPC handler module and the update service are unregistered before the database closes', async () => {
       // Arrange
       const runningApp = await startApp(env);
@@ -377,6 +409,7 @@ describe('When the app is bootstrapped', () => {
         'updateHandlers.dispose',
         'widgetHandlers.dispose',
         'appWindowHandlers.dispose',
+        'd2rLoaderHandlers.dispose',
         'updateService.dispose',
       ];
 

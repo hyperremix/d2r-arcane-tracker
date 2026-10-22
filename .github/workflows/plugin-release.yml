@@ -1,0 +1,73 @@
+name: Plugin release
+
+# Builds the D2RLoader plugin (plugin/) for a `plugin-vX.Y.Z` tag and uploads it to the D2RLoader
+# hub as a new release of the extension. It creates no GitHub release on purpose: the app's
+# auto-updater reads this repository's GitHub releases. See plugin/README.md.
+on:
+  push:
+    tags: ["plugin-v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the tag against the plugin version
+        run: |
+          version="${GITHUB_REF_NAME#plugin-v}"
+          if ! grep -q "project(ArcaneTrackerPlugin VERSION ${version} " plugin/CMakeLists.txt; then
+            echo "::error::The tag is ${GITHUB_REF_NAME}, but plugin/CMakeLists.txt has another version."
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Build the plugin
+        run: |
+          cmake -S plugin -B plugin/build -A x64
+          cmake --build plugin/build --config Release
+
+      # Only the DLL: D2RLoader writes the default config from the DLL, and a config in the package
+      # would replace the port and token the tracker wrote when it connected the plugin
+      - name: Package
+        run: |
+          mkdir -p package/plugins
+          cp plugin/build/Release/d2rl-arcane-tracker.dll package/plugins/
+          (cd package && 7z a "../d2rl-arcane-tracker-${VERSION}.zip" plugins)
+          echo "PACKAGE=d2rl-arcane-tracker-${VERSION}.zip" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d2rl-arcane-tracker-${{ env.VERSION }}
+          path: ${{ env.PACKAGE }}
+          if-no-files-found: error
+
+      # The hub scans the file with VirusTotal (`consent=1` agrees to that) and may hold it for a
+      # moderator before it is published
+      - name: Upload to the D2RLoader hub
+        env:
+          D2RLOADER_TOKEN: ${{ secrets.D2RLOADER_TOKEN }}
+          PLUGIN_ID: ${{ vars.D2RLOADER_PLUGIN_ID }}
+        run: |
+          if [ -z "$D2RLOADER_TOKEN" ] || [ -z "$PLUGIN_ID" ]; then
+            echo "::notice::Not uploaded: set the D2RLOADER_TOKEN secret and the D2RLOADER_PLUGIN_ID variable (plugin/README.md)."
+            exit 0
+          fi
+          # The changelog is the message of the annotated tag; checkout doesn't fetch the tag object
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          changelog="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")"
+          if [ -z "$changelog" ]; then
+            changelog="Version ${VERSION}"
+          fi
+          details="$(jq -cn --arg version "$VERSION" --arg changelog "$changelog" '{version: $version, changelog: $changelog}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST "https://d2rloader.net/api/v1/hub/plugins/${PLUGIN_ID}/releases?consent=1" \
+            --header "Authorization: Bearer ${D2RLOADER_TOKEN}" \
+            --form-string "details=${details}" \
+            --form "file=@${PACKAGE}"

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { mockStoreState } from '@/test/storeMock';
 import { SessionControls } from './SessionControls';
 
@@ -1391,6 +1392,44 @@ describe('SessionControls', () => {
       expect(screen.queryByText('Runs are tracked automatically')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
       expect(screen.getByRole('switch')).toBeInTheDocument();
+    });
+
+    it('If the D2RLoader plugin connects while memory reading is unavailable, Then runs are tracked automatically again', async () => {
+      // Arrange
+      const mainEvents = createMainEventsMock();
+      const getMemoryStatus = vi
+        .fn()
+        .mockResolvedValueOnce({ available: false, reason: 'Unknown D2R build' })
+        .mockResolvedValue({ available: true, reason: null });
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform: 'win32',
+          on: mainEvents.on,
+          runTracker: {
+            getMemoryStatus,
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      mockStoreState(mockUseGrailStore, {
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+      render(<SessionControls />);
+      await screen.findByText('Auto mode temporarily unavailable.');
+
+      // Act
+      await act(async () => {
+        mainEvents.emit('d2rLoader:status', { connected: true });
+      });
+
+      // Assert
+      expect(await screen.findByText('Runs are tracked automatically')).toBeInTheDocument();
+      expect(screen.queryByText('Auto mode temporarily unavailable.')).not.toBeInTheDocument();
     });
 
     it('When the Auto Mode switch is shown, Then it is named by its visible label', async () => {

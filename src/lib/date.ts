@@ -1,6 +1,9 @@
 import i18n, { type TFunction } from 'i18next';
 import { translations } from '@/i18n/translations';
 
+// Shared with the main process, which formats the run time of the D2RLoader overlay
+export { formatClockDuration } from 'electron/utils/runClock';
+
 const SECOND_MS = 1000;
 const MINUTE_MS = 60 * SECOND_MS;
 export const HOUR_MS = 60 * MINUTE_MS;
@@ -57,26 +60,6 @@ export function formatDuration(durationMs?: number): string {
   }
 
   return parts.join(' ');
-}
-
-/**
- * Formats a duration in milliseconds as a stopwatch-style clock string.
- * Uses fixed-width segments so the value does not jump around while it ticks.
- * @param {number} durationMs - Duration in milliseconds
- * @returns {string} Clock string (e.g., "0:05", "12:34", "1:02:03")
- */
-export function formatClockDuration(durationMs?: number): string {
-  const totalSeconds =
-    durationMs === undefined || durationMs < 0 ? 0 : Math.floor(durationMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const paddedSeconds = String(seconds).padStart(2, '0');
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${paddedSeconds}`;
-  }
-  return `${minutes}:${paddedSeconds}`;
 }
 
 /**

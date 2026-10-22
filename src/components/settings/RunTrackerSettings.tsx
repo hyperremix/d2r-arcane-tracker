@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { translations } from '@/i18n/translations';
 import { formatShortcutForDisplay, getModifierKeyNames, normalizeShortcut } from '@/lib/hotkeys';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { useGrailStore } from '@/stores/grailStore';
 import { ShortcutRecorder } from './ShortcutRecorder';
 
@@ -76,10 +77,17 @@ export function RunTrackerSettings() {
     reason: string | null;
   } | null>(null);
 
+  // Fetched again when the D2RLoader plugin connects or disconnects: while it's connected, it detects
+  // games instead of memory reading
   useEffect(() => {
-    if (isWindows) {
-      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    if (!isWindows) {
+      return;
     }
+    const refresh = () => {
+      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    };
+    refresh();
+    return onMainEvent('d2rLoader:status', refresh);
   }, [isWindows]);
 
   const updatePollingInterval = useCallback(

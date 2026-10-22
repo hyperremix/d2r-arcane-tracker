@@ -16,12 +16,15 @@ const RUN_TRACKER_SETTING_KEYS: readonly (keyof Settings)[] = [
 /**
  * Service for tracking gaming sessions and runs using memory reading (auto mode).
  * Automatically detects when players enter/exit games via D2R memory reading and manages run lifecycle.
+ * While the D2RLoader plugin is connected, auto mode follows the plugin's game events instead: a run
+ * starts when the player leaves town, and memory reading's events are ignored.
  */
 export class RunTrackerService {
   private currentSession: Session | null = null;
   private currentRun: Run | null = null;
   private memoryReader: MemoryReader | null = null;
   private autoModeEnabled = false;
+  private d2rLoaderConnected = false;
   private eventUnsubscribers: Array<() => void> = [];
 
   constructor(
@@ -50,17 +53,29 @@ export class RunTrackerService {
    * @private
    */
   private setupEventListeners(): void {
-    // Listen for game-entered events from memory reader
+    // Listen for game-entered events from memory reader or the D2RLoader plugin
     this.eventUnsubscribers.push(
       this.eventBus.on('game-entered', (payload) => {
+        if (this.isFromInactiveSource(payload.source)) return;
         this.handleGameEntered(payload.characterId);
       }),
     );
 
-    // Listen for game-exited events from memory reader
+    // Listen for game-exited events from memory reader or the D2RLoader plugin
     this.eventUnsubscribers.push(
       this.eventBus.on('game-exited', (payload) => {
+        if (this.isFromInactiveSource(payload.source)) return;
         this.handleGameExited(payload.characterId);
+      }),
+    );
+
+    // The connected plugin replaces memory reading as the source of game events
+    this.eventUnsubscribers.push(
+      this.eventBus.on('d2rloader-connection-changed', ({ connected }) => {
+        this.d2rLoaderConnected = connected;
+        if (connected) {
+          this.resumePausedRunForAutoTracking();
+        }
       }),
     );
 
@@ -154,13 +169,24 @@ export class RunTrackerService {
   }
 
   /**
-   * Resumes a paused run once runs are tracked automatically, which needs auto mode and working
-   * memory reading. Runs can only be paused and resumed manually, and the run controls stay
-   * visible while memory reading is unavailable, so a run paused before that point is left alone.
+   * Whether a game event comes from the source auto mode doesn't follow: memory reading while the
+   * D2RLoader plugin is connected. The plugin reports leaving town, memory reading joining the game,
+   * so following both would start runs early.
+   * @private
+   */
+  private isFromInactiveSource(source: 'd2rloader' | undefined): boolean {
+    return source !== 'd2rloader' && this.d2rLoaderConnected;
+  }
+
+  /**
+   * Resumes a paused run once runs are tracked automatically, which needs auto mode and a working
+   * game event source (memory reading or the D2RLoader plugin). Runs can only be paused and resumed
+   * manually, and the run controls stay visible while no source works, so a run paused before that
+   * point is left alone.
    * @private
    */
   private resumePausedRunForAutoTracking(): void {
-    if (this.autoModeEnabled && this.isPaused() && this.isMemoryReadingAvailable()) {
+    if (this.autoModeEnabled && this.isPaused() && this.isAutoTrackingAvailable()) {
       log.info('resumePausedRunForAutoTracking', 'Runs are tracked automatically, resuming run');
       this.resumeRun();
     }
@@ -469,6 +495,14 @@ export class RunTrackerService {
    */
   isMemoryReadingAvailable(): boolean {
     return this.memoryReader?.isOffsetsValid() ?? false;
+  }
+
+  /**
+   * Returns whether auto mode can detect games: memory reading works or the D2RLoader plugin is
+   * connected.
+   */
+  isAutoTrackingAvailable(): boolean {
+    return this.d2rLoaderConnected || this.isMemoryReadingAvailable();
   }
 
   /**

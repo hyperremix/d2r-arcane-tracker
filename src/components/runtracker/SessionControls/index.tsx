@@ -22,6 +22,7 @@ import { isGlobalHotkeysActive, useGlobalHotkeyStatus } from '@/hooks/useGlobalH
 import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { formatShortcutForDisplay, matchesShortcut } from '@/lib/hotkeys';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { useGrailStore } from '@/stores/grailStore';
 import type { RunTrackerAction } from '@/stores/runTrackerStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -196,11 +197,17 @@ export function SessionControls() {
   // otherwise the manual run controls stay usable so the user is not left without a way to track runs
   const autoTrackingActive = autoModeEnabled && memoryStatus?.available !== false;
 
-  // Fetch memory status on mount
+  // Fetch memory status on mount, and again when the D2RLoader plugin connects or disconnects: while
+  // it's connected, it detects games instead of memory reading
   useEffect(() => {
-    if (isWindows) {
-      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    if (!isWindows) {
+      return;
     }
+    const refresh = () => {
+      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    };
+    refresh();
+    return onMainEvent('d2rLoader:status', refresh);
   }, [isWindows]);
 
   const toggleAutoMode = useCallback(

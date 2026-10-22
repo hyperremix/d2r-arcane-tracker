@@ -12,6 +12,7 @@ import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useWizardStore } from '@/stores/wizardStore';
 import { D2RInstallationSettings } from './D2RInstallationSettings';
+import { D2RLoaderSettings } from './D2RLoaderSettings';
 import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
@@ -170,6 +171,7 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
         <>
           <SaveFileMonitor />
           <D2RInstallationSettings />
+          <D2RLoaderSettings />
           <SetupWizardCard />
         </>
       );

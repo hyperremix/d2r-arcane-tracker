@@ -157,6 +157,23 @@ jobs:
       - name: Package unpacked Windows app
         run: bunx electron-builder --win --dir --publish never
 
+  # Builds the D2RLoader plugin (plugin/) with MSVC, the compiler the release uses
+  plugin:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the D2RLoader plugin
+        run: |
+          cmake -S plugin -B plugin/build -A x64
+          cmake --build plugin/build --config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d2rl-arcane-tracker
+          path: plugin/build/Release/d2rl-arcane-tracker.dll
+          if-no-files-found: error
+
   build-linux:
     runs-on: ubuntu-latest
     steps:

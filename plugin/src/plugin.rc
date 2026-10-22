@@ -1,0 +1,5 @@
+#include <D2RLPlugin/resource.h>
+#include <D2RLPlugin/version.h>
+
+// Tells D2RLoader which plugin ABI this DLL was built for, before it loads the DLL
+D2RL_PLUGIN_MANIFEST_RESOURCE_ID RCDATA { D2RL_PLUGIN_RESOURCE_DWORD(D2RL_PLUGIN_ABI_VERSION) }

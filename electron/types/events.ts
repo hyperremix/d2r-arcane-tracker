@@ -101,18 +101,31 @@ export interface D2RStoppedPayload {
 }
 
 /**
- * Payload for game-entered event (from memory reading)
+ * Payload for game-entered event (from memory reading, or from the D2RLoader plugin when the player
+ * leaves town)
  */
 export interface GameEnteredPayload {
   characterId?: string;
   gameId?: string;
+  /** Set when the D2RLoader plugin reported the game; memory reading leaves it out. */
+  source?: 'd2rloader';
 }
 
 /**
- * Payload for game-exited event (from memory reading)
+ * Payload for game-exited event (from memory reading, or from the D2RLoader plugin)
  */
 export interface GameExitedPayload {
   characterId?: string;
+  /** Set when the D2RLoader plugin reported the game; memory reading leaves it out. */
+  source?: 'd2rloader';
+}
+
+/**
+ * Payload for d2rloader-connection-changed event
+ */
+export interface D2RLoaderConnectionChangedPayload {
+  /** Whether the D2RLoader plugin is connected to the app. */
+  connected: boolean;
 }
 
 /**
@@ -135,6 +148,7 @@ export type AppEvent =
   | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
   | { type: 'game-entered'; payload: GameEnteredPayload }
   | { type: 'game-exited'; payload: GameExitedPayload }
+  | { type: 'd2rloader-connection-changed'; payload: D2RLoaderConnectionChangedPayload }
   | { type: 'settings-updated'; payload: Partial<Settings> };
 
 /**

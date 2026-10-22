@@ -1,0 +1,441 @@
+// D2RLoader plugin of D2R Arcane Tracker: reports games, areas and pickups to the tracker, and shows
+// the tracker's Holy Grail status on item tooltips and its run overlay in game. PROTOCOL.md
+// describes how it talks to the tracker.
+//
+// Threads: gameplay events, input actions, item tooltips and the pump (pickup scans and HTTP
+// requests) run on D2R's UI thread. HTTP responses arrive on a worker thread and overlay frames on
+// the render thread; they only touch the locked BridgeClient and TrackerState and the atomics below.
+
+#include "bridge_client.h"
+#include "config.h"
+#include "grail_item.h"
+#include "pickups.h"
+#include "tracker_state.h"
+
+#include <D2RLPlugin/api.h>
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+
+namespace {
+
+using namespace ArcaneTracker;
+using Clock = std::chrono::steady_clock;
+using std::chrono::milliseconds;
+
+constexpr D2RL::PluginInfo PluginInfo {
+	.infoSize    = D2RL::PluginInfoSize,
+	.abiVersion  = D2RL_PLUGIN_ABI_VERSION,
+	.id          = "arcane-tracker",
+	.name        = "D2R Arcane Tracker",
+	.version     = ARCANE_TRACKER_PLUGIN_VERSION,
+	.author      = "hyperremix",
+	.description = "Connects D2RLoader to D2R Arcane Tracker: Holy Grail status on tooltips, a run overlay and instant pickup alerts.",
+	.flags       = D2RL::PluginFlags::Client,
+};
+
+/** How often the config file is read again, so changes apply while the game runs. */
+constexpr milliseconds ConfigReloadInterval { 5'000 };
+/** A pump that hasn't run for this long is started again by the next gameplay event. */
+constexpr milliseconds PumpRestartAfter { 2'000 };
+
+/** D2R color markers (`ÿc4` gold, `ÿc5` gray) in UTF-8. */
+constexpr char MissingColor[] = "\xC3\xBF"
+                                "c4";
+constexpr char FoundColor[]   = "\xC3\xBF"
+                                "c5";
+
+constexpr uint32_t LifecycleGameplayFieldEnd = static_cast<uint32_t>(offsetof(D2RL::LifecycleService, unregisterGameplayEventListener) + sizeof(D2RL::Lifecycle::UnregisterGameplayEventListenerFn));
+
+const D2RL::PluginContext*      g_context   = nullptr;
+const D2RL::ThreadService*      g_threads   = nullptr;
+const D2RL::InventoryService*   g_inventory = nullptr;
+const D2RL::ItemService*        g_items     = nullptr;
+const D2RL::OverlayService*     g_overlay   = nullptr;
+
+// UI thread only
+Config            g_config;
+Clock::time_point g_nextConfigReloadAt {};
+Clock::time_point g_nextScanAt {};
+
+// Read by the overlay thread or the tooltip listener
+std::atomic<bool>  g_inGame { false };
+std::atomic<bool>  g_overlayEnabled { true };
+std::atomic<bool>  g_overlayToggledOn { true };
+std::atomic<float> g_overlayX { 0.01F };
+std::atomic<float> g_overlayY { 0.15F };
+std::atomic<bool>  g_tooltipsEnabled { true };
+std::atomic<bool>  g_unloading { false };
+
+// The pump: a UI-thread task that queues itself again. Starting a pump takes a new ticket, so an
+// older pump that is still queued stops when it runs.
+std::atomic<uint64_t> g_pumpTicket { 0 };
+std::atomic<int64_t>  g_pumpLastRunMs { 0 };
+
+auto NowMs() -> int64_t {
+	return std::chrono::duration_cast<milliseconds>(Clock::now().time_since_epoch()).count();
+}
+
+void ApplyConfig(Config config) {
+	g_overlayEnabled  = config.overlay;
+	g_overlayX        = config.overlayX;
+	g_overlayY        = config.overlayY;
+	g_tooltipsEnabled = config.tooltips;
+	BridgeClient::Configure(config);
+	g_config = std::move(config);
+}
+
+/** The pump's work: reload the config, send what is due and look for pickups. */
+void RunPeriodicWork(const D2RL::PluginContext* context) {
+	const auto now = Clock::now();
+	if (now >= g_nextConfigReloadAt) {
+		g_nextConfigReloadAt = now + ConfigReloadInterval;
+		ApplyConfig(LoadConfig(context));
+	}
+
+	if (g_inventory != nullptr && g_inGame && now >= g_nextScanAt) {
+		g_nextScanAt = now + milliseconds(g_config.scanIntervalMs);
+		for (const auto& item : Pickups::Scan(context, g_inventory)) {
+			BridgeClient::Enqueue(PickupEventJson(item));
+		}
+	}
+
+	BridgeClient::Tick(context);
+}
+
+void __cdecl RunPump(const D2RL::PluginContext* context, void* userData) noexcept {
+	const auto ticket = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(userData));
+	if (g_unloading || ticket != g_pumpTicket) {
+		return;
+	}
+	g_pumpLastRunMs = NowMs();
+	try {
+		RunPeriodicWork(context);
+	} catch (...) {
+		// Never let an exception reach the game's UI thread; the next run tries again
+	}
+	if (g_threads->runOnUiThread(context, RunPump, userData) != D2RL::Threads::Result::Success) {
+		g_pumpLastRunMs = 0;
+	}
+}
+
+/** Starts the pump unless it ran recently. */
+void EnsurePump(const D2RL::PluginContext* context) {
+	const int64_t lastRun = g_pumpLastRunMs;
+	if (lastRun != 0 && NowMs() - lastRun < PumpRestartAfter.count()) {
+		return;
+	}
+	const uint64_t ticket = ++g_pumpTicket;
+	g_pumpLastRunMs       = NowMs();
+	if (g_threads->runOnUiThread(context, RunPump, reinterpret_cast<void*>(static_cast<uintptr_t>(ticket))) != D2RL::Threads::Result::Success) {
+		g_pumpLastRunMs = 0;
+		context->LogWarn("Could not start the plugin's update task; it is tried again at the next game event.");
+	}
+}
+
+void __cdecl OnGameplayEvent(const D2RL::PluginContext* context, const D2RL::Lifecycle::GameplayEvent* event, void*) noexcept {
+	if (context == nullptr || !D2RL::Lifecycle::HasGameplayEventField(event, D2RL::Lifecycle::GameplayEventRequiredSize)) {
+		return;
+	}
+	try {
+		switch (event->kind) {
+			case D2RL::Lifecycle::GameplayEventKind::GameJoined:
+				Pickups::Reset();
+				g_inGame = true;
+				BridgeClient::Enqueue(R"({"type":"game-joined"})");
+				break;
+			case D2RL::Lifecycle::GameplayEventKind::GameLeft:
+				Pickups::Reset();
+				g_inGame = false;
+				BridgeClient::Enqueue(R"({"type":"game-left"})");
+				break;
+			case D2RL::Lifecycle::GameplayEventKind::LocalPlayerReady:
+				if (g_inventory != nullptr) {
+					Pickups::Baseline(context, g_inventory);
+				}
+				break;
+			case D2RL::Lifecycle::GameplayEventKind::LevelChanged:
+				BridgeClient::Enqueue(R"({"type":"level-changed","levelId":)" + std::to_string(event->currentValue) + R"(,"previousLevelId":)" + std::to_string(event->previousValue) + "}");
+				break;
+			default: break;
+		}
+		EnsurePump(context);
+	} catch (...) {
+		// Never let an exception reach the game's UI thread
+	}
+}
+
+void __cdecl OnItemTooltip(const D2RL::PluginContext* context, D2RL::SharedEvents::ItemTooltipEvent* event, void*) noexcept {
+	if (context == nullptr || !g_tooltipsEnabled || event == nullptr || event->structSize < D2RL::SharedEvents::ItemTooltipEventRequiredSize || event->text == nullptr) {
+		return;
+	}
+	try {
+		D2RL::Items::ItemInfo info { .structSize = D2RL::Items::ItemInfoSize };
+		if (g_items->getItemInfo(context, event->item, &info) != D2RL::Items::Result::Success) {
+			return;
+		}
+		const auto item = DescribeGrailItem(info);
+		if (!item) {
+			return;
+		}
+		const auto line = TrackerState::Tooltip(GrailKey(*item), item->ethereal);
+		if (!line) {
+			return;
+		}
+		const std::string text = (line->status == GrailStatus::Missing ? MissingColor : FoundColor) + line->text;
+		if (text.size() >= event->capacity) {
+			return;
+		}
+		std::memcpy(event->text, text.c_str(), text.size() + 1);
+		event->length = static_cast<uint32_t>(text.size());
+	} catch (...) {
+		// Never let an exception reach the game's UI thread
+	}
+}
+
+void __cdecl DrawOverlay(const D2RL::PluginContext* context, const D2RL::Overlay::Frame* frame, void*) noexcept {
+	if (context == nullptr || frame == nullptr || frame->structSize < D2RL::Overlay::FrameRequiredSize || !g_inGame || !g_overlayEnabled || !g_overlayToggledOn) {
+		return;
+	}
+	try {
+		const auto lines = TrackerState::OverlayLines();
+		if (lines.empty()) {
+			return;
+		}
+		const float textSize   = frame->defaultTextSize > 0.0F ? frame->defaultTextSize : 18.0F;
+		const float lineHeight = textSize * 1.25F;
+		float       x          = g_overlayX * frame->screenWidth;
+		float       y          = g_overlayY * frame->screenHeight;
+		for (const auto& line : lines) {
+			const auto length = static_cast<uint32_t>(std::min<size_t>(line.size(), D2RL::Overlay::MaxTextBytes));
+			// A dark copy one pixel down and right keeps the text readable on bright ground
+			D2RL::Overlay::TextRequest request {
+				.structSize = D2RL::Overlay::TextRequestSize,
+				.canvas     = frame->canvas,
+				.position   = { x + 1.0F, y + 1.0F },
+				.color      = { 0.0F, 0.0F, 0.0F, 0.85F },
+				.textSize   = textSize,
+				.text       = line.data(),
+				.textLength = length,
+			};
+			(void)g_overlay->drawText(context, &request);
+			request.position = { x, y };
+			request.color    = { 0.93F, 0.84F, 0.6F, 1.0F };
+			(void)g_overlay->drawText(context, &request);
+			y += lineHeight;
+		}
+	} catch (...) {
+		// Never let an exception reach the render thread
+	}
+}
+
+auto __cdecl OnToggleOverlay(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* event, void*) noexcept -> D2RL::Input::ActionResult {
+	if (event == nullptr || event->structSize < D2RL::Input::ActionEventRequiredSize || event->kind != D2RL::Input::ActionEventKind::Pressed) {
+		return D2RL::Input::ActionResult::Ignored;
+	}
+	g_overlayToggledOn = !g_overlayToggledOn;
+	return D2RL::Input::ActionResult::Handled;
+}
+
+auto __cdecl OnToggleSession(const D2RL::PluginContext*, const D2RL::Input::ActionEvent* event, void*) noexcept -> D2RL::Input::ActionResult {
+	if (event == nullptr || event->structSize < D2RL::Input::ActionEventRequiredSize || event->kind != D2RL::Input::ActionEventKind::Pressed) {
+		return D2RL::Input::ActionResult::Ignored;
+	}
+	try {
+		BridgeClient::Enqueue(R"({"type":"command","action":"toggle-session"})");
+	} catch (...) {
+		return D2RL::Input::ActionResult::Ignored;
+	}
+	return D2RL::Input::ActionResult::Handled;
+}
+
+auto __cdecl OnStatusCommand(D2R::Game::Client*, const D2RL::ConsoleCommandContext* command, void*) noexcept -> D2RL::ConsoleCommandResult {
+	if (command == nullptr || command->plugin == nullptr) {
+		return D2RL::ConsoleCommandResult::Failed;
+	}
+	try {
+		const auto        status = BridgeClient::GetStatus();
+		const std::string connection =
+		    !status.enabled ? "not connected: connect the plugin in D2R Arcane Tracker's settings" : (status.connected ? "connected" : "connecting");
+		std::string message = "Arcane Tracker " ARCANE_TRACKER_PLUGIN_VERSION ": " + connection;
+		if (!status.lastError.empty()) {
+			message += " (last error: " + status.lastError + ")";
+		}
+		message += ". Grail items: " + std::to_string(TrackerState::ItemCount()) + ", revision '" + TrackerState::Revision() + "'. Queued events: " + std::to_string(status.queuedEvents);
+		if (status.droppedEvents > 0) {
+			message += ", " + std::to_string(status.droppedEvents) + " dropped while the tracker was away";
+		}
+		message += ".";
+		command->plugin->WriteConsoleMessage(message.c_str());
+	} catch (...) {
+		return D2RL::ConsoleCommandResult::Failed;
+	}
+	return D2RL::ConsoleCommandResult::Handled;
+}
+
+/**
+ * Queries a service and checks that it has the fields the plugin uses.
+ * @returns The service, or nullptr when D2RLoader doesn't provide it
+ */
+template <typename Service, typename HasField>
+auto QueryService(const D2RL::PluginContext* context, uint32_t fieldEnd, HasField hasField) -> const Service* {
+	const Service* service = nullptr;
+	if (context->QueryService(&service) != D2RL::ServiceQueryResult::Success || !hasField(service, fieldEnd)) {
+		return nullptr;
+	}
+	return service;
+}
+
+auto RegisterGameplayListeners(const D2RL::PluginContext* context, const D2RL::LifecycleService* lifecycle) -> bool {
+	constexpr D2RL::Lifecycle::GameplayEventKind Kinds[] {
+		D2RL::Lifecycle::GameplayEventKind::GameJoined,
+		D2RL::Lifecycle::GameplayEventKind::GameLeft,
+		D2RL::Lifecycle::GameplayEventKind::LocalPlayerReady,
+		D2RL::Lifecycle::GameplayEventKind::LevelChanged,
+	};
+	for (const auto kind : Kinds) {
+		const D2RL::Lifecycle::GameplayEventListener listener {
+			.structSize = D2RL::Lifecycle::GameplayEventListenerSize,
+			.kind       = kind,
+			.callback   = OnGameplayEvent,
+		};
+		D2RL::Lifecycle::ListenerHandle handle = D2RL::Lifecycle::InvalidHandle;
+		if (lifecycle->registerGameplayEventListener(context, &listener, &handle) != D2RL::Lifecycle::Result::Success) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/** Item tooltips need the item service (to read the hovered item) and the shared events. */
+void RegisterTooltips(const D2RL::PluginContext* context) {
+	g_items           = QueryService<D2RL::ItemService>(context, D2RL::ItemServiceRequiredSize, D2RL::HasItemServiceField);
+	const auto events = QueryService<D2RL::SharedEventService>(context, D2RL::SharedEventServiceRequiredSize, D2RL::HasSharedEventServiceField);
+	if (g_items == nullptr || events == nullptr) {
+		context->LogWarn("Item tooltips are not available in this D2RLoader version.");
+		return;
+	}
+	const D2RL::SharedEvents::ItemTooltipListener listener {
+		.structSize = D2RL::SharedEvents::ItemTooltipListenerSize,
+		.region     = D2RL::SharedEvents::ItemTooltipRegion::Description,
+		.position   = D2RL::SharedEvents::ItemTooltipPosition::Bottom,
+		.anchor     = D2RL::SharedEvents::ItemTooltipAnchor::None,
+		.callback   = OnItemTooltip,
+	};
+	D2RL::SharedEvents::ListenerHandle handle = D2RL::SharedEvents::InvalidHandle;
+	if (events->registerItemTooltipListener(context, &listener, &handle) != D2RL::SharedEvents::Result::Success) {
+		context->LogWarn("Could not add the Holy Grail status to item tooltips.");
+	}
+}
+
+void RegisterOverlay(const D2RL::PluginContext* context) {
+	g_overlay = QueryService<D2RL::OverlayService>(context, D2RL::OverlayServiceRequiredSize, D2RL::HasOverlayServiceField);
+	if (g_overlay == nullptr) {
+		context->LogWarn("The overlay is not available in this D2RLoader version.");
+		return;
+	}
+	const D2RL::Overlay::CallbackRegistration registration {
+		.structSize = D2RL::Overlay::CallbackRegistrationSize,
+		.phase      = D2RL::Overlay::Phase::AfterGameUi,
+		.callback   = DrawOverlay,
+	};
+	D2RL::Overlay::CallbackHandle handle = D2RL::Overlay::InvalidCallbackHandle;
+	if (g_overlay->registerFrameCallback(context, &registration, &handle) != D2RL::Overlay::Result::Success) {
+		context->LogWarn("Could not register the overlay.");
+	}
+}
+
+/** Adds the plugin's actions to D2R's Controls menu, without a default key. */
+void RegisterActions(const D2RL::PluginContext* context) {
+	const auto input = QueryService<D2RL::InputService>(context, D2RL::InputServiceRequiredSize, D2RL::HasInputServiceField);
+	if (input == nullptr) {
+		context->LogWarn("Key bindings are not available in this D2RLoader version.");
+		return;
+	}
+	const D2RL::Input::ActionRegistration actions[] {
+		{
+		    .structSize  = D2RL::Input::ActionRegistrationSize,
+		    .logicalId   = "toggle-overlay",
+		    .displayName = "Show/Hide Arcane Tracker overlay",
+		    .category    = "Arcane Tracker",
+		    .callback    = OnToggleOverlay,
+		},
+		{
+		    .structSize  = D2RL::Input::ActionRegistrationSize,
+		    .logicalId   = "toggle-session",
+		    .displayName = "Start/End Arcane Tracker session",
+		    .category    = "Arcane Tracker",
+		    .callback    = OnToggleSession,
+		},
+	};
+	for (const auto& action : actions) {
+		D2RL::Input::ActionHandle handle = D2RL::Input::InvalidHandle;
+		if (input->registerAction(context, &action, &handle) != D2RL::Input::Result::Success) {
+			context->LogWarn("Could not register a key binding.");
+		}
+	}
+}
+
+}
+
+D2RL_PLUGIN_EXPORT auto D2RLoaderGetPluginInfo() noexcept -> const D2RL::PluginInfo* {
+	return &PluginInfo;
+}
+
+D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) noexcept -> bool {
+	if (context == nullptr) {
+		return false;
+	}
+	try {
+		g_context        = context;
+		g_threads        = QueryService<D2RL::ThreadService>(context, D2RL::ThreadServiceRequiredSize, D2RL::HasThreadServiceField);
+		const auto http  = QueryService<D2RL::HttpService>(context, D2RL::HttpServiceRequiredSize, D2RL::HasHttpServiceField);
+		const auto cycle = QueryService<D2RL::LifecycleService>(context, LifecycleGameplayFieldEnd, D2RL::HasLifecycleServiceField);
+		if (g_threads == nullptr || http == nullptr || cycle == nullptr) {
+			context->LogError("This D2RLoader version lacks the thread, HTTP or lifecycle service the plugin needs. Update D2RLoader.");
+			return false;
+		}
+		if (!RegisterGameplayListeners(context, cycle)) {
+			context->LogError("Could not listen for game events.");
+			return false;
+		}
+
+		BridgeClient::Initialize(http);
+		ApplyConfig(LoadConfig(context));
+		g_nextConfigReloadAt = Clock::now() + ConfigReloadInterval;
+		if (!g_config.enabled) {
+			context->LogInfo("The plugin is turned off in its config file.");
+		} else if (g_config.token.empty()) {
+			context->LogInfo("Not connected yet: connect the plugin in D2R Arcane Tracker's settings.");
+		}
+
+		g_inventory = QueryService<D2RL::InventoryService>(context, D2RL::InventoryServiceRequiredSize, D2RL::HasInventoryServiceField);
+		if (g_inventory == nullptr) {
+			context->LogWarn("Pickups can't be detected in this D2RLoader version.");
+		}
+		RegisterTooltips(context);
+		RegisterOverlay(context);
+		RegisterActions(context);
+		if (!context->RegisterConsoleCommand("arcane-tracker", OnStatusCommand, "Show the connection to D2R Arcane Tracker.")) {
+			context->LogWarn("Could not register the arcane-tracker console command.");
+		}
+
+		EnsurePump(context);
+		context->LogInfo("D2R Arcane Tracker plugin " ARCANE_TRACKER_PLUGIN_VERSION " loaded.");
+		return true;
+	} catch (...) {
+		context->LogError("The plugin failed to load.");
+		return false;
+	}
+}
+
+D2RL_PLUGIN_EXPORT void D2RLoaderUnloadPlugin() noexcept {
+	g_unloading = true;
+	if (g_context != nullptr) {
+		BridgeClient::Shutdown(g_context);
+	}
+}

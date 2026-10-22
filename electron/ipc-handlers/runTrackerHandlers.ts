@@ -121,7 +121,8 @@ export function initializeRunTrackerHandlers({
   handle('run-tracker:get-overall-statistics', () => database.getOverallRunStatistics());
 
   handle('run-tracker:get-memory-status', () => {
-    const available = runTracker.isMemoryReadingAvailable();
+    // The D2RLoader plugin replaces memory reading while it's connected
+    const available = runTracker.isAutoTrackingAvailable();
     return {
       available,
       reason: available ? null : 'pattern_not_found',

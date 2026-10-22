@@ -75,6 +75,26 @@ export function getNotificationIconPath(
   return paths.viteDevServerUrl ? '/logo.png' : getAppIconPath(paths, platform, resourcesPath);
 }
 
+/** File name of the D2RLoader plugin DLL the app ships (built from `plugin/`). */
+export const D2RLOADER_PLUGIN_FILE_NAME = 'd2rl-arcane-tracker.dll';
+
+/**
+ * Path of the D2RLoader plugin DLL the app ships. Packaged builds have it in the resources
+ * directory (electron-builder `extraResources`); during development it is the local plugin build in
+ * `plugin/dist`. Builds without the plugin (Linux, or a development checkout that didn't build it)
+ * have no file there.
+ * @param paths - The app locations
+ * @param resourcesPath - Resources directory override for tests
+ */
+export function getBundledD2RLoaderPluginPath(
+  paths: AppPaths,
+  resourcesPath: string = process.resourcesPath,
+): string {
+  return paths.viteDevServerUrl
+    ? path.join(paths.appRoot, 'plugin', 'dist', D2RLOADER_PLUGIN_FILE_NAME)
+    : path.join(resourcesPath, 'd2rloader', D2RLOADER_PLUGIN_FILE_NAME);
+}
+
 /**
  * Folder name under the OS app data directory that holds the database, item icons and backups.
  * Electron derives the default from the package name, and earlier releases stored their data

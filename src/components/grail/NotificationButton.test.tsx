@@ -196,4 +196,69 @@ describe('When NotificationButton is rendered', () => {
       expect(bell).toHaveFocus();
     });
   });
+
+  it('If the plugin reports a picked-up grail item, Then it is listed as waiting for the game to save', async () => {
+    // Arrange
+    await renderNotificationButton();
+
+    // Act
+    await act(async () => {
+      mainEvents.emit('d2rLoader:item-picked-up', {
+        grailItem: { id: '1', name: 'Shako' },
+        ethereal: false,
+      });
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Notifications, 1 unread' }, { timeout: 2000 }),
+    );
+
+    // Assert
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Shako');
+    expect(dialog).toHaveTextContent('Picked up in game. Saved to your grail when the game saves.');
+  });
+
+  it('If the save file then confirms the pickup, Then the same notification becomes a regular find instead of a new one', async () => {
+    // Arrange
+    await renderNotificationButton();
+    await act(async () => {
+      mainEvents.emit('d2rLoader:item-picked-up', {
+        grailItem: { id: '1', name: 'Shako' },
+        ethereal: false,
+      });
+    });
+    await screen.findByRole('button', { name: 'Notifications, 1 unread' }, { timeout: 2000 });
+
+    // Act
+    await emitDetections([createDetectionEvent('1', 'Shako')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 unread' }));
+
+    // Assert
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(dialog).not.toHaveTextContent('Picked up in game');
+    });
+    expect(screen.getAllByRole('button', { name: 'Dismiss notification for Shako' })).toHaveLength(
+      1,
+    );
+  });
+
+  it('If the save file finds the other version of a picked-up item, Then both are listed', async () => {
+    // Arrange
+    await renderNotificationButton();
+    await act(async () => {
+      mainEvents.emit('d2rLoader:item-picked-up', {
+        grailItem: { id: '1', name: 'Shako' },
+        ethereal: true,
+      });
+    });
+
+    // Act
+    await emitDetections([createDetectionEvent('1', 'Shako')]);
+
+    // Assert
+    expect(
+      await screen.findByRole('button', { name: 'Notifications, 2 unread' }, { timeout: 2000 }),
+    ).toBeInTheDocument();
+  });
 });

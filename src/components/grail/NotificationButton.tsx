@@ -1,6 +1,14 @@
-import type { GrailProgress, ItemDetectionEvent } from 'electron/types/grail';
+import type { D2RLoaderPickupPayload } from 'electron/types/d2rLoader';
+import type { GrailProgress, Item, ItemDetectionEvent } from 'electron/types/grail';
 import { Bell, Trophy, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { ItemCard } from '@/components/grail/ItemCard';
@@ -8,22 +16,92 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { translations } from '@/i18n/translations';
-import { onMainEvent } from '@/lib/ipcEvents';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import dingSound from '/ding.mp3';
 import logoUrl from '/logo.png';
 
 /**
- * Interface extending ItemDetectionEvent with additional notification metadata.
+ * A grail find to announce: one the save file detection recorded, or one the D2RLoader plugin
+ * reported as picked up, which the save file detection records once the game saves.
  */
-interface NotificationItem extends ItemDetectionEvent {
+interface Find {
+  grailItem: Item;
+  ethereal: boolean;
+  /** Character that found the item; the plugin doesn't know it. */
+  characterName?: string;
+  /** Picked up in game and announced before the game saved it. */
+  provisional: boolean;
+}
+
+/**
+ * A find with additional notification metadata.
+ */
+interface NotificationItem extends Find {
   id: string;
   timestamp: Date;
   dismissed: boolean;
   seen: boolean;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
+}
+
+/**
+ * A pickup that the save file didn't confirm within this time (the item was dropped again, or the
+ * game wasn't saved) no longer suppresses the announcement of a later find of the same item.
+ */
+const PENDING_PICKUP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+/** Identifies the grail item version of a find. */
+function getFindKey(find: Find): string {
+  return `${find.grailItem.id}:${find.ethereal}`;
+}
+
+/**
+ * Whether a find was announced as a pickup that the save file hasn't confirmed yet.
+ * @param pendingPickups - Pickup times by find key
+ * @param key - Find key
+ * @param now - Current time in milliseconds
+ */
+function isPendingPickup(pendingPickups: Map<string, number>, key: string, now: number): boolean {
+  const pickedUpAt = pendingPickups.get(key);
+  return pickedUpAt !== undefined && now - pickedUpAt <= PENDING_PICKUP_MAX_AGE_MS;
+}
+
+/** Reads the progress of a grail item, split into its normal and ethereal versions. */
+async function fetchProgress(
+  itemId: string,
+): Promise<Pick<NotificationItem, 'normalProgress' | 'etherealProgress'>> {
+  let allProgress: GrailProgress[] = [];
+  try {
+    allProgress = (await window.electronAPI?.grail.getProgressByItem(itemId)) ?? [];
+  } catch (error) {
+    console.error('Failed to fetch progress for item:', error);
+  }
+  return {
+    normalProgress: allProgress.filter((p) => !p.isEthereal),
+    etherealProgress: allProgress.filter((p) => p.isEthereal),
+  };
+}
+
+/**
+ * Turns the notifications of a confirmed pickup into regular finds, with the character from the
+ * save file and the progress the detection recorded.
+ */
+async function confirmPickup(
+  find: Find,
+  key: string,
+  setNotifications: Dispatch<SetStateAction<NotificationItem[]>>,
+): Promise<void> {
+  const progress = await fetchProgress(find.grailItem.id);
+  setNotifications((prev) =>
+    prev.map((notification) =>
+      notification.provisional && getFindKey(notification) === key
+        ? { ...notification, ...progress, characterName: find.characterName, provisional: false }
+        : notification,
+    ),
+  );
 }
 
 /**
@@ -35,7 +113,7 @@ export function NotificationButton() {
   const { t } = useTranslation();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
+  const [notificationQueue, setNotificationQueue] = useState<Find[]>([]);
   const [iconPath, setIconPath] = useState<string>(logoUrl);
   // Characters are loaded and kept in sync by the grail store
   const characters = useGrailStore((state) => state.characters);
@@ -52,6 +130,9 @@ export function NotificationButton() {
   // Use refs to avoid useEffect re-registration on state/callback changes
   const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const processBatchRef = useRef<() => void>();
+  // Picked-up item versions announced before the game saved them, by find key, with the time they
+  // were picked up. Their save file detection is not announced a second time.
+  const pendingPickupsRef = useRef(new Map<string, number>());
 
   const BATCH_DELAY = 500; // 0.5 seconds
 
@@ -108,30 +189,35 @@ export function NotificationButton() {
   }, [enableSounds, notificationVolume]);
 
   const showBrowserNotification = useCallback(
-    (itemEvent: ItemDetectionEvent) => {
-      if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
-        const notification = new Notification(
-          t(translations.grail.notifications.holyGrailItemFound),
-          {
+    (find: Find) => {
+      const itemName = find.grailItem.name;
+      const notification = find.provisional
+        ? new Notification(t(translations.grail.notifications.itemPickedUp), {
+            body: find.ethereal
+              ? t(translations.grail.notifications.etherealItemPickedUp, { itemName })
+              : itemName,
+            icon: iconPath,
+            tag: 'grail-item',
+            requireInteraction: true,
+          })
+        : new Notification(t(translations.grail.notifications.holyGrailItemFound), {
             body: t(translations.grail.notifications.itemFoundBy, {
-              itemName: itemEvent.grailItem.name,
-              characterName: itemEvent.item.characterName,
+              itemName,
+              characterName: find.characterName,
             }),
             icon: iconPath,
             tag: 'grail-item',
             requireInteraction: true,
-          },
-        );
+          });
 
-        // Auto-close after 5 seconds
-        setTimeout(() => notification.close(), 5000);
-      }
+      // Auto-close after 5 seconds
+      setTimeout(() => notification.close(), 5000);
     },
     [iconPath, t],
   );
 
   const showBatchNotification = useCallback(
-    (events: ItemDetectionEvent[]) => {
+    (events: Find[]) => {
       const itemNames = events.map((e) => e.grailItem.name).join(', ');
       const notification = new Notification(
         t(translations.grail.notifications.multipleItemsFound, { count: events.length }),
@@ -162,29 +248,14 @@ export function NotificationButton() {
     if (inAppNotifications) {
       // Fetch progress data for each item
       const newNotifications = await Promise.all(
-        notificationQueue.map(async (itemEvent) => {
-          let allProgress: GrailProgress[] = [];
-          try {
-            allProgress =
-              (await window.electronAPI?.grail.getProgressByItem(itemEvent.grailItem.id)) ?? [];
-          } catch (error) {
-            console.error('Failed to fetch progress for item:', error);
-          }
-
-          // Separate into normal and ethereal progress
-          const normalProgress = allProgress.filter((p) => !p.isEthereal);
-          const etherealProgress = allProgress.filter((p) => p.isEthereal);
-
-          return {
-            ...itemEvent,
-            id: `${Date.now()}_${itemEvent.item.id}_${Math.random()}`,
-            timestamp: new Date(),
-            dismissed: false,
-            seen: false,
-            normalProgress,
-            etherealProgress,
-          };
-        }),
+        notificationQueue.map(async (find) => ({
+          ...find,
+          ...(await fetchProgress(find.grailItem.id)),
+          id: `${Date.now()}_${find.grailItem.id}_${Math.random()}`,
+          timestamp: new Date(),
+          dismissed: false,
+          seen: false,
+        })),
       );
 
       setNotifications((prev) => [
@@ -224,20 +295,8 @@ export function NotificationButton() {
   }, [processBatch]);
 
   useEffect(() => {
-    // Listen for item detection events. The cleanup removes exactly this listener, so React Strict
-    // Mode's mount/unmount/mount in development does not leave a duplicate behind.
-    const handleItemDetection = (itemEvent: ItemDetectionEvent) => {
-      // Skip all notifications if silent flag is set
-      // Silent flag is true during:
-      // - Initial startup parsing: prevents spam for existing items
-      // - Force re-scan: prevents re-notification of already found items
-      // Items are still saved to database, only UI notifications are suppressed
-      if (itemEvent.silent) {
-        return;
-      }
-
-      // Add to queue
-      setNotificationQueue((prev) => [...prev, itemEvent]);
+    const enqueue = (find: Find) => {
+      setNotificationQueue((prev) => [...prev, find]);
 
       // Clear existing timer if any
       if (batchTimerRef.current) {
@@ -254,7 +313,45 @@ export function NotificationButton() {
       }, BATCH_DELAY);
     };
 
-    const unsubscribe = onMainEvent('item-detection-event', handleItemDetection);
+    // Listen for item detection events. The cleanup removes exactly this listener, so React Strict
+    // Mode's mount/unmount/mount in development does not leave a duplicate behind.
+    const handleItemDetection = (itemEvent: ItemDetectionEvent) => {
+      // Skip all notifications if silent flag is set
+      // Silent flag is true during:
+      // - Initial startup parsing: prevents spam for existing items
+      // - Force re-scan: prevents re-notification of already found items
+      // Items are still saved to database, only UI notifications are suppressed
+      if (itemEvent.silent) {
+        return;
+      }
+
+      const find: Find = {
+        grailItem: itemEvent.grailItem,
+        ethereal: Boolean(itemEvent.item.ethereal),
+        characterName: itemEvent.item.characterName,
+        provisional: false,
+      };
+      // The save file confirms a pickup the plugin announced: update its notification instead of
+      // announcing the item again
+      const key = getFindKey(find);
+      if (isPendingPickup(pendingPickupsRef.current, key, Date.now())) {
+        pendingPickupsRef.current.delete(key);
+        void confirmPickup(find, key, setNotifications);
+        return;
+      }
+      enqueue(find);
+    };
+
+    const handlePickup = ({ grailItem, ethereal }: D2RLoaderPickupPayload) => {
+      const find: Find = { grailItem, ethereal, provisional: true };
+      pendingPickupsRef.current.set(getFindKey(find), Date.now());
+      enqueue(find);
+    };
+
+    const unsubscribe = combineUnsubscribers([
+      onMainEvent('item-detection-event', handleItemDetection),
+      onMainEvent('d2rLoader:item-picked-up', handlePickup),
+    ]);
 
     return () => {
       unsubscribe();
@@ -374,6 +471,11 @@ export function NotificationButton() {
                     viewMode="list"
                     withoutStatusIndicators
                   />
+                  {notification.provisional && (
+                    <p className="px-3 pt-1 text-muted-foreground text-xs">
+                      {t(translations.grail.notifications.pickedUpPending)}
+                    </p>
+                  )}
                   <Button
                     onClick={() => dismissNotification(notification.id)}
                     variant="ghost"

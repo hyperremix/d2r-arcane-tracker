@@ -3,6 +3,7 @@ import { app, BrowserWindow, webContents } from 'electron';
 import { GrailDatabase } from '../database/database';
 import { createRendererBroadcaster } from '../ipc/broadcast';
 import { initializeAppWindowHandlers } from '../ipc-handlers/appWindowHandlers';
+import { initializeD2RLoaderHandlers } from '../ipc-handlers/d2rLoaderHandlers';
 import { initializeDialogHandlers } from '../ipc-handlers/dialogHandlers';
 import { initializeFarmingHandlers } from '../ipc-handlers/farmingHandlers';
 import { initializeGlobalHotkeyHandlers } from '../ipc-handlers/globalHotkeyHandlers';
@@ -17,6 +18,8 @@ import { initializeTerrorZoneHandlers } from '../ipc-handlers/terrorZoneHandlers
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from '../ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from '../ipc-handlers/widgetHandlers';
+import { D2RLoaderBridge } from '../services/d2rLoader/d2rLoaderBridge';
+import { PluginInstaller } from '../services/d2rLoader/pluginInstaller';
 import { EventBus } from '../services/EventBus';
 import { FarmingService } from '../services/farming/farmingService';
 import { createGameProcessGuard } from '../services/gameProcessGuard';
@@ -45,7 +48,7 @@ import { getWidgetSizeSettingKey } from '../utils/widgetDisplay';
 import { createMainWindow, getMainWindow } from '../window/mainWindow';
 import { createDebouncedWidgetSizeSaver, showWidgetWindow } from '../window/widgetWindow';
 import { AppLifecycle, closeWindowAndWait } from './lifecycle';
-import type { AppPaths } from './paths';
+import { type AppPaths, getBundledD2RLoaderPluginPath } from './paths';
 
 /** The running application. */
 export interface RunningApp {
@@ -196,6 +199,24 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   const runTracker = new RunTrackerService(eventBus, database, memoryReader);
   lifecycle.onShutdown('run tracker', () => runTracker.shutdown());
 
+  // Optional connection with the D2RLoader plugin; stopped before the run tracker, so a run the
+  // plugin started is ended while the run tracker still runs
+  const d2rLoaderBridge = new D2RLoaderBridge({
+    eventBus,
+    settings,
+    database,
+    runTracker,
+    broadcastToRenderers,
+  });
+  lifecycle.onShutdown('D2RLoader bridge', () => d2rLoaderBridge.dispose());
+  await d2rLoaderBridge.start();
+  const getGameFolder = () => settings.get('d2rInstallPath') || undefined;
+  const d2rLoaderInstaller = new PluginInstaller({
+    getGameFolder,
+    bundledPluginPath: getBundledD2RLoaderPluginPath(paths),
+    getConnectionSettings: () => d2rLoaderBridge.getConnectionSettings(),
+  });
+
   const grailProgress = new GrailProgressService({
     database,
     eventBus,
@@ -295,6 +316,15 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
     initializeTerrorZoneHandlers({ terrorZoneService, settings }),
   );
   lifecycle.onShutdown('farming handlers', initializeFarmingHandlers({ farmingService, settings }));
+  lifecycle.onShutdown(
+    'D2RLoader handlers',
+    initializeD2RLoaderHandlers({
+      bridge: d2rLoaderBridge,
+      installer: d2rLoaderInstaller,
+      database,
+      getGameFolder,
+    }),
+  );
   lifecycle.onShutdown(
     'update handlers',
     initializeUpdateHandlers({ updateService, getMainWindow }),
