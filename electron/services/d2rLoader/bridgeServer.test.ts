@@ -1,5 +1,5 @@
 import { createServer, request as httpRequest } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { type AddressInfo, connect } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensure } from '../../ipc/validation';
 import {
@@ -158,6 +158,38 @@ describe('When the bridge server receives requests', () => {
     // Assert
     expect(invalid.status).toBe(400);
     expect(tooLarge.status).toBe(413);
+    expect(handler.events).not.toHaveBeenCalled();
+  });
+
+  it('If a body is larger than allowed, then it answers 413 and closes the connection without reading the rest', async () => {
+    // Arrange: announces 10 MiB, sends a little more than the limit and keeps the request open
+    const socket = connect(port, '127.0.0.1');
+    let received = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk: string) => {
+      received += chunk;
+    });
+    const closed = new Promise<void>((resolve) => socket.on('close', () => resolve()));
+    socket.on('error', () => undefined);
+
+    // Act
+    socket.write(
+      [
+        'POST /v1/events HTTP/1.1',
+        `Host: 127.0.0.1:${port}`,
+        `Authorization: Bearer ${TOKEN}`,
+        'Content-Type: application/json',
+        `Content-Length: ${10 * 1024 * 1024}`,
+        '',
+        '',
+      ].join('\r\n'),
+    );
+    socket.write('x'.repeat(MAX_BODY_BYTES + 1024));
+    await closed;
+
+    // Assert
+    expect(received).toMatch(/^HTTP\/1\.1 413 /);
+    expect(received.toLowerCase()).toContain('connection: close');
     expect(handler.events).not.toHaveBeenCalled();
   });
 

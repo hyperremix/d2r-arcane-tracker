@@ -56,7 +56,9 @@ because TCP/IP clients have no local game thread.
 HTTP responses arrive on a worker thread and the overlay draws on the render thread. Both only use
 the state in `bridge_client.cpp` and `tracker_state.cpp`, which is locked. Events are queued (at
 most 200; the oldest are dropped) while the tracker can't be reached, and the plugin retries the
-connection with a growing delay, up to 30 seconds.
+connection with a growing delay, up to 30 seconds. An event that waited longer than 30 seconds is
+dropped instead of sent, and so is the whole queue when the port or token changes, so a tracker that
+comes back doesn't receive a replay of old game events.
 
 | File | Purpose |
 | --- | --- |
@@ -96,6 +98,16 @@ docker run --rm -v "$PWD/plugin":/src:ro ubuntu:24.04 bash -c '
 
 CI builds the plugin with MSVC on every pull request, and the Windows release of the app builds it
 and bundles it from `plugin/dist/`.
+
+## Tests
+
+`tests/plugin_tests.cpp` checks the config parser (`config.cpp`) and the state parser
+(`tracker_state.cpp`), which need neither the game nor D2RLoader. Add `-DARCANE_TRACKER_BUILD_TESTS=ON`
+to the configure command above and run `ctest --test-dir plugin/build -C Release --output-on-failure`;
+CI does this in the *plugin* job. The HTTP client (`bridge_client.cpp`: retries, event batches,
+dropping old events) and the game hooks need D2RLoader's services and have no automated tests;
+[PROTOCOL.md](PROTOCOL.md) is the contract between the plugin and the tracker, and the tracker's
+side of it is covered by the app's tests.
 
 ## Release on the D2RLoader hub
 

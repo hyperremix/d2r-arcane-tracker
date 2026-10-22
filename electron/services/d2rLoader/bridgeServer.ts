@@ -52,14 +52,16 @@ function secretsEqual(actual: string, expected: string): boolean {
 }
 
 function send(response: ServerResponse, { status, json, text }: BridgeResponse): void {
+  // The rest of an oversized body is never read, so its connection can't be reused
+  const connection: Record<string, string> = status === 413 ? { Connection: 'close' } : {};
   if (json !== undefined) {
-    response.writeHead(status, { 'Content-Type': 'application/json' });
+    response.writeHead(status, { ...connection, 'Content-Type': 'application/json' });
     response.end(JSON.stringify(json));
   } else if (text !== undefined) {
-    response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.writeHead(status, { ...connection, 'Content-Type': 'text/plain; charset=utf-8' });
     response.end(text);
   } else {
-    response.writeHead(status);
+    response.writeHead(status, connection);
     response.end();
   }
 }
@@ -86,27 +88,24 @@ function checkAccess(
 }
 
 /**
- * Reads a request body of at most {@link MAX_BODY_BYTES} and parses it as JSON.
+ * Reads a request body of at most {@link MAX_BODY_BYTES} and parses it as JSON. A body that grows
+ * past the limit is answered at once and the rest of it isn't read.
  * @returns The parsed body, or a response to send instead (too large, not JSON)
  */
 function readJsonBody(request: IncomingMessage): Promise<{ body: unknown } | BridgeResponse> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    let tooLarge = false;
     request.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        tooLarge = true;
+        request.pause();
+        resolve({ status: 413 });
         return;
       }
       chunks.push(chunk);
     });
     request.on('end', () => {
-      if (tooLarge) {
-        resolve({ status: 413 });
-        return;
-      }
       try {
         resolve({ body: JSON.parse(Buffer.concat(chunks).toString('utf8')) });
       } catch {

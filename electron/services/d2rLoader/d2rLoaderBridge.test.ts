@@ -169,7 +169,7 @@ describe('When the D2RLoader bridge runs', () => {
 
     // Assert
     expect(response.status).toBe(409);
-    expect(bridge.isConnected()).toBe(false);
+    expect(bridge.getStatus().connected).toBe(false);
   });
 
   it('If the player leaves town, Then the game is entered once, and leaving the game exits it', async () => {
@@ -305,7 +305,7 @@ describe('When the D2RLoader bridge runs', () => {
     vi.advanceTimersByTime(1_000);
 
     // Assert
-    expect(bridge.isConnected()).toBe(false);
+    expect(bridge.getStatus().connected).toBe(false);
     expect(exited).toHaveBeenCalledWith({ source: 'd2rloader' });
   });
 

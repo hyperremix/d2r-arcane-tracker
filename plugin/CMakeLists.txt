@@ -51,3 +51,23 @@ else()
 	target_compile_options(ArcaneTrackerPlugin PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic;-Wno-missing-field-initializers>")
 	target_link_options(ArcaneTrackerPlugin PRIVATE -static -static-libgcc -static-libstdc++ "$<$<CONFIG:Release>:-s>")
 endif()
+
+# Tests of the pure logic (config and tracker state parsers); off by default. Run them with ctest.
+option(ARCANE_TRACKER_BUILD_TESTS "Build the plugin's unit tests" OFF)
+if(ARCANE_TRACKER_BUILD_TESTS)
+	enable_testing()
+	add_executable(ArcaneTrackerPluginTests
+		tests/plugin_tests.cpp
+		src/config.cpp
+		src/tracker_state.cpp
+	)
+	target_include_directories(ArcaneTrackerPluginTests PRIVATE src)
+	target_link_libraries(ArcaneTrackerPluginTests PRIVATE D2RLPlugin::D2RLPlugin)
+	target_compile_definitions(ArcaneTrackerPluginTests PRIVATE NOMINMAX)
+	if(MSVC)
+		target_compile_options(ArcaneTrackerPluginTests PRIVATE /W4 /permissive- /EHsc /utf-8)
+	else()
+		target_compile_options(ArcaneTrackerPluginTests PRIVATE -Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
+	endif()
+	add_test(NAME ArcaneTrackerPluginTests COMMAND ArcaneTrackerPluginTests)
+endif()

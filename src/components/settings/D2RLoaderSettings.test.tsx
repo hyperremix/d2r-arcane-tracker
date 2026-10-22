@@ -239,6 +239,44 @@ describe('When D2RLoaderSettings is rendered', () => {
     expect(screen.queryByRole('button', { name: 'Install plugin' })).not.toBeInTheDocument();
   });
 
+  it('If installing the plugin throws, Then the toast shows only the translated message', async () => {
+    // Arrange
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    setupGrailStore({ d2rLoaderBridge: true });
+    const d2rLoader = setupElectronAPI({ ...INSTALLED, pluginInstalled: false });
+    d2rLoader.installPlugin.mockRejectedValue(
+      new Error('D2RLoader was not found in the D2R folder'),
+    );
+    await renderSettings();
+
+    // Act
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
+    });
+
+    // Assert
+    expect(toast.error).toHaveBeenCalledWith("The plugin couldn't be changed.");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('If the Run Counter import throws, Then the toast shows only the translated message', async () => {
+    // Arrange
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    setupGrailStore({ d2rLoaderBridge: false });
+    const d2rLoader = setupElectronAPI(INSTALLED);
+    d2rLoader.importRunCounter.mockRejectedValue(new Error('EACCES: permission denied'));
+    await renderSettings();
+
+    // Act
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Import Run Counter history' }));
+    });
+
+    // Assert
+    expect(toast.error).toHaveBeenCalledWith("The Run Counter history couldn't be imported.");
+    consoleErrorSpy.mockRestore();
+  });
+
   it.each([
     [
       'finds no data',

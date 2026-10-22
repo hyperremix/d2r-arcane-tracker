@@ -1,8 +1,15 @@
+import { createHash } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PluginInstaller, readPluginConfig, writePluginConfig } from './pluginInstaller';
+import {
+  buildElevationCommand,
+  PluginInstaller,
+  quotePowerShell,
+  readPluginConfig,
+  writePluginConfig,
+} from './pluginInstaller';
 
 const CONNECTION = { port: 41733, token: 'a'.repeat(64) };
 
@@ -72,6 +79,59 @@ describe('When readPluginConfig reads the connection settings', () => {
 
     // Assert
     expect(values).toEqual(CONNECTION);
+  });
+});
+
+describe('When a value is quoted for PowerShell', () => {
+  it.each([
+    ["O'Brien", "'O''Brien'"],
+    ['O\u2018Brien', "'O\u2018\u2018Brien'"],
+    ['O\u2019Brien', "'O\u2019\u2019Brien'"],
+    ['O\u201ABrien', "'O\u201A\u201ABrien'"],
+    ['O\u201BBrien', "'O\u201B\u201BBrien'"],
+    ['C:\\Games\\D2R', "'C:\\Games\\D2R'"],
+  ])('If the value is %s, Then every single-quote variant is doubled', (value, expected) => {
+    // Act
+    const quoted = quotePowerShell(value);
+
+    // Assert
+    expect(quoted).toBe(expected);
+  });
+});
+
+describe('When the elevated PowerShell command is built', () => {
+  it('Then the script travels as -EncodedCommand and no script file is named', () => {
+    // Arrange
+    const script = "Put 'C:\\Games\\Diablo II Resurrected\\d2rloader\\config\\arcane-tracker.toml'";
+
+    // Act
+    const command = buildElevationCommand(script);
+
+    // Assert
+    const encoded = /'-EncodedCommand','([^']+)'/.exec(command)?.[1] ?? '';
+    expect(Buffer.from(encoded, 'base64').toString('utf16le')).toBe(script);
+    expect(command).not.toMatch(/'-File'|\.ps1/);
+    expect(command).toContain('-Verb RunAs');
+  });
+
+  it('If every path is as long as Windows allows, Then the command stays below the command line limit', () => {
+    // Arrange
+    const longPath = `C:\\${'a'.repeat(250)}`;
+    const script = [
+      `PutVerified '${longPath}' '${'f'.repeat(64)}' '${longPath}'`,
+      `Put '${longPath}' ([Convert]::FromBase64String('${'A'.repeat(400)}'))`,
+      `if (Test-Path -LiteralPath '${longPath}') { Remove-Item -LiteralPath '${longPath}' -Force }`,
+    ]
+      .join('\r\n')
+      .padEnd(2_000, ' ');
+
+    // Act
+    const command = buildElevationCommand(script);
+
+    // Assert
+    expect(
+      command.length + 'powershell.exe -NoProfile -NonInteractive -Command '.length,
+    ).toBeLessThan(32_767);
   });
 });
 
@@ -183,22 +243,35 @@ describe('When the plugin installer works on a D2R folder', () => {
     expect(installation).toMatchObject({ pluginInstalled: false, configured: false });
   });
 
+  /**
+   * Stands in for the administrator: carries out the script's Put and PutVerified calls with the
+   * checks PowerShell does, without a script file.
+   */
+  async function runScriptAsAdministrator(script: string): Promise<boolean> {
+    await chmod(gameFolder, 0o755);
+    for (const [, source, hash, target] of script.matchAll(
+      /^PutVerified '([^']+)' '([^']+)' '([^']+)'$/gm,
+    )) {
+      const bytes = await readFile(source);
+      if (createHash('sha256').update(bytes).digest('hex') !== hash) return false;
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, bytes);
+    }
+    for (const [, target, content] of script.matchAll(
+      /^Put '([^']+)' \(\[Convert\]::FromBase64String\('([^']+)'\)\)$/gm,
+    )) {
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, Buffer.from(content, 'base64'));
+    }
+    return true;
+  }
+
   it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
     'If the D2R folder needs administrator rights on Windows, Then an elevated script makes the changes',
     async () => {
       // Arrange
       await chmod(gameFolder, 0o555);
-      const runElevated = vi.fn(async (script: string) => {
-        // Stands in for the administrator: the script names the staged files and their targets
-        await chmod(gameFolder, 0o755);
-        for (const [, source, target] of script.matchAll(
-          /Copy-Item -LiteralPath '([^']+)' -Destination '([^']+)'/g,
-        )) {
-          await mkdir(path.dirname(target), { recursive: true });
-          await writeFile(target, await readFile(source));
-        }
-        return true;
-      });
+      const runElevated = vi.fn(runScriptAsAdministrator);
 
       // Act
       const { installation, canceled } = await createInstaller({
@@ -210,6 +283,50 @@ describe('When the plugin installer works on a D2R folder', () => {
       expect(runElevated).toHaveBeenCalledTimes(1);
       expect(canceled).toBeUndefined();
       expect(installation).toMatchObject({ pluginInstalled: true, configured: true });
+      expect(await readFile(pluginPath, 'utf8')).toBe('plugin v1');
+    },
+  );
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'If the elevated script is built, Then it carries the config and the hash of the plugin and reads no staged copy',
+    async () => {
+      // Arrange
+      await chmod(gameFolder, 0o555);
+      const runElevated = vi.fn(async (_script: string) => false);
+
+      // Act
+      await createInstaller({ runElevated, platform: 'win32' }).install();
+
+      // Assert
+      const script = runElevated.mock.calls[0][0];
+      const expectedHash = createHash('sha256').update('plugin v1').digest('hex');
+      expect(script).toContain(`PutVerified '${bundledPluginPath}' '${expectedHash}'`);
+      expect(script).toContain(
+        Buffer.from(`[arcane-tracker]\nport = 41733\ntoken = "${CONNECTION.token}"\n`).toString(
+          'base64',
+        ),
+      );
+      expect(script).not.toContain('Copy-Item');
+      expect(script).not.toContain('arcane-tracker-plugin-');
+    },
+  );
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'If the plugin file is replaced while the administrator prompt is open, Then the script refuses it and the result is canceled',
+    async () => {
+      // Arrange
+      await chmod(gameFolder, 0o555);
+      const runElevated = vi.fn(async (script: string) => {
+        await writeFile(bundledPluginPath, 'malicious plugin');
+        return runScriptAsAdministrator(script);
+      });
+
+      // Act
+      const result = await createInstaller({ runElevated, platform: 'win32' }).install();
+
+      // Assert
+      expect(result.canceled).toBe(true);
+      expect(result.installation.pluginInstalled).toBe(false);
     },
   );
 

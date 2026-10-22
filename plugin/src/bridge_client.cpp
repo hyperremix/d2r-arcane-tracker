@@ -29,6 +29,8 @@ constexpr uint32_t    MaxStateBytes     = 4U * 1'024U * 1'024U;
 constexpr milliseconds StatePollInterval { 1'000 };
 constexpr milliseconds FirstRetryDelay { 2'000 };
 constexpr milliseconds MaxRetryDelay { 30'000 };
+/** Events older than this are dropped instead of sent: a replay of what happened minutes ago is wrong. */
+constexpr milliseconds MaxEventAge { 30'000 };
 
 enum class RequestKind : uintptr_t {
 	Hello  = 0,
@@ -37,8 +39,9 @@ enum class RequestKind : uintptr_t {
 };
 
 struct QueuedEvent {
-	uint64_t    sequence;
-	std::string json;
+	uint64_t          sequence;
+	std::string       json;
+	Clock::time_point queuedAt;
 };
 
 const D2RL::HttpService* g_http = nullptr;
@@ -148,6 +151,14 @@ void Send(const D2RL::PluginContext* context, RequestKind kind, D2RL::Http::Meth
 	}
 }
 
+/** Drops the events that waited longer than MaxEventAge. The queue is ordered by age. */
+void DropStaleEventsLocked(Clock::time_point now) {
+	while (!g_queue.empty() && now - g_queue.front().queuedAt > MaxEventAge) {
+		g_queue.pop_front();
+		++g_droppedEvents;
+	}
+}
+
 auto BuildEventBatchLocked() -> std::string {
 	std::string body = R"({"events":[)";
 	const auto  count = std::min(g_queue.size(), MaxBatchSize);
@@ -222,7 +233,7 @@ void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Re
 				case RequestKind::Events:
 					if (status >= 200 && status < 300) {
 						EraseSentEventsLocked();
-					} else if (status == 400) {
+					} else if (status == 400 || status == 413) {
 						// The tracker won't accept this batch however often it is sent
 						EraseSentEventsLocked();
 						logWarn = "D2R Arcane Tracker rejected some events.";
@@ -278,6 +289,9 @@ void Configure(const Config& config) {
 	g_retryDelay        = FirstRetryDelay;
 	g_nextHelloAt       = Clock::now();
 	g_lastError.clear();
+	// The events were meant for the old tracker
+	g_droppedEvents += g_queue.size();
+	g_queue.clear();
 	TrackerState::Clear();
 }
 
@@ -287,7 +301,7 @@ void Enqueue(std::string eventJson) {
 		g_queue.pop_front();
 		++g_droppedEvents;
 	}
-	g_queue.push_back({ g_nextSequence++, std::move(eventJson) });
+	g_queue.push_back({ g_nextSequence++, std::move(eventJson), Clock::now() });
 }
 
 void Tick(const D2RL::PluginContext* context) {
@@ -311,6 +325,7 @@ void Tick(const D2RL::PluginContext* context) {
 		}
 		authorization  = g_authorization;
 		const auto now = Clock::now();
+		DropStaleEventsLocked(now);
 		if (!g_connected) {
 			if (!g_inFlight[Index(RequestKind::Hello)] && now >= g_nextHelloAt) {
 				g_inFlight[Index(RequestKind::Hello)] = true;

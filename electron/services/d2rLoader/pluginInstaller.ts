@@ -1,8 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { D2RLOADER_PLUGIN_FILE_NAME } from '../../app/paths';
 import type { D2RLoaderInstallation, D2RLoaderInstallResult } from '../../types/d2rLoader';
@@ -161,39 +160,43 @@ export function writePluginConfig(
   return content.endsWith(newline) ? content : `${content}${newline}`;
 }
 
-/** Quotes a value for a single-quoted PowerShell string. */
-function quotePowerShell(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+/**
+ * Quotes a value for a single-quoted PowerShell string. PowerShell treats the typographic single
+ * quotes (U+2018 to U+201B) like the ASCII one, so a path with one of them (a user name like
+ * O’Brien) would end the string early; each is doubled.
+ */
+export function quotePowerShell(value: string): string {
+  return `'${value.replace(/['\u2018\u2019\u201A\u201B]/g, (quote) => quote + quote)}'`;
+}
+
+/**
+ * Builds the command that runs a script in an elevated PowerShell. The script travels in the
+ * command line as `-EncodedCommand` (base64 of UTF-16LE), so there is no script file that another
+ * process could replace while the administrator prompt is open. The command line of a Windows
+ * process is limited to 32,767 characters; the script only names a few paths.
+ */
+export function buildElevationCommand(script: string): string {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  return [
+    '$process = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden',
+    `-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}';`,
+    'exit $process.ExitCode',
+  ].join(' ');
 }
 
 /**
  * Runs a PowerShell script in an elevated PowerShell (Windows shows the administrator prompt) and
  * waits for it. Declining the prompt fails the outer PowerShell, which resolves to false.
  */
-const runElevatedPowerShell: RunElevated = async (script) => {
-  const folder = await mkdtemp(path.join(tmpdir(), 'arcane-tracker-'));
-  const scriptPath = path.join(folder, 'apply.ps1');
-  try {
-    // Windows PowerShell reads a script without a byte order mark in the ANSI code page, which
-    // would garble paths with non-ASCII characters
-    await writeFile(scriptPath, `﻿${script}`, 'utf8');
-    const command = [
-      `$process = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden`,
-      `-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',${quotePowerShell(`"${scriptPath}"`)};`,
-      'exit $process.ExitCode',
-    ].join(' ');
-    return await new Promise<boolean>((resolve) => {
-      execFile(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-Command', command],
-        { windowsHide: true },
-        (error) => resolve(!error),
-      );
-    });
-  } finally {
-    await rm(folder, { recursive: true, force: true }).catch(() => undefined);
-  }
-};
+const runElevatedPowerShell: RunElevated = (script) =>
+  new Promise<boolean>((resolve) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', buildElevationCommand(script)],
+      { windowsHide: true },
+      (error) => resolve(!error),
+    );
+  });
 
 function isPermissionError(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code;
@@ -329,32 +332,38 @@ export class PluginInstaller {
     }
   }
 
-  /** Stages the new files in a temporary folder and copies them into place with an elevated script. */
+  /**
+   * Makes the changes with an elevated script that holds everything it needs: the content of a
+   * config file is part of the script, and a file to copy is read once by the script, checked
+   * against the SHA-256 this process computed and written from the bytes it checked. Another
+   * process that replaces such a file while the administrator prompt is open makes the script fail.
+   */
   private async applyElevated({ writes, removals }: FileChanges): Promise<void> {
-    const staging = await mkdtemp(path.join(tmpdir(), 'arcane-tracker-plugin-'));
-    try {
-      const lines = ["$ErrorActionPreference = 'Stop'"];
-      for (const [index, write] of writes.entries()) {
-        let source = write.source;
-        if (!source) {
-          source = path.join(staging, `file-${index}`);
-          await writeFile(source, write.content ?? '', 'utf8');
-        }
+    const lines = [
+      "$ErrorActionPreference = 'Stop'",
+      'function Put($target, [byte[]]$bytes) { New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($target)) | Out-Null; [IO.File]::WriteAllBytes($target, $bytes) }',
+      "function PutVerified($source, $hash, $target) { $bytes = [IO.File]::ReadAllBytes($source); if (([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)).Replace('-', '')) -ne $hash) { throw 'The source file changed' }; Put $target $bytes }",
+    ];
+    for (const write of writes) {
+      if (write.source) {
+        const hash = sha256(await readFile(write.source));
         lines.push(
-          `New-Item -ItemType Directory -Force -Path ${quotePowerShell(path.dirname(write.target))} | Out-Null`,
-          `Copy-Item -LiteralPath ${quotePowerShell(source)} -Destination ${quotePowerShell(write.target)} -Force`,
+          `PutVerified ${quotePowerShell(write.source)} ${quotePowerShell(hash)} ${quotePowerShell(write.target)}`,
+        );
+      } else {
+        const content = Buffer.from(write.content ?? '', 'utf8').toString('base64');
+        lines.push(
+          `Put ${quotePowerShell(write.target)} ([Convert]::FromBase64String('${content}'))`,
         );
       }
-      for (const removal of removals) {
-        lines.push(
-          `if (Test-Path -LiteralPath ${quotePowerShell(removal)}) { Remove-Item -LiteralPath ${quotePowerShell(removal)} -Force }`,
-        );
-      }
-      if (!(await this.runElevated(lines.join('\r\n')))) {
-        log.warn('applyElevated', 'The elevated script failed or the prompt was declined');
-      }
-    } finally {
-      await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+    }
+    for (const removal of removals) {
+      lines.push(
+        `if (Test-Path -LiteralPath ${quotePowerShell(removal)}) { Remove-Item -LiteralPath ${quotePowerShell(removal)} -Force }`,
+      );
+    }
+    if (!(await this.runElevated(lines.join('\r\n')))) {
+      log.warn('applyElevated', 'The elevated script failed or the prompt was declined');
     }
   }
 }

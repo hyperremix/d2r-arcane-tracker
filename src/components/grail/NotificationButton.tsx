@@ -47,6 +47,10 @@ interface NotificationItem extends Find {
   etherealProgress: GrailProgress[];
 }
 
+/** What the save file detection recorded for a pickup it confirmed. */
+type PickupConfirmation = Pick<NotificationItem, 'normalProgress' | 'etherealProgress'> &
+  Pick<Find, 'characterName'>;
+
 /**
  * A pickup that the save file didn't confirm within this time (the item was dropped again, or the
  * game wasn't saved) no longer suppresses the announcement of a later find of the same item.
@@ -85,22 +89,33 @@ async function fetchProgress(
   };
 }
 
+/** Turns a notification of a pickup into a regular find, if the save file confirmed that pickup. */
+function applyConfirmation(
+  notification: NotificationItem,
+  confirmations: ReadonlyMap<string, PickupConfirmation>,
+): NotificationItem {
+  const confirmation = notification.provisional
+    ? confirmations.get(getFindKey(notification))
+    : undefined;
+  return confirmation ? { ...notification, ...confirmation, provisional: false } : notification;
+}
+
 /**
- * Turns the notifications of a confirmed pickup into regular finds, with the character from the
- * save file and the progress the detection recorded.
+ * Records that the save file confirmed a pickup and turns its notifications into regular finds,
+ * with the character from the save file and the progress the detection recorded. The confirmation
+ * is kept for notifications that are not shown yet: the save file may be detected while the pickup
+ * still waits for the batch timer.
  */
 async function confirmPickup(
   find: Find,
   key: string,
+  confirmations: Map<string, PickupConfirmation>,
   setNotifications: Dispatch<SetStateAction<NotificationItem[]>>,
 ): Promise<void> {
   const progress = await fetchProgress(find.grailItem.id);
+  confirmations.set(key, { ...progress, characterName: find.characterName });
   setNotifications((prev) =>
-    prev.map((notification) =>
-      notification.provisional && getFindKey(notification) === key
-        ? { ...notification, ...progress, characterName: find.characterName, provisional: false }
-        : notification,
-    ),
+    prev.map((notification) => applyConfirmation(notification, confirmations)),
   );
 }
 
@@ -133,6 +148,9 @@ export function NotificationButton() {
   // Picked-up item versions announced before the game saved them, by find key, with the time they
   // were picked up. Their save file detection is not announced a second time.
   const pendingPickupsRef = useRef(new Map<string, number>());
+  // What the save file recorded for pickups it confirmed, by find key; applied to notifications
+  // that are shown after the confirmation
+  const confirmationsRef = useRef(new Map<string, PickupConfirmation>());
 
   const BATCH_DELAY = 500; // 0.5 seconds
 
@@ -259,7 +277,9 @@ export function NotificationButton() {
       );
 
       setNotifications((prev) => [
-        ...newNotifications,
+        ...newNotifications.map((notification) =>
+          applyConfirmation(notification, confirmationsRef.current),
+        ),
         ...prev.slice(0, 10 - newNotifications.length),
       ]);
     }
@@ -316,6 +336,22 @@ export function NotificationButton() {
     // Listen for item detection events. The cleanup removes exactly this listener, so React Strict
     // Mode's mount/unmount/mount in development does not leave a duplicate behind.
     const handleItemDetection = (itemEvent: ItemDetectionEvent) => {
+      const find: Find = {
+        grailItem: itemEvent.grailItem,
+        ethereal: Boolean(itemEvent.item.ethereal),
+        characterName: itemEvent.item.characterName,
+        provisional: false,
+      };
+      // The save file confirms a pickup the plugin announced: update its notification instead of
+      // announcing the item again. This also holds for a silent detection, which only suppresses
+      // new notifications.
+      const key = getFindKey(find);
+      if (isPendingPickup(pendingPickupsRef.current, key, Date.now())) {
+        pendingPickupsRef.current.delete(key);
+        void confirmPickup(find, key, confirmationsRef.current, setNotifications);
+        return;
+      }
+
       // Skip all notifications if silent flag is set
       // Silent flag is true during:
       // - Initial startup parsing: prevents spam for existing items
@@ -324,27 +360,15 @@ export function NotificationButton() {
       if (itemEvent.silent) {
         return;
       }
-
-      const find: Find = {
-        grailItem: itemEvent.grailItem,
-        ethereal: Boolean(itemEvent.item.ethereal),
-        characterName: itemEvent.item.characterName,
-        provisional: false,
-      };
-      // The save file confirms a pickup the plugin announced: update its notification instead of
-      // announcing the item again
-      const key = getFindKey(find);
-      if (isPendingPickup(pendingPickupsRef.current, key, Date.now())) {
-        pendingPickupsRef.current.delete(key);
-        void confirmPickup(find, key, setNotifications);
-        return;
-      }
       enqueue(find);
     };
 
     const handlePickup = ({ grailItem, ethereal }: D2RLoaderPickupPayload) => {
       const find: Find = { grailItem, ethereal, provisional: true };
-      pendingPickupsRef.current.set(getFindKey(find), Date.now());
+      const key = getFindKey(find);
+      // A new pickup of this version is not confirmed yet
+      confirmationsRef.current.delete(key);
+      pendingPickupsRef.current.set(key, Date.now());
       enqueue(find);
     };
 

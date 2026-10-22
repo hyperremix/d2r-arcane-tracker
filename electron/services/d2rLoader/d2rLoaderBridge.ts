@@ -75,6 +75,11 @@ interface GrailState {
   builtAt: number;
 }
 
+/** The state of a game in which nothing has happened yet. */
+function newGame(): GameState {
+  return { runStarted: false, reportedFinds: new Set() };
+}
+
 /** 32-bit FNV-1a hash of a text, as eight hex digits. */
 function hashText(text: string): string {
   let hash = 0x811c9dc5;
@@ -142,11 +147,6 @@ export class D2RLoaderBridge {
   /** Returns the connection state. */
   getStatus(): D2RLoaderStatus {
     return { ...this.status };
-  }
-
-  /** Whether the plugin reached the app in the last few seconds. */
-  isConnected(): boolean {
-    return this.status.connected;
   }
 
   /** Port and token the plugin needs in its config file; creates the token when there is none. */
@@ -276,7 +276,7 @@ export class D2RLoaderBridge {
     switch (event.type) {
       case 'game-joined':
         this.endGame();
-        this.game = { runStarted: false, reportedFinds: new Set() };
+        this.game = newGame();
         return;
       case 'game-left':
         this.endGame();
@@ -295,7 +295,7 @@ export class D2RLoaderBridge {
 
   private handleLevelChanged(levelId: number): void {
     // A game the plugin joined before the app listened has no game-joined event
-    this.game ??= { runStarted: false, reportedFinds: new Set() };
+    this.game ??= newGame();
     if (!this.game.runStarted && !TOWN_LEVEL_IDS.has(levelId)) {
       this.game.runStarted = true;
       this.deps.eventBus.emit('game-entered', { source: 'd2rloader' });
@@ -320,7 +320,7 @@ export class D2RLoaderBridge {
     if (!status || getStatusOfCopy(status, item.ethereal) !== VersionStatus.Missing) {
       return;
     }
-    this.game ??= { runStarted: false, reportedFinds: new Set() };
+    this.game ??= newGame();
     const findKey = `${status.item.id}:${item.ethereal}`;
     if (this.game.reportedFinds.has(findKey)) {
       return;

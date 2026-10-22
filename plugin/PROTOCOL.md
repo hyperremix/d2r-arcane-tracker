@@ -14,7 +14,9 @@ plugin sends is untrusted input for the tracker and is validated like IPC input.
 - The tracker answers `403` to any request with an `Origin` header (browsers always send one) and
   to a `Host` header other than `127.0.0.1:<port>` or `localhost:<port>` (DNS rebinding).
 - Request bodies are JSON (`Content-Type: application/json`), at most 64 KiB.
-- Unknown paths answer `404`, wrong methods `405`, invalid bodies `400`.
+- Unknown paths answer `404`, wrong methods `405`, invalid bodies `400`. A body over the limit
+  answers `413` as soon as the limit is passed; the tracker doesn't read the rest of it and closes
+  the connection.
 
 ## Endpoints
 
@@ -31,7 +33,14 @@ the plugin then logs it and stops sending.
 
 ### `POST /v1/events`
 
-Sends up to 50 events, oldest first. `204` on success.
+Sends up to 50 events, oldest first. `204` on success. `400` and `413` mean the tracker won't
+accept the batch however often it is sent, so the plugin drops it; any other failure counts as a lost
+connection and the plugin sends the batch again after the next hello.
+
+The plugin keeps events (at most 200, the oldest dropped first) while the tracker can't be reached,
+but only sends events that are less than 30 seconds old. It drops older events, and the whole queue
+when its port or token changes. The tracker therefore never sees a replay of old game events after
+an outage; it applies the events of a request in order, as they arrive.
 
 ```json
 { "events": [ { "type": "game-joined" } ] }
@@ -68,8 +77,8 @@ are ignored, so later tracker versions can add records.
 revision	<revision>
 text	missing	Holy Grail: not found yet
 text	found	Holy Grail: already found
-text	missing-ethereal	Holy Grail: not found yet (ethereal)
-text	found-ethereal	Holy Grail: already found (ethereal)
+text	missing-ethereal	Holy Grail: ethereal not found yet
+text	found-ethereal	Holy Grail: ethereal already found
 item	u:123:uap	1	2
 overlay	Run 12 · 03:21
 overlay	Grail 412/1032 (39.9%)

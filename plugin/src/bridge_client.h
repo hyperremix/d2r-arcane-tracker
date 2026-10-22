@@ -38,7 +38,10 @@ void Initialize(const D2RL::HttpService* http);
  */
 void Configure(const Config& config);
 
-/** Queues one event (a JSON object). Events are kept while the tracker can't be reached. */
+/**
+ * Queues one event (a JSON object). Events are kept while the tracker can't be reached, but only
+ * sent when they are less than 30 seconds old; a new port or token drops the queue.
+ */
 void Enqueue(std::string eventJson);
 
 /** Starts the requests that are due: hello, the next event batch and the state poll. */

@@ -128,9 +128,7 @@ export function D2RLoaderSettings() {
         }
       } catch (error) {
         console.error('Failed to change the D2RLoader plugin:', error);
-        toast.error(t(messages.actionFailed), {
-          description: error instanceof Error ? error.message : undefined,
-        });
+        toast.error(t(messages.actionFailed));
       } finally {
         setBusy(false);
       }
@@ -153,9 +151,7 @@ export function D2RLoaderSettings() {
       }
     } catch (error) {
       console.error('Failed to import the Run Counter history:', error);
-      toast.error(t(messages.runCounterFailed), {
-        description: error instanceof Error ? error.message : undefined,
-      });
+      toast.error(t(messages.runCounterFailed));
     } finally {
       setBusy(false);
     }

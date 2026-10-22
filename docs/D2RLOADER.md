@@ -28,13 +28,13 @@ The app listens on `127.0.0.1` (port 41733 by default), so only programs on your
 
 If another program uses the port, the settings say so. Enter another port, then select **Connect plugin** so the plugin uses it too.
 
-The plugin's config file also has its display options: `overlay` (on or off), `overlay_x` and `overlay_y` (the overlay position as a fraction of the screen) and `tooltips` (on or off). Connecting the plugin keeps your changes to them. In the D2RLoader console, `arcane-tracker` shows whether the plugin is connected.
+The plugin's config file also has its options: `overlay` (on or off), `overlay_x` and `overlay_y` (the overlay position as a fraction of the screen), `tooltips` (on or off) and `scan_interval_ms` (how often your items are checked for pickups, 100 to 5000 milliseconds). Connecting the plugin keeps your changes to them. In the D2RLoader console, `arcane-tracker` shows whether the plugin is connected.
 
 ## Importing Run Counter history
 
 If you used the [Run Counter](https://d2rloader.net/hub) plugin, select **Import Run Counter history** in the same settings card. The app reads Run Counter's `runs.csv` and `drops.csv` (from `d2rloader/run-counter` in your D2R folder, or the `data_folder` in Run Counter's config) and adds them to the [Run Tracker](RUN_TRACKER.md):
 
-- Runs less than 30 minutes apart become one session.
+- A run that starts no more than 30 minutes after the previous run ended joins its session; a longer gap starts a new one.
 - Each run keeps its time and duration, and its character if the app knows a character with that name.
 - Uniques, set items and runes Run Counter recorded become the run's items. Other drops aren't imported.
 
