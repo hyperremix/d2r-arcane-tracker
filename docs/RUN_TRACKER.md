@@ -42,6 +42,8 @@ While auto mode is on, the run buttons are replaced by a *Runs are tracked autom
 
 Auto mode only reads memory and never writes to the game process. Each D2R patch needs a verified memory offset. After a patch that isn't supported yet, auto mode does nothing until an app update adds it. See [Troubleshooting](#troubleshooting).
 
+If you start D2R through D2RLoader with the [Arcane Tracker plugin](D2RLOADER.md) connected, auto mode follows the plugin instead of memory reading: a run starts when you first leave town in a game, so time in town before the run isn't counted, and ends when you leave the game. This also works when memory reading doesn't support your D2R version.
+
 ### Manual controls and shortcuts
 
 Turn auto mode off to use the buttons, or use these shortcuts. You can change the shortcuts in **Settings → Run tracker settings**.
@@ -87,7 +89,7 @@ You can include or leave out per-run items, and either save to a file or copy to
 
 | Problem | Fix |
 | --- | --- |
-| Auto mode does nothing | Make sure you're on Windows, D2R is running, and a session is active. If the settings show *Auto mode temporarily unavailable*, or the log says `Unknown D2R build`, your D2R version isn't supported yet. Use manual controls and [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues) with your D2R version. |
+| Auto mode does nothing | Make sure you're on Windows, D2R is running, and a session is active. If the settings show *Auto mode temporarily unavailable*, or the log says `Unknown D2R build`, your D2R version isn't supported yet. Use manual controls, or the [D2RLoader plugin](D2RLOADER.md), and [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues) with your D2R version. With the plugin connected, runs start when you leave town, not when you join a game. |
 | Shortcut doesn't fire | Focus the app on the Run Tracker page and make sure you're not typing in a text field, or turn on [global hotkeys](#global-hotkeys). Choose a combination that doesn't clash with other software. In auto mode only End session works. |
 | Items missing from a run | Check that the item shows as found in the grail view. Leave the game so D2R writes the save file. Add the item manually if needed. |
 | Export has no loot | Turn on the option to include items, and make sure the session has runs with items. |

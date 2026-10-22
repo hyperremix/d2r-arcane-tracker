@@ -97,3 +97,7 @@ BUGS.md
 
 # Website build output (website/build.ts)
 website/.ssr
+
+# D2RLoader plugin build output (plugin/README.md)
+plugin/build
+plugin/dist

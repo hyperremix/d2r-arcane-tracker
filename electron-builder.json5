@@ -43,6 +43,16 @@
       "**/node_modules/@dschu012/**/*",
       "**/dist/logo.ico",
     ],
+    // The D2RLoader plugin the app installs into the D2R folder (see docs/D2RLOADER.md). The release
+    // workflow builds it into plugin/dist; a build without it ships no plugin, and the app then
+    // points users to the D2RLoader hub.
+    extraResources: [
+      {
+        from: "plugin/dist",
+        to: "d2rloader",
+        filter: ["d2rl-arcane-tracker.dll"],
+      },
+    ],
   },
   nsis: {
     oneClick: false,

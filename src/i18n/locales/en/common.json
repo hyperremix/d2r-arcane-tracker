@@ -382,7 +382,10 @@
       "holyGrailItemFound": "Holy Grail item found!",
       "itemFoundBy": "{{itemName}} found by {{characterName}}",
       "multipleItemsFound": "{{count}} Holy Grail items found!",
-      "multipleItemsIncluding": "{{count}} items including {{firstName}}..."
+      "multipleItemsIncluding": "{{count}} items including {{firstName}}...",
+      "itemPickedUp": "Holy Grail item picked up!",
+      "etherealItemPickedUp": "{{itemName}} (ethereal)",
+      "pickedUpPending": "Picked up in game. Saved to your grail when the game saves."
     }
   },
   "settings": {
@@ -394,7 +397,7 @@
     "nav": {
       "label": "Settings sections",
       "general": "General",
-      "generalDescription": "Save files, D2R installation and the setup wizard",
+      "generalDescription": "Save files, D2R installation, D2RLoader and the setup wizard",
       "tracking": "Tracking",
       "trackingDescription": "Game mode, game version, Holy Grail and run tracking",
       "display": "Display",
@@ -805,10 +808,65 @@
       "pressKeyCombination": "Press desired key combination (Esc to cancel)",
       "includeNonModifier": "Include a non-modifier key in the shortcut."
     },
+    "d2rLoader": {
+      "title": "D2RLoader plugin",
+      "description": "If you start D2R with D2RLoader, the Arcane Tracker plugin shows in item tooltips whether you still need an item for your grail, tells the app the moment you pick up a missing item, starts runs when you leave town and shows your run and grail progress in the game. The app works the same without it.",
+      "connect": "Connect with the plugin",
+      "connectDescription": "Listen for the plugin on this computer. Only the plugin, which knows a secret key, can connect.",
+      "port": "Port",
+      "portDescription": "Change it only if another program uses port {{defaultPort}}. Connect the plugin again afterwards.",
+      "portInvalid": "Enter a port from {{min}} to {{max}}.",
+      "statusWaiting": "Waiting for the plugin. Start D2R with D2RLoader.",
+      "statusConnected": "Connected to plugin {{version}}.",
+      "statusConnectedNoVersion": "Connected to the plugin.",
+      "statusPortInUse": "Port {{port}} is used by another program. Choose another port.",
+      "statusListenFailed": "The app can't listen for the plugin. Choose another port or restart the app.",
+      "pluginHeading": "Plugin",
+      "noGameFolder": "Set your D2R folder in the D2R installation settings first.",
+      "loaderMissing": "D2RLoader isn't in your D2R folder. Install it from d2rloader.net, then check again.",
+      "notInstalled": "The plugin isn't installed.",
+      "upToDate": "The plugin is installed.",
+      "updateAvailable": "This app version ships another version of the plugin.",
+      "notConfigured": "The plugin doesn't have this app's connection settings yet.",
+      "notBundled": "This app version doesn't include the plugin. Install it from the D2RLoader hub, then connect it here.",
+      "checkAgain": "Check again",
+      "install": "Install plugin",
+      "update": "Update plugin",
+      "connectPlugin": "Connect plugin",
+      "uninstall": "Remove plugin",
+      "installed": "Plugin installed. Restart D2R to load it.",
+      "connected": "Connection settings saved. The plugin connects within a few seconds.",
+      "removed": "Plugin removed. Restart D2R to unload it.",
+      "canceled": "Nothing was changed. Writing to the D2R folder needs administrator rights, and the request was declined or failed.",
+      "actionFailed": "The plugin couldn't be changed.",
+      "runCounterHeading": "Run Counter history",
+      "runCounterDescription": "Import the runs and grail drops the Run Counter plugin recorded as run tracker sessions. Importing again only adds new runs.",
+      "runCounterImport": "Import Run Counter history",
+      "runCounterImported_one": "Imported {{count}} run.",
+      "runCounterImported_other": "Imported {{count}} runs.",
+      "runCounterImportedItems_one": "{{count}} grail item was found in them.",
+      "runCounterImportedItems_other": "{{count}} grail items were found in them.",
+      "runCounterNothingNew": "No new runs to import.",
+      "runCounterNotFound": "No Run Counter data in {{folder}}.",
+      "runCounterFailed": "The Run Counter history couldn't be imported."
+    },
     "reportIssues": {
       "title": "Report issues",
       "description": "If you encounter any bugs or issues while using D2R Arcane Tracker, please report them on our GitHub repository. Your feedback helps us improve the application for everyone.",
       "openGithubIssues": "Open GitHub issues"
+    }
+  },
+  "d2rLoader": {
+    "inGame": {
+      "tooltipMissing": "Holy Grail: not found yet",
+      "tooltipFound": "Holy Grail: already found",
+      "tooltipMissingEthereal": "Holy Grail: ethereal not found yet",
+      "tooltipFoundEthereal": "Holy Grail: ethereal already found",
+      "overlayRun": "Run {{number}} · {{time}}",
+      "overlaySession_one": "Session: {{count}} run",
+      "overlaySession_other": "Session: {{count}} runs",
+      "overlayGrail": "Grail {{found}}/{{total}} ({{percentage}}%)",
+      "overlayLastFind": "New: {{name}}"
     }
   },
   "statistics": {

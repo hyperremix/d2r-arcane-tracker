@@ -1,0 +1,29 @@
+# D2R Arcane Tracker
+#
+# Connects D2RLoader to D2R Arcane Tracker running on this PC. D2RLoader copies this file to
+# d2rloader/config/arcane-tracker.toml on first launch. Connecting the plugin in the tracker's
+# settings writes port and token there. The plugin reads the file again every few seconds, so
+# changes apply while the game runs.
+
+[arcane-tracker]
+# Turn the plugin off without removing it.
+enabled = true
+
+# Port of the tracker on 127.0.0.1. Written by the tracker.
+port = 41733
+
+# Secret shared with the tracker. Written by the tracker; the plugin sends nothing while it's empty.
+token = ""
+
+# Show the run and grail overlay. It can also be toggled in game (Controls, category Arcane Tracker).
+overlay = true
+
+# Position of the overlay's top-left corner, as a fraction of the screen (0.0 to 1.0).
+overlay_x = 0.01
+overlay_y = 0.15
+
+# Add the Holy Grail status of uniques, sets and runes to their names on the ground.
+ground_labels = true
+
+# How often your items are checked for pickups, in milliseconds (100 to 5000).
+scan_interval_ms = 500

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getAppIconPath,
+  getBundledD2RLoaderPluginPath,
   getNotificationIconPath,
   resolveAppPaths,
   resolveUserDataPath,
@@ -82,5 +83,26 @@ describe('When the user data directory is resolved', () => {
 
     // Assert
     expect(userDataPath).toBe(path.join(appDataPath, '@hyperremix', 'd2r-arcane-tracker'));
+  });
+});
+
+describe('When the bundled D2RLoader plugin is located', () => {
+  it('If a packaged build runs, Then it is in the resources folder', () => {
+    // Act
+    const pluginPath = getBundledD2RLoaderPluginPath(resolveAppPaths(mainDist), resourcesPath);
+
+    // Assert
+    expect(pluginPath).toBe(path.join(resourcesPath, 'd2rloader', 'd2rl-arcane-tracker.dll'));
+  });
+
+  it('If the app runs from the dev server, Then it is the local plugin build', () => {
+    // Act
+    const pluginPath = getBundledD2RLoaderPluginPath(
+      resolveAppPaths(mainDist, 'http://localhost:5173'),
+      resourcesPath,
+    );
+
+    // Assert
+    expect(pluginPath).toBe(path.join('/app', 'plugin', 'dist', 'd2rl-arcane-tracker.dll'));
   });
 });

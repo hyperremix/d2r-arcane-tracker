@@ -709,3 +709,85 @@ describe('When the auto mode setting changes while the app runs', () => {
     expect(memoryReader.startPolling).not.toHaveBeenCalled();
   });
 });
+
+describe('When the D2RLoader plugin reports games in auto mode', () => {
+  const originalPlatform = process.platform;
+  let eventBus: EventBus;
+  let memoryReader: { isOffsetsValid: ReturnType<typeof vi.fn> } & Record<string, unknown>;
+  let service: RunTrackerService;
+
+  beforeEach(() => {
+    // Auto mode is only available on Windows
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    eventBus = new EventBus();
+    memoryReader = {
+      startPolling: vi.fn(),
+      stopPolling: vi.fn(),
+      updatePollingInterval: vi.fn(),
+      isOffsetsValid: vi.fn(() => true),
+    };
+    const database = {
+      getAllSettings: vi.fn(() => ({
+        runTrackerMemoryReading: true,
+        runTrackerMemoryPollingInterval: 500,
+      })),
+      getActiveSession: vi.fn(() => null),
+      getRunsBySession: vi.fn(() => []),
+      upsertRun: vi.fn(),
+      upsertSession: vi.fn(),
+    } as unknown as GrailDatabase;
+    service = new RunTrackerService(eventBus, database, memoryReader as unknown as MemoryReader);
+    service.startSession();
+  });
+
+  afterEach(() => {
+    service.shutdown();
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('If the plugin is connected, Then memory reading events are ignored and the plugin starts and ends runs', () => {
+    // Arrange
+    eventBus.emit('d2rloader-connection-changed', { connected: true });
+
+    // Act
+    eventBus.emit('game-entered', {});
+    const runAfterMemoryEvent = service.getActiveRun();
+    eventBus.emit('game-entered', { source: 'd2rloader' });
+    const runAfterPluginEvent = service.getActiveRun();
+    eventBus.emit('game-exited', {});
+    const runAfterMemoryExit = service.getActiveRun();
+    eventBus.emit('game-exited', { source: 'd2rloader' });
+
+    // Assert
+    expect(runAfterMemoryEvent).toBeNull();
+    expect(runAfterPluginEvent).not.toBeNull();
+    expect(runAfterMemoryExit).toBe(runAfterPluginEvent);
+    expect(service.getActiveRun()).toBeNull();
+  });
+
+  it('If the plugin disconnects, Then memory reading starts runs again', () => {
+    // Arrange
+    eventBus.emit('d2rloader-connection-changed', { connected: true });
+    eventBus.emit('d2rloader-connection-changed', { connected: false });
+
+    // Act
+    eventBus.emit('game-entered', {});
+
+    // Assert
+    expect(service.getActiveRun()).not.toBeNull();
+  });
+
+  it('If memory reading is unavailable but the plugin is connected, Then auto tracking is available and a paused run resumes', () => {
+    // Arrange
+    memoryReader.isOffsetsValid.mockReturnValue(false);
+    service.startRun(undefined, true);
+    service.pauseRun();
+
+    // Act
+    eventBus.emit('d2rloader-connection-changed', { connected: true });
+
+    // Assert
+    expect(service.isAutoTrackingAvailable()).toBe(true);
+    expect(service.getState().isPaused).toBe(false);
+  });
+});

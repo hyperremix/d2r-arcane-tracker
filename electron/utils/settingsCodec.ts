@@ -1,4 +1,5 @@
 import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
+import { DEFAULT_D2RLOADER_PORT } from '../types/d2rLoader';
 import { GameMode, GameVersion, ITEM_ICON_SIZES, type Settings } from '../types/grail';
 import { DEFAULT_SNAPSHOTS_PER_FILE } from '../types/saveFileSnapshots';
 import { DEFAULT_RUN_TRACKER_SHORTCUTS } from './runTrackerShortcuts';
@@ -226,6 +227,9 @@ export const SETTINGS_CODECS: { readonly [K in keyof Settings]-?: SettingCodec<K
   runTrackerGlobalHotkeys: flag(false),
   saveSnapshotsEnabled: flag(true),
   saveSnapshotsPerFile: integer(DEFAULT_SNAPSHOTS_PER_FILE),
+  d2rLoaderBridge: flag(false),
+  d2rLoaderPort: integer(DEFAULT_D2RLOADER_PORT),
+  d2rLoaderToken: optionalText(),
 };
 
 const SETTING_KEYS = Object.keys(SETTINGS_CODECS) as (keyof Settings)[];

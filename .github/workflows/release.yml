@@ -73,5 +73,14 @@ jobs:
       - name: Build renderer and main bundles
         run: bunx vite build
 
+      # The Windows app bundles the D2RLoader plugin from plugin/dist (see plugin/README.md)
+      - name: Build the D2RLoader plugin
+        if: matrix.os == 'windows-latest'
+        run: |
+          cmake -S plugin -B plugin/build -A x64
+          cmake --build plugin/build --config Release
+          New-Item -ItemType Directory -Force plugin/dist | Out-Null
+          Copy-Item plugin/build/Release/d2rl-arcane-tracker.dll plugin/dist/
+
       - name: Package and upload to the draft release
         run: bunx electron-builder ${{ matrix.platform }} --publish always

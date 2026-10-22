@@ -105,4 +105,8 @@ export type Settings = {
   // Save file snapshots
   saveSnapshotsEnabled?: boolean; // Whether a copy of a monitored save file is kept whenever it changes (default: true)
   saveSnapshotsPerFile?: number; // How many snapshots are kept per save file (default: 50)
+  // D2RLoader bridge (see docs/D2RLOADER.md)
+  d2rLoaderBridge?: boolean; // Whether the app listens for the Arcane Tracker plugin of D2RLoader (default: false)
+  d2rLoaderPort?: number; // Loopback port the app listens on for the plugin (default: 41733)
+  d2rLoaderToken?: string; // Secret the plugin authenticates with; created by the main process
 };

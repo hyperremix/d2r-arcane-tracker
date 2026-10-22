@@ -6,6 +6,7 @@ vi.mock('./SaveFileMonitor', () => ({ SaveFileMonitor: () => <div>SaveFileMonito
 vi.mock('./D2RInstallationSettings', () => ({
   D2RInstallationSettings: () => <div>D2RInstallationCard</div>,
 }));
+vi.mock('./D2RLoaderSettings', () => ({ D2RLoaderSettings: () => <div>D2RLoaderCard</div> }));
 vi.mock('./GameModeSettings', () => ({ GameModeSettings: () => <div>GameModeCard</div> }));
 vi.mock('./GameVersionSettings', () => ({ GameVersionSettings: () => <div>GameVersionCard</div> }));
 vi.mock('./GrailSettings', () => ({ GrailSettings: () => <div>GrailCard</div> }));
@@ -136,13 +137,13 @@ describe('Settings', () => {
     // Assert
     const general = screen.getByRole('region', { name: 'General' });
     expect(
-      within(general).getByText('Save files, D2R installation and the setup wizard'),
+      within(general).getByText('Save files, D2R installation, D2RLoader and the setup wizard'),
     ).toBeVisible();
     expect(
       within(general)
         .getAllByText(/Card$|Run setup wizard/)
         .map((element) => element.textContent),
-    ).toEqual(['SaveFileMonitorCard', 'D2RInstallationCard', 'Run setup wizard']);
+    ).toEqual(['SaveFileMonitorCard', 'D2RInstallationCard', 'D2RLoaderCard', 'Run setup wizard']);
 
     const tracking = screen.getByRole('region', { name: 'Tracking' });
     expect(
