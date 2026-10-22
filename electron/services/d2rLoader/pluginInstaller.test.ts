@@ -245,7 +245,9 @@ describe('When the plugin installer works on a D2R folder', () => {
 
   /**
    * Stands in for the administrator: carries out the script's Put and PutVerified calls with the
-   * checks PowerShell does, without a script file.
+   * checks PowerShell does, without a script file. This is a Node re-implementation, so the
+   * PowerShell text itself (the `Put` and `PutVerified` functions in `applyElevated`) is not run by
+   * these tests; it was run once in PowerShell 7 on Linux by hand.
    */
   async function runScriptAsAdministrator(script: string): Promise<boolean> {
     await chmod(gameFolder, 0o755);
@@ -325,6 +327,28 @@ describe('When the plugin installer works on a D2R folder', () => {
       const result = await createInstaller({ runElevated, platform: 'win32' }).install();
 
       // Assert
+      expect(result.canceled).toBe(true);
+      expect(result.installation.pluginInstalled).toBe(false);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'If the config file is too large for the Windows command line, Then no elevated command is started and the result is canceled',
+    async () => {
+      // Arrange
+      await mkdir(path.dirname(configPath), { recursive: true });
+      await writeFile(configPath, `# ${'x'.repeat(20_000)}\n`);
+      await chmod(configPath, 0o444);
+      const loaderFolder = path.join(gameFolder, 'd2rloader');
+      await chmod(loaderFolder, 0o555);
+      const runElevated = vi.fn(async () => true);
+
+      // Act
+      const result = await createInstaller({ runElevated, platform: 'win32' }).install();
+      await chmod(loaderFolder, 0o755);
+
+      // Assert
+      expect(runElevated).not.toHaveBeenCalled();
       expect(result.canceled).toBe(true);
       expect(result.installation.pluginInstalled).toBe(false);
     },

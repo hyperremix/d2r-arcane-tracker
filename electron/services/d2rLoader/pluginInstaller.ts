@@ -160,6 +160,9 @@ export function writePluginConfig(
   return content.endsWith(newline) ? content : `${content}${newline}`;
 }
 
+/** Stays clear of the 32,767 characters a Windows process may have in its command line. */
+const MAX_ELEVATION_COMMAND_LENGTH = 30_000;
+
 /**
  * Quotes a value for a single-quoted PowerShell string. PowerShell treats the typographic single
  * quotes (U+2018 to U+201B) like the ASCII one, so a path with one of them (a user name like
@@ -173,7 +176,8 @@ export function quotePowerShell(value: string): string {
  * Builds the command that runs a script in an elevated PowerShell. The script travels in the
  * command line as `-EncodedCommand` (base64 of UTF-16LE), so there is no script file that another
  * process could replace while the administrator prompt is open. The command line of a Windows
- * process is limited to 32,767 characters; the script only names a few paths.
+ * process is limited to 32,767 characters and the script carries the config files it writes
+ * (base64 inside base64 of UTF-16LE), so `applyElevated` checks the length of the command.
  */
 export function buildElevationCommand(script: string): string {
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
@@ -362,7 +366,16 @@ export class PluginInstaller {
         `if (Test-Path -LiteralPath ${quotePowerShell(removal)}) { Remove-Item -LiteralPath ${quotePowerShell(removal)} -Force }`,
       );
     }
-    if (!(await this.runElevated(lines.join('\r\n')))) {
+    const script = lines.join('\r\n');
+    const commandLength = buildElevationCommand(script).length;
+    if (commandLength > MAX_ELEVATION_COMMAND_LENGTH) {
+      log.error(
+        'applyElevated',
+        `The elevated command has ${commandLength} characters and Windows would refuse it, nothing was changed`,
+      );
+      return;
+    }
+    if (!(await this.runElevated(script))) {
       log.warn('applyElevated', 'The elevated script failed or the prompt was declined');
     }
   }

@@ -292,16 +292,23 @@ describe('When NotificationButton is rendered', () => {
 
   it('If a silent detection is for an item that was not picked up in game, Then nothing is announced', async () => {
     // Arrange
-    await renderNotificationButton();
+    vi.useFakeTimers();
+    try {
+      await renderNotificationButton();
 
-    // Act
-    await emitDetections([{ ...createDetectionEvent('1', 'Shako'), silent: true }]);
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 700));
-    });
+      // Act
+      await emitDetections([{ ...createDetectionEvent('1', 'Shako'), silent: true }]);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
 
-    // Assert
-    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+      // Assert
+      expect(screen.queryByRole('button', { name: /unread/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toHaveTextContent('No recent item detections');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('If the save file finds the other version of a picked-up item, Then both are listed', async () => {

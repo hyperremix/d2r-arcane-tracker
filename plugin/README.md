@@ -58,7 +58,8 @@ the state in `bridge_client.cpp` and `tracker_state.cpp`, which is locked. Event
 most 200; the oldest are dropped) while the tracker can't be reached, and the plugin retries the
 connection with a growing delay, up to 30 seconds. An event that waited longer than 30 seconds is
 dropped instead of sent, and so is the whole queue when the port or token changes, so a tracker that
-comes back doesn't receive a replay of old game events.
+comes back only sees events that are less than 30 seconds old (a short outage can still replay
+recent events).
 
 | File | Purpose |
 | --- | --- |

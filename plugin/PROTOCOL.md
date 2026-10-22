@@ -39,8 +39,9 @@ connection and the plugin sends the batch again after the next hello.
 
 The plugin keeps events (at most 200, the oldest dropped first) while the tracker can't be reached,
 but only sends events that are less than 30 seconds old. It drops older events, and the whole queue
-when its port or token changes. The tracker therefore never sees a replay of old game events after
-an outage; it applies the events of a request in order, as they arrive.
+when its port or token changes. The tracker therefore only sees events that are less than 30 seconds
+old after an outage (a short outage can still replay recent events). It applies the events of a
+request in order, as they arrive.
 
 ```json
 { "events": [ { "type": "game-joined" } ] }
