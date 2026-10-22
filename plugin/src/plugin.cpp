@@ -1,14 +1,16 @@
 // D2RLoader plugin of D2R Arcane Tracker: reports games, areas and pickups to the tracker, and shows
-// the tracker's Holy Grail status on item tooltips and its run overlay in game. PROTOCOL.md
+// the tracker's Holy Grail status on ground items and its run overlay in game. PROTOCOL.md
 // describes how it talks to the tracker.
 //
-// Threads: gameplay events, input actions, item tooltips and the pump (pickup scans and HTTP
-// requests) run on D2R's UI thread. HTTP responses arrive on a worker thread and overlay frames on
-// the render thread; they only touch the locked BridgeClient and TrackerState and the atomics below.
+// Threads: gameplay events, input actions and the pump (pickup scans and HTTP requests) run on D2R's
+// UI thread. HTTP responses arrive on a worker thread and overlay frames on the render thread; they
+// only touch the locked BridgeClient and TrackerState and the atomics below. The ground item labels
+// are built on whatever thread D2R names items on, and only read TrackerState (see ground_hooks.cpp).
 
 #include "bridge_client.h"
 #include "config.h"
 #include "grail_item.h"
+#include "ground_hooks.h"
 #include "pickups.h"
 #include "tracker_state.h"
 
@@ -18,7 +20,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <string>
 
 namespace {
@@ -34,27 +35,20 @@ constexpr D2RL::PluginInfo PluginInfo {
 	.name        = "D2R Arcane Tracker",
 	.version     = ARCANE_TRACKER_PLUGIN_VERSION,
 	.author      = "hyperremix",
-	.description = "Connects D2RLoader to D2R Arcane Tracker: Holy Grail status on tooltips, a run overlay and instant pickup alerts.",
-	.flags       = D2RL::PluginFlags::Client,
+	.description = "Connects D2RLoader to D2R Arcane Tracker: Holy Grail status on ground items, a run overlay and instant pickup alerts.",
+	.flags       = D2RL::PluginFlags::Client | D2RL::PluginFlags::NativeHooks,
 };
 
 /** How often the config file is read again, so changes apply while the game runs. */
 constexpr milliseconds ConfigReloadInterval { 5'000 };
-/** A pump that hasn't run for this long is started again by the next gameplay event. */
+/** A pump that hasn't run for this long is started again by the next gameplay event or frame. */
 constexpr milliseconds PumpRestartAfter { 2'000 };
-
-/** D2R color markers (`ÿc4` gold, `ÿc5` gray) in UTF-8. */
-constexpr char MissingColor[] = "\xC3\xBF"
-                                "c4";
-constexpr char FoundColor[]   = "\xC3\xBF"
-                                "c5";
 
 constexpr uint32_t LifecycleGameplayFieldEnd = static_cast<uint32_t>(offsetof(D2RL::LifecycleService, unregisterGameplayEventListener) + sizeof(D2RL::Lifecycle::UnregisterGameplayEventListenerFn));
 
 const D2RL::PluginContext*      g_context   = nullptr;
 const D2RL::ThreadService*      g_threads   = nullptr;
 const D2RL::InventoryService*   g_inventory = nullptr;
-const D2RL::ItemService*        g_items     = nullptr;
 const D2RL::OverlayService*     g_overlay   = nullptr;
 
 // UI thread only
@@ -62,19 +56,19 @@ Config            g_config;
 Clock::time_point g_nextConfigReloadAt {};
 Clock::time_point g_nextScanAt {};
 
-// Read by the overlay thread or the tooltip listener
+// Read by the overlay thread
 std::atomic<bool>  g_inGame { false };
 std::atomic<bool>  g_overlayEnabled { true };
 std::atomic<bool>  g_overlayToggledOn { true };
 std::atomic<float> g_overlayX { 0.01F };
 std::atomic<float> g_overlayY { 0.15F };
-std::atomic<bool>  g_tooltipsEnabled { true };
 std::atomic<bool>  g_unloading { false };
 
 // The pump: a UI-thread task that queues itself again. Starting a pump takes a new ticket, so an
 // older pump that is still queued stops when it runs.
 std::atomic<uint64_t> g_pumpTicket { 0 };
 std::atomic<int64_t>  g_pumpLastRunMs { 0 };
+std::atomic<bool>     g_pumpStartWarned { false };
 
 auto NowMs() -> int64_t {
 	return std::chrono::duration_cast<milliseconds>(Clock::now().time_since_epoch()).count();
@@ -84,7 +78,7 @@ void ApplyConfig(Config config) {
 	g_overlayEnabled  = config.overlay;
 	g_overlayX        = config.overlayX;
 	g_overlayY        = config.overlayY;
-	g_tooltipsEnabled = config.tooltips;
+	GroundHooks::SetEnabled(config.groundLabels);
 	BridgeClient::Configure(config);
 	g_config = std::move(config);
 }
@@ -123,7 +117,7 @@ void __cdecl RunPump(const D2RL::PluginContext* context, void* userData) noexcep
 	}
 }
 
-/** Starts the pump unless it ran recently. */
+/** Starts the pump unless it ran recently. A failure is logged once, until the pump starts. */
 void EnsurePump(const D2RL::PluginContext* context) {
 	const int64_t lastRun = g_pumpLastRunMs;
 	if (lastRun != 0 && NowMs() - lastRun < PumpRestartAfter.count()) {
@@ -133,7 +127,11 @@ void EnsurePump(const D2RL::PluginContext* context) {
 	g_pumpLastRunMs       = NowMs();
 	if (g_threads->runOnUiThread(context, RunPump, reinterpret_cast<void*>(static_cast<uintptr_t>(ticket))) != D2RL::Threads::Result::Success) {
 		g_pumpLastRunMs = 0;
-		context->LogWarn("Could not start the plugin's update task; it is tried again at the next game event.");
+		if (!g_pumpStartWarned.exchange(true)) {
+			context->LogWarn("Could not start the plugin's update task yet; it is tried again on every frame.");
+		}
+	} else {
+		g_pumpStartWarned = false;
 	}
 }
 
@@ -169,35 +167,12 @@ void __cdecl OnGameplayEvent(const D2RL::PluginContext* context, const D2RL::Lif
 	}
 }
 
-void __cdecl OnItemTooltip(const D2RL::PluginContext* context, D2RL::SharedEvents::ItemTooltipEvent* event, void*) noexcept {
-	if (context == nullptr || !g_tooltipsEnabled || event == nullptr || event->structSize < D2RL::SharedEvents::ItemTooltipEventRequiredSize || event->text == nullptr) {
-		return;
-	}
-	try {
-		D2RL::Items::ItemInfo info { .structSize = D2RL::Items::ItemInfoSize };
-		if (g_items->getItemInfo(context, event->item, &info) != D2RL::Items::Result::Success) {
-			return;
-		}
-		const auto item = DescribeGrailItem(info);
-		if (!item) {
-			return;
-		}
-		const auto line = TrackerState::Tooltip(GrailKey(*item), item->ethereal);
-		if (!line) {
-			return;
-		}
-		const std::string text = (line->status == GrailStatus::Missing ? MissingColor : FoundColor) + line->text;
-		if (text.size() >= event->capacity) {
-			return;
-		}
-		std::memcpy(event->text, text.c_str(), text.size() + 1);
-		event->length = static_cast<uint32_t>(text.size());
-	} catch (...) {
-		// Never let an exception reach the game's UI thread
-	}
-}
-
 void __cdecl DrawOverlay(const D2RL::PluginContext* context, const D2RL::Overlay::Frame* frame, void*) noexcept {
+	if (context != nullptr && !g_unloading) {
+		// The update task can't start while D2R loads, and a game event may be minutes away (the main
+		// menu), so every frame is a chance to start it. Queueing from the render thread is allowed.
+		EnsurePump(context);
+	}
 	if (context == nullptr || frame == nullptr || frame->structSize < D2RL::Overlay::FrameRequiredSize || !g_inGame || !g_overlayEnabled || !g_overlayToggledOn) {
 		return;
 	}
@@ -311,27 +286,6 @@ auto RegisterGameplayListeners(const D2RL::PluginContext* context, const D2RL::L
 	return true;
 }
 
-/** Item tooltips need the item service (to read the hovered item) and the shared events. */
-void RegisterTooltips(const D2RL::PluginContext* context) {
-	g_items           = QueryService<D2RL::ItemService>(context, D2RL::ItemServiceRequiredSize, D2RL::HasItemServiceField);
-	const auto events = QueryService<D2RL::SharedEventService>(context, D2RL::SharedEventServiceRequiredSize, D2RL::HasSharedEventServiceField);
-	if (g_items == nullptr || events == nullptr) {
-		context->LogWarn("Item tooltips are not available in this D2RLoader version.");
-		return;
-	}
-	const D2RL::SharedEvents::ItemTooltipListener listener {
-		.structSize = D2RL::SharedEvents::ItemTooltipListenerSize,
-		.region     = D2RL::SharedEvents::ItemTooltipRegion::Description,
-		.position   = D2RL::SharedEvents::ItemTooltipPosition::Bottom,
-		.anchor     = D2RL::SharedEvents::ItemTooltipAnchor::None,
-		.callback   = OnItemTooltip,
-	};
-	D2RL::SharedEvents::ListenerHandle handle = D2RL::SharedEvents::InvalidHandle;
-	if (events->registerItemTooltipListener(context, &listener, &handle) != D2RL::SharedEvents::Result::Success) {
-		context->LogWarn("Could not add the Holy Grail status to item tooltips.");
-	}
-}
-
 void RegisterOverlay(const D2RL::PluginContext* context) {
 	g_overlay = QueryService<D2RL::OverlayService>(context, D2RL::OverlayServiceRequiredSize, D2RL::HasOverlayServiceField);
 	if (g_overlay == nullptr) {
@@ -417,7 +371,7 @@ D2RL_PLUGIN_EXPORT auto D2RLoaderLoadPlugin(const D2RL::PluginContext* context) 
 		if (g_inventory == nullptr) {
 			context->LogWarn("Pickups can't be detected in this D2RLoader version.");
 		}
-		RegisterTooltips(context);
+		GroundHooks::Install(context);
 		RegisterOverlay(context);
 		RegisterActions(context);
 		if (!context->RegisterConsoleCommand("arcane-tracker", OnStatusCommand, "Show the connection to D2R Arcane Tracker.")) {

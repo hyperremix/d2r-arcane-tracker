@@ -25,6 +25,13 @@ struct GrailItem {
 	bool          ethereal;
 };
 
+/**
+ * Describes an item for the grail, or nothing when it is no unique, set or rune.
+ * @param qualityRecordId - UniqueItems or SetItems row of the item
+ * @param itemCode - Four-byte item code, padded with spaces
+ */
+auto DescribeGrailItem(D2RL::Items::Quality quality, int32_t qualityRecordId, uint32_t itemCode, bool ethereal) -> std::optional<GrailItem>;
+
 /** Describes an item for the grail, or nothing when it is no unique, set or rune. */
 auto DescribeGrailItem(const D2RL::Items::ItemInfo& info) -> std::optional<GrailItem>;
 

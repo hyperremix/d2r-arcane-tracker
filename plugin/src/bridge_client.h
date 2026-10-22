@@ -15,8 +15,9 @@ struct Config;
 /**
  * The HTTP client of the bridge protocol (PROTOCOL.md): says hello, sends the queued events and
  * polls the tracker's state. Requests start from Tick on the UI thread; their responses arrive on
- * an HTTP worker thread. The shared state is locked, so every function may be called from any
- * thread, but only the UI thread calls Configure and Tick.
+ * a worker thread. They go through D2RLoader's HTTP service, or through WinHTTP (local_http.h) when
+ * D2RLoader refuses plain-HTTP requests, as 1.3.1-beta does. The shared state is locked, so every
+ * function may be called from any thread, but only the UI thread calls Configure and Tick.
  */
 namespace BridgeClient {
 

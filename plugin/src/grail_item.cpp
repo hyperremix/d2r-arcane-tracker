@@ -33,20 +33,23 @@ auto KindName(GrailItemKind kind) -> const char* {
 
 }
 
-auto DescribeGrailItem(const D2RL::Items::ItemInfo& info) -> std::optional<GrailItem> {
-	std::string code     = CodeText(info.code);
-	const bool  ethereal = (info.stateFlags & D2RL::Items::ItemStateEthereal) != 0;
+auto DescribeGrailItem(D2RL::Items::Quality quality, int32_t qualityRecordId, uint32_t itemCode, bool ethereal) -> std::optional<GrailItem> {
+	std::string code = CodeText(itemCode);
 
-	if (info.quality == D2RL::Items::Quality::Unique && info.qualityRecordId >= 0) {
-		return GrailItem { GrailItemKind::Unique, info.qualityRecordId, std::move(code), ethereal };
+	if (quality == D2RL::Items::Quality::Unique && qualityRecordId >= 0) {
+		return GrailItem { GrailItemKind::Unique, qualityRecordId, std::move(code), ethereal };
 	}
-	if (info.quality == D2RL::Items::Quality::Set && info.qualityRecordId >= 0) {
-		return GrailItem { GrailItemKind::Set, info.qualityRecordId, std::move(code), ethereal };
+	if (quality == D2RL::Items::Quality::Set && qualityRecordId >= 0) {
+		return GrailItem { GrailItemKind::Set, qualityRecordId, std::move(code), ethereal };
 	}
 	if (IsRuneCode(code)) {
 		return GrailItem { GrailItemKind::Rune, -1, std::move(code), ethereal };
 	}
 	return std::nullopt;
+}
+
+auto DescribeGrailItem(const D2RL::Items::ItemInfo& info) -> std::optional<GrailItem> {
+	return DescribeGrailItem(info.quality, info.qualityRecordId, info.code, (info.stateFlags & D2RL::Items::ItemStateEthereal) != 0);
 }
 
 auto GrailKey(const GrailItem& item) -> std::string {

@@ -4,8 +4,9 @@
 game to D2R Arcane Tracker running on the same PC. The tracker works without it; with it, players
 who launch D2R through D2RLoader get:
 
-- **Holy Grail status on tooltips**: uniques, sets and runes show whether the grail still misses
-  them (gold) or already has them (gray), for the normal or the ethereal version.
+- **Holy Grail status on ground items**: the name of a unique, set item or rune lying on the ground
+  shows whether the grail still misses it (gold) or already has it (gray), for the normal or the
+  ethereal version. It works on D2R 3.3.0 (build 93847) only; see [Ground labels](#ground-labels).
 - **Instant pickup alerts**: the tracker hears about a grail item the moment it lands in your
   inventory, belt or cursor, before the game saves.
 - **Run tracking from the game itself**: game joins, game exits and area changes.
@@ -13,9 +14,10 @@ who launch D2R through D2RLoader get:
 - Two actions in D2R's Controls menu (category *Arcane Tracker*, no default key):
   *Show/Hide Arcane Tracker overlay* and *Start/End Arcane Tracker session*.
 
-The plugin only reads game state through D2RLoader's SDK services. It changes no items and patches
-no game code (it is a `Client` plugin without `NativeHooks`), and it talks only to the tracker on
-`127.0.0.1`. [PROTOCOL.md](PROTOCOL.md) describes the connection.
+The plugin reads game state through D2RLoader's SDK services and changes no items. The only game
+code it touches is the item name code, for the ground labels (it is a `Client` plugin with
+`NativeHooks`), and it talks only to the tracker on `127.0.0.1`. [PROTOCOL.md](PROTOCOL.md)
+describes the connection.
 
 ## Install and connect
 
@@ -47,14 +49,18 @@ file in the D2RLoader logs folder.
 ## How it works
 
 Everything that talks to the game runs on D2R's UI thread: the gameplay events (game joined and
-left, local player ready, area changed), the item tooltip, the input actions and a small task that
+left, local player ready, area changed), the input actions and a small task that
 queues itself again on every UI update (the pump). The pump reloads the config, compares the
 player's items with the items they owned when the player became ready (every `scan_interval_ms`),
 and starts the HTTP requests that are due. A UI-thread pump is used instead of a game-thread one
-because TCP/IP clients have no local game thread.
+because TCP/IP clients have no local game thread. The pump can't start while D2R loads, so every
+overlay frame tries again until it runs, which connects the plugin to the tracker at the main menu.
 
 HTTP responses arrive on a worker thread and the overlay draws on the render thread. Both only use
-the state in `bridge_client.cpp` and `tracker_state.cpp`, which is locked. Events are queued (at
+the state in `bridge_client.cpp` and `tracker_state.cpp`, which is locked. Requests go through
+D2RLoader's HTTP service. D2RLoader 1.3.1-beta (SDK 0.3.0) only allows HTTPS there and answers
+`Unsupported` to the tracker's plain `http://127.0.0.1` requests, so the plugin then sends them
+through WinHTTP (`local_http.cpp`) on a worker thread of its own. Events are queued (at
 most 200; the oldest are dropped) while the tracker can't be reached, and the plugin retries the
 connection with a growing delay, up to 30 seconds. An event that waited longer than 30 seconds is
 dropped instead of sent, and so is the whole queue when the port or token changes, so a tracker that
@@ -63,13 +69,28 @@ recent events).
 
 | File | Purpose |
 | --- | --- |
-| `src/plugin.cpp` | Entry points, services, listeners, pump, tooltip, overlay, actions, console command |
+| `src/plugin.cpp` | Entry points, services, listeners, pump, overlay, actions, console command |
 | `src/bridge_client.cpp` | HTTP client: hello, event batches, state polling, reconnecting |
+| `src/local_http.cpp` | WinHTTP requests to the tracker, for D2RLoader versions that refuse local HTTP |
 | `src/tracker_state.cpp` | The grail status table and overlay lines from `GET /v1/state` |
 | `src/pickups.cpp` | Finds picked-up items by comparing the player's items |
 | `src/grail_item.cpp` | Recognizes uniques, sets and runes and builds their grail keys |
+| `src/ground_label.cpp` | The text that goes into the name of a ground item: color marker and the tracker's line |
+| `src/ground_hooks.cpp`, `src/ground_hook_stub.asm` | The two hooks into D2R's item name code (MSVC builds only) |
 | `src/config.cpp` | Reads the `[arcane-tracker]` table of the config file |
 
+## Ground labels
+
+D2R builds the name of an item on the ground in two places, one for the labels shown while holding
+Alt and one for the label under the mouse. `ground_hooks.cpp` hooks both through D2RLoader's inline
+hook API. A hook reads the item (it must be on the ground, a unique, set item or rune), finds its
+base item code in the game's item table through the data table service, and appends the line from
+`ground_label.cpp` to the name. The addresses, the layout of the game's item unit and the item
+flags come from build 93847 of D2R 3.3.0, so the hooks are only installed on that build and when the
+game still has the bytes they expect; on any other build the plugin logs a line and shows no
+labels, and everything else keeps working. A new D2R patch needs new addresses. The labels follow
+the game's Reign of the Warlock item table. Set `ground_labels = false` in the config file to turn
+them off.
 ## Build
 
 The build fetches the [D2RLoader Plugin SDK](https://github.com/D2RLoader/PluginSDK) (MIT) at a
@@ -102,10 +123,11 @@ and bundles it from `plugin/dist/`.
 
 ## Tests
 
-`tests/plugin_tests.cpp` checks the config parser (`config.cpp`) and the state parser
-(`tracker_state.cpp`), which need neither the game nor D2RLoader. Add `-DARCANE_TRACKER_BUILD_TESTS=ON`
-to the configure command above and run `ctest --test-dir plugin/build -C Release --output-on-failure`;
-CI does this in the *plugin* job. The HTTP client (`bridge_client.cpp`: retries, event batches,
+`tests/plugin_tests.cpp` checks the config parser (`config.cpp`), the state parser
+(`tracker_state.cpp`), the ground label text (`ground_label.cpp`) and the WinHTTP client
+(`local_http.cpp`, against a one-connection server on 127.0.0.1), which need neither the game nor
+D2RLoader. Add `-DARCANE_TRACKER_BUILD_TESTS=ON` to the configure command above and run `ctest --test-dir plugin/build -C Release --output-on-failure`;
+CI does this in the *plugin* job. The bridge client (`bridge_client.cpp`: retries, event batches,
 dropping old events) and the game hooks need D2RLoader's services and have no automated tests;
 [PROTOCOL.md](PROTOCOL.md) is the contract between the plugin and the tracker, and the tracker's
 side of it is covered by the app's tests.

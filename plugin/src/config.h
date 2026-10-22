@@ -18,7 +18,7 @@ struct Config {
 	bool        overlay        = true;
 	float       overlayX       = 0.01F;
 	float       overlayY       = 0.15F;
-	bool        tooltips       = true;
+	bool        groundLabels   = true;
 	uint32_t    scanIntervalMs = 500;
 };
 

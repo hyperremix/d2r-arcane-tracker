@@ -98,8 +98,8 @@ void ApplyValue(Config& config, std::string_view key, std::string_view value) {
 		config.overlayX = std::clamp(ParseFloat(value).value_or(config.overlayX), 0.0F, 1.0F);
 	} else if (key == "overlay_y") {
 		config.overlayY = std::clamp(ParseFloat(value).value_or(config.overlayY), 0.0F, 1.0F);
-	} else if (key == "tooltips") {
-		config.tooltips = ParseBool(value).value_or(config.tooltips);
+	} else if (key == "ground_labels") {
+		config.groundLabels = ParseBool(value).value_or(config.groundLabels);
 	} else if (key == "scan_interval_ms") {
 		const auto interval = ParseInteger(value);
 		if (interval) {

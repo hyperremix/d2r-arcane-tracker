@@ -88,12 +88,12 @@ overlay	Grail 412/1032 (39.9%)
 - `revision`: identifies the grail status below. Always the first line.
 - `text` and `item` records are only sent when the plugin's revision differs from the tracker's;
   they replace everything the plugin had. Without them, the plugin keeps its grail status.
-- `text <id> <text>`: tooltip line for each status, already translated.
+- `text <id> <text>`: label line for each status, already translated.
 - `item <key> <normal> <ethereal>`: grail status of an item. Keys are `u:<UniqueItems row>:<code>`,
   `s:<SetItems row>:<code>` and `r:<rune code>`, where `<code>` is the item
   code without padding spaces (for example `u:123:uap`). The code makes a unique or set row that
   doesn't match the item (a mod or a game patch that shifted the rows) show nothing instead of the
   wrong status. Each status is `0` (not tracked), `1` (missing) or `2` (found). The plugin uses the `ethereal` status for ethereal items and the
-  `normal` status otherwise, and adds no tooltip line for `0` or unknown keys.
+  `normal` status otherwise, and adds no label line for `0` or unknown keys.
 - `overlay <text>`: the overlay lines, top to bottom, already translated and formatted. No
   `overlay` records means the overlay draws nothing.

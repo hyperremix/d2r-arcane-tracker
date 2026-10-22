@@ -126,7 +126,7 @@ function collectFoundVersions(progress: GrailProgress[]): Map<string, FoundVersi
 }
 
 /**
- * Builds the grail status the plugin shows in item tooltips and the overlay. A version counts as
+ * Builds the grail status the plugin shows on ground items and in the overlay. A version counts as
  * found when any character found it, the same as on the grail page; a version the grail settings
  * don't track is "not tracked", even when it was found.
  * @param items - Tracked grail items (already filtered by the rune and runeword settings)

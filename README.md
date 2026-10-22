@@ -66,7 +66,7 @@ The app checks for updates on startup and installs them when you confirm. On Lin
 | [Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md) | The challenge, setup, tracking options, how detection works, and the other app features |
 | [Inventory Browser Guide](docs/INVENTORY_BROWSER_GUIDE.md) | Browsing, moving and vaulting items in your save files, the character overview, and the safety rules |
 | [Run Tracker Guide](docs/RUN_TRACKER.md) | Sessions, runs, auto mode, shortcuts and exports |
-| [D2RLoader Plugin](docs/D2RLOADER.md) | The optional plugin for D2RLoader: grail status in tooltips, pickup alerts, runs from leaving town and an overlay |
+| [D2RLoader Plugin](docs/D2RLOADER.md) | The optional plugin for D2RLoader: grail status on ground items, pickup alerts, runs from leaving town and an overlay |
 | [Terror Zone Configuration](docs/TERROR_ZONE_CONFIGURATION.md) | Changing the terror zone rotation |
 | [Farming Advisor](docs/FARMING_ADVISOR.md) | Where missing items drop, terror zones and drop rates, and how they are calculated |
 | [Extracting Game Files](docs/EXTRACTING_GAME_FILES.md) | CASC extraction, needed for item icons, terror zones and the farming advisor |

@@ -2,7 +2,7 @@
 
 [D2RLoader](https://d2rloader.net/) is a mod loader that you start instead of D2R. The Arcane Tracker plugin for it connects the game to the app. Everything in the app works the same without it; with it, you also get:
 
-- **Grail status in item tooltips**: uniques, set items and runes show *Holy Grail: not found yet* (gold) or *Holy Grail: already found* (gray). An ethereal item shows the status of the ethereal version. Versions your [grail settings](HOLY_GRAIL_GUIDE.md) don't track show nothing.
+- **Grail status on items on the ground**: the name of a unique, set item or rune lying on the ground gets a line, *Holy Grail: not found yet* in gold or *Holy Grail: already found* in gray, both on the labels you get while holding Alt and when you point at the item. An ethereal item shows the status of the ethereal version. Versions your [grail settings](HOLY_GRAIL_GUIDE.md) don't track show nothing. This works on D2R 3.3.0 (build 93847) only.
 - **Instant pickup alerts**: the moment you pick up a unique, set item or rune your grail is missing, the app plays its sound and adds a notification marked *Picked up in game*. The app records the find once the game saves, the same way as without the plugin, and the notification then turns into a regular find without a second sound.
 - **Runs that start when you leave town**: with [auto mode](RUN_TRACKER.md#auto-mode-windows-only) on, a run starts when you first leave town in a game and ends when you leave the game, so time spent in town before a run isn't counted. This works even when memory reading doesn't support your D2R version yet.
 - **An overlay in the game**: the current run and its time (or the session's run count between runs), your grail progress, and the last missing grail item you picked up in this game.
@@ -28,7 +28,7 @@ The app listens on `127.0.0.1` (port 41733 by default), so only programs on your
 
 If another program uses the port, the settings say so. Enter another port, then select **Connect plugin** so the plugin uses it too.
 
-The plugin's config file also has its options: `overlay` (on or off), `overlay_x` and `overlay_y` (the overlay position as a fraction of the screen), `tooltips` (on or off) and `scan_interval_ms` (how often your items are checked for pickups, 100 to 5000 milliseconds). Connecting the plugin keeps your changes to them. In the D2RLoader console, `arcane-tracker` shows whether the plugin is connected.
+The plugin's config file also has its options: `overlay` (on or off), `overlay_x` and `overlay_y` (the overlay position as a fraction of the screen), `ground_labels` (on or off) and `scan_interval_ms` (how often your items are checked for pickups, 100 to 5000 milliseconds). Connecting the plugin keeps your changes to them. In the D2RLoader console, `arcane-tracker` shows whether the plugin is connected.
 
 ## Importing Run Counter history
 
@@ -42,8 +42,8 @@ Importing again only adds the runs that are new since the last import.
 
 ## Limitations
 
-- Runewords show no grail status in tooltips and aren't announced when made; the save file detection finds them as before.
-- Items on the ground aren't marked; the status shows once the item is in your inventory or stash.
+- Runewords show no grail status and aren't announced when made; the save file detection finds them as before.
+- The status shows on items on the ground only, not in your inventory, stash or vendors' windows. It needs D2R 3.3.0 (build 93847); after a game patch it stays off until the plugin is updated. The plugin writes a line to its log when it leaves it out.
 - The plugin doesn't know which character picked an item up, so pickup notifications name no character until the save confirms them.
 - Auto mode stays Windows-only.
 

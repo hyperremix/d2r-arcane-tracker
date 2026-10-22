@@ -22,8 +22,8 @@ overlay = true
 overlay_x = 0.01
 overlay_y = 0.15
 
-# Add the Holy Grail status of uniques, sets and runes to their tooltips.
-tooltips = true
+# Add the Holy Grail status of uniques, sets and runes to their names on the ground.
+ground_labels = true
 
 # How often your items are checked for pickups, in milliseconds (100 to 5000).
 scan_interval_ms = 500

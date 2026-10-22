@@ -1,6 +1,7 @@
 #include "bridge_client.h"
 
 #include "config.h"
+#include "local_http.h"
 #include "tracker_state.h"
 
 #include <D2RLPlugin/context.h>
@@ -105,42 +106,75 @@ auto DisconnectLocked(std::string error) -> bool {
 	return wasConnected;
 }
 
-auto DescribeFailure(const D2RL::Http::Response* response) -> std::string {
-	if (!D2RL::Http::HasResponseField(response, D2RL::Http::ResponseRequiredSize)) {
-		return "invalid response";
+/** What came back for a request, from D2RLoader's HTTP service or from WinHTTP. */
+struct Outcome {
+	D2RL::Http::Result result;
+	uint32_t           statusCode;
+	std::string_view   body;
+};
+
+auto DescribeFailure(const Outcome& outcome) -> std::string {
+	if (outcome.result != D2RL::Http::Result::Success) {
+		return "request failed (result " + std::to_string(static_cast<uint32_t>(outcome.result)) + ")";
 	}
-	if (response->result != D2RL::Http::Result::Success) {
-		return "request failed (result " + std::to_string(static_cast<uint32_t>(response->result)) + ")";
-	}
-	return "HTTP " + std::to_string(response->statusCode);
+	return "HTTP " + std::to_string(outcome.statusCode);
 }
 
-void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Response* response, void* userData) noexcept;
+void HandleOutcome(const D2RL::PluginContext* context, RequestKind kind, const Outcome& outcome);
+
+void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Response* response, void* userData) noexcept {
+	const auto kind = static_cast<RequestKind>(reinterpret_cast<uintptr_t>(userData));
+	if (!D2RL::Http::HasResponseField(response, D2RL::Http::ResponseRequiredSize)) {
+		HandleOutcome(context, kind, { D2RL::Http::Result::InvalidArgument, 0, {} });
+		return;
+	}
+	HandleOutcome(context, kind, { response->result, response->statusCode, { static_cast<const char*>(response->body), response->bodySize } });
+}
 
 /**
- * Sends one request; the response arrives in OnResponse. Must be called without g_mutex held, as
+ * Set once D2RLoader refuses a local HTTP request, as D2RLoader 1.3.1-beta does: the requests then
+ * go through WinHTTP. Only the UI thread, which calls Send, reads or writes it.
+ */
+bool g_useWinHttp = false;
+
+/**
+ * Sends one request; the outcome arrives in HandleOutcome. Must be called without g_mutex held, as
  * the response may arrive before send returns.
  */
 void Send(const D2RL::PluginContext* context, RequestKind kind, D2RL::Http::Method method, const std::string& url, const std::string& authorization, const std::string& body) {
 	const bool                hasBody = method == D2RL::Http::Method::Post;
-	const D2RL::Http::Header  headers[] {
-        { .name = "Authorization", .value = authorization.c_str() },
-        { .name = "Content-Type", .value = "application/json" },
-    };
-	const D2RL::Http::Request request {
-		.structSize      = D2RL::Http::RequestSize,
-		.method          = method,
-		.timeoutMs       = RequestTimeoutMs,
-		.url             = url.c_str(),
-		.headerCount     = hasBody ? 2U : 1U,
-		.bodySize        = static_cast<uint32_t>(body.size()),
-		.headers         = headers,
-		.body            = hasBody ? body.data() : nullptr,
-		.maxResponseSize = MaxStateBytes,
-	};
+	D2RL::Http::RequestHandle handle  = D2RL::Http::InvalidRequestHandle;
+	auto                      result  = D2RL::Http::Result::Unsupported;
 
-	D2RL::Http::RequestHandle handle = D2RL::Http::InvalidRequestHandle;
-	const auto result = g_http->send(context, &request, OnResponse, reinterpret_cast<void*>(static_cast<uintptr_t>(kind)), &handle);
+	if (!g_useWinHttp) {
+		const D2RL::Http::Header  headers[] {
+            { .name = "Authorization", .value = authorization.c_str() },
+            { .name = "Content-Type", .value = "application/json" },
+        };
+		const D2RL::Http::Request request {
+			.structSize      = D2RL::Http::RequestSize,
+			.method          = method,
+			.timeoutMs       = RequestTimeoutMs,
+			.url             = url.c_str(),
+			.headerCount     = hasBody ? 2U : 1U,
+			.bodySize        = static_cast<uint32_t>(body.size()),
+			.headers         = headers,
+			.body            = hasBody ? body.data() : nullptr,
+			.maxResponseSize = MaxStateBytes,
+		};
+		result = g_http->send(context, &request, OnResponse, reinterpret_cast<void*>(static_cast<uintptr_t>(kind)), &handle);
+		if (result == D2RL::Http::Result::Unsupported) {
+			g_useWinHttp = true;
+			context->LogInfo("This D2RLoader version doesn't allow local HTTP requests. The plugin sends them through Windows (WinHTTP) instead.");
+		}
+	}
+
+	if (g_useWinHttp) {
+		LocalHttp::Send(
+		    { hasBody, url, authorization, body, RequestTimeoutMs, MaxStateBytes },
+		    [context, kind](LocalHttp::Response response) { HandleOutcome(context, kind, { response.result, response.statusCode, response.body }); });
+		result = D2RL::Http::Result::Success;
+	}
 
 	const std::lock_guard lock(g_mutex);
 	if (result != D2RL::Http::Result::Success) {
@@ -178,19 +212,17 @@ void EraseSentEventsLocked() {
 	}
 }
 
-void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Response* response, void* userData) noexcept {
+void HandleOutcome(const D2RL::PluginContext* context, RequestKind kind, const Outcome& outcome) {
 	try {
 		if (g_shuttingDown || context == nullptr) {
 			return;
 		}
-		const auto kind      = static_cast<RequestKind>(reinterpret_cast<uintptr_t>(userData));
-		const bool delivered = D2RL::Http::HasResponseField(response, D2RL::Http::ResponseRequiredSize) && response->result == D2RL::Http::Result::Success;
-		const auto status    = delivered ? response->statusCode : 0U;
+		const bool delivered = outcome.result == D2RL::Http::Result::Success;
+		const auto status    = delivered ? outcome.statusCode : 0U;
 
 		// Applied outside the lock: TrackerState has its own, and parsing a large table takes a moment
 		if (kind == RequestKind::State && status == 200) {
-			const std::string_view body(static_cast<const char*>(response->body), response->bodySize);
-			if (!TrackerState::Apply(body)) {
+			if (!TrackerState::Apply(outcome.body)) {
 				context->LogWarn("The tracker sent a state the plugin doesn't understand.");
 			}
 		}
@@ -223,7 +255,7 @@ void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Re
 							logWarn             = "D2R Arcane Tracker rejected the token. Connect the plugin again in the tracker's settings.";
 						}
 					} else {
-						DisconnectLocked("the tracker can't be reached: " + DescribeFailure(response));
+						DisconnectLocked("the tracker can't be reached: " + DescribeFailure(outcome));
 						if (!g_unreachableLogged) {
 							g_unreachableLogged = true;
 							logInfo             = "D2R Arcane Tracker can't be reached. The plugin keeps trying while it runs.";
@@ -237,14 +269,14 @@ void __cdecl OnResponse(const D2RL::PluginContext* context, const D2RL::Http::Re
 						// The tracker won't accept this batch however often it is sent
 						EraseSentEventsLocked();
 						logWarn = "D2R Arcane Tracker rejected some events.";
-					} else if (DisconnectLocked("sending events failed: " + DescribeFailure(response))) {
+					} else if (DisconnectLocked("sending events failed: " + DescribeFailure(outcome))) {
 						logInfo = "Lost the connection to D2R Arcane Tracker.";
 					}
 					break;
 				case RequestKind::State:
 					if (status == 200) {
 						g_nextStatePollAt = Clock::now() + StatePollInterval;
-					} else if (DisconnectLocked("reading the state failed: " + DescribeFailure(response))) {
+					} else if (DisconnectLocked("reading the state failed: " + DescribeFailure(outcome))) {
 						logInfo = "Lost the connection to D2R Arcane Tracker.";
 					}
 					break;
@@ -361,6 +393,7 @@ auto GetStatus() -> Status {
 
 void Shutdown(const D2RL::PluginContext* context) {
 	g_shuttingDown = true;
+	LocalHttp::Shutdown();
 	if (g_http == nullptr) {
 		return;
 	}
